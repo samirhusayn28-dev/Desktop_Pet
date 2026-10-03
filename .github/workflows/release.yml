@@ -11,7 +11,7 @@ permissions:
 jobs:
   build-mac:
     name: Build macOS Intel DMG (x64)
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,9 +26,7 @@ jobs:
         run: npm install
 
       - name: Build macOS Intel DMG
-        run: npx electron-builder --mac --x64
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --mac --x64 --publish never
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
@@ -54,9 +52,7 @@ jobs:
         run: npm install
 
       - name: Build Windows NSIS Installer
-        run: npx electron-builder --win --x64
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --x64 --publish never
 
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
