@@ -1,0 +1,102 @@
+{
+  "name": "desktop-pet",
+  "productName": "Desktop Pet",
+  "version": "1.0.0",
+  "description": "Desktop Pet – Minimal 3D Face-Bot Companion",
+  "main": "main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "preview": "electron scripts/capture_preview.js",
+    "preview:emotions": "electron facebot_preview.html",
+    "verify": "electron scripts/verify_real_desktop_pet.js",
+    "build:mac": "electron-builder --mac --x64",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux",
+    "dist": "electron-builder --mac --x64"
+  },
+  "build": {
+    "appId": "com.antigravity.desktoppet",
+    "productName": "Desktop Pet",
+    "mac": {
+      "icon": "assets/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "identity": null
+    },
+    "dmg": {
+      "title": "Desktop Pet",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "assets/**/*",
+      "audio/**/*",
+      "bubble-window/**/*",
+      "character/**/*",
+      "main/**/*",
+      "panel-window/**/*",
+      "pet-window/**/*",
+      "themes/**/*",
+      "node_modules/lucide/**/*",
+      "node_modules/systeminformation/**/*",
+      "package.json"
+    ]
+  },
+  "keywords": [
+    "desktop-pet",
+    "ai-companion",
+    "face-bot",
+    "tobi-emo",
+    "electron"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "lucide": "^1.16.0",
+    "systeminformation": "^5.33.15"
+  }
+}

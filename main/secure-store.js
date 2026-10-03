@@ -1,0 +1,270 @@
+/**
+ * Desktop Pet — Secure Storage Module
+ * Uses Electron's safeStorage API (macOS Keychain, Windows DPAPI) for sensitive data (API keys)
+ * and persisted JSON for general application preferences.
+ */
+
+const fs = require('fs');
+const path = require('path');
+const electron = require('electron');
+
+class SecureStore {
+  constructor() {
+    this.userDataPath = null;
+    try {
+      const app = electron.app || (electron.remote && electron.remote.app);
+      if (app && typeof app.getPath === 'function') {
+        this.userDataPath = app.getPath('userData');
+      }
+    } catch (e) {}
+
+    if (!this.userDataPath) {
+      const home = process.env.HOME || process.env.USERPROFILE || '.';
+      this.userDataPath = path.join(home, 'Library', 'Application Support', 'desktop-pet');
+    }
+
+    try {
+      if (!fs.existsSync(this.userDataPath)) {
+        fs.mkdirSync(this.userDataPath, { recursive: true });
+      }
+    } catch (e) {}
+
+    this.filePath = path.join(this.userDataPath, 'desktop-pet-data.json');
+    this.secureKeysPath = path.join(this.userDataPath, 'secure-credentials.json');
+
+    this.defaults = {
+      isFirstRun: true,
+      window: {
+        petX: 200,
+        petY: 200,
+        panelX: 250,
+        panelY: 250
+      },
+      settings: {
+        general: {
+          petName: 'Bolt',
+          launchAtLogin: false,
+          alwaysOnTop: true,
+          rememberPosition: true,
+          showPet: true
+        },
+        behavior: {
+          idleSleepyMinutes: 2,
+          idleSleepingMinutes: 5,
+          sounds: true,
+          dnd: false,
+          bubbleDuration: 5
+        },
+        reactions: {
+          brightness: true,
+          volume: true,
+          battery: true,
+          media: true,
+          highLoad: true,
+          network: true,
+          lateNight: true,
+          screenUnlock: true
+        },
+        appearance: {
+          scale: 1.0,
+          width: 136,
+          height: 120,
+          roundness: 36,
+          eyeSize: 1.0,
+          eyeSpacing: 44,
+          mouthWidth: 14,
+          depth: 80,
+          bodyColor: '#FFFFFF',
+          accentColor: '#FF7A2F',
+          panelTransparency: 0.30,
+          panelBlur: 24,
+          theme: 'default'
+        },
+        ai: {
+          activeProvider: 'gemini',
+          models: {
+            gemini: 'gemini-1.5-flash',
+            groq: 'llama-3.3-70b-versatile',
+            openai: 'gpt-4o-mini',
+            anthropic: 'claude-3-5-sonnet-20241022',
+            qwen: 'qwen-turbo',
+            deepseek: 'deepseek-chat',
+            openrouter: 'meta-llama/llama-3.3-70b-instruct',
+            ollama: 'llama3:latest',
+            custom: 'default'
+          },
+          baseUrls: {
+            groq: 'https://api.groq.com/openai/v1',
+            openai: 'https://api.openai.com/v1',
+            gemini: 'https://generativelanguage.googleapis.com',
+            anthropic: 'https://api.anthropic.com/v1',
+            ollama: 'http://localhost:11434',
+            custom: 'https://api.openai.com/v1'
+          }
+        },
+        privacy: {
+          contextAwareness: true,
+          allowScreenshots: false,
+          blocklist: [
+            '1password',
+            'bitwarden',
+            'lastpass',
+            'keychain',
+            'bank',
+            'chase',
+            'wellsfargo',
+            'paypal',
+            'login',
+            'signin',
+            'incognito',
+            'private browsing'
+          ]
+        }
+      },
+      todos: [
+        { id: '1', text: 'Plan next coding sprint', done: true },
+        { id: '2', text: 'Drink glass of water', done: true },
+        { id: '3', text: 'Refactor desktop pet companion', done: false }
+      ],
+      notes: [
+        { id: '1', title: 'Architecture Notes', content: 'Main process AI streaming with zero CORS.\nDedicated bubble window at screen-saver layer.\nSub-2% idle CPU.', pinned: true, updatedAt: new Date().toISOString() }
+      ],
+      reminders: [
+        { id: '1', title: 'Hydrate & drink water', time: '14:00', repeat: 'every-hour', enabled: true },
+        { id: '2', title: 'Stand up and stretch', time: '16:00', repeat: 'daily', enabled: true }
+      ],
+      clipboardHistory: [],
+      chatHistory: [
+        { role: 'assistant', content: "Hello! I'm your desktop coding companion. Ask me anything, or let me know what you're working on!", timestamp: Date.now() }
+      ]
+    };
+
+    this.data = this.loadData();
+  }
+
+  loadData() {
+    try {
+      if (fs.existsSync(this.filePath)) {
+        const fileContent = fs.readFileSync(this.filePath, 'utf8');
+        const parsed = JSON.parse(fileContent);
+        return this.deepMerge(this.defaults, parsed);
+      }
+    } catch (err) {
+      console.warn('Failed to load store, using defaults:', err);
+    }
+    return JSON.parse(JSON.stringify(this.defaults));
+  }
+
+  saveData() {
+    try {
+      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8');
+    } catch (err) {
+      console.error('Failed to save store:', err);
+    }
+  }
+
+  get(keyPath) {
+    const keys = keyPath.split('.');
+    let current = this.data;
+    for (const key of keys) {
+      if (current === undefined || current === null) return undefined;
+      current = current[key];
+    }
+    return current;
+  }
+
+  set(keyPath, value) {
+    const keys = keyPath.split('.');
+    let current = this.data;
+    for (let i = 0; i < keys.length - 1; i++) {
+      const key = keys[i];
+      if (!current[key] || typeof current[key] !== 'object') {
+        current[key] = {};
+      }
+      current = current[key];
+    }
+    current[keys[keys.length - 1]] = value;
+    this.saveData();
+  }
+
+  // Secure API Key Storage using safeStorage
+  getApiKey(provider) {
+    try {
+      if (!fs.existsSync(this.secureKeysPath)) return '';
+      const creds = JSON.parse(fs.readFileSync(this.secureKeysPath, 'utf8'));
+      const encryptedBase64 = creds[provider];
+      if (!encryptedBase64) return '';
+
+      const { safeStorage } = electron;
+      if (safeStorage && safeStorage.isEncryptionAvailable()) {
+        const buffer = Buffer.from(encryptedBase64, 'base64');
+        return safeStorage.decryptString(buffer);
+      } else {
+        // Fallback for environments without keychain (simple base64 decode)
+        return Buffer.from(encryptedBase64, 'base64').toString('utf8');
+      }
+    } catch (e) {
+      console.warn(`[SecureStore] Failed to decrypt key for ${provider}:`, e.message);
+      return '';
+    }
+  }
+
+  setApiKey(provider, plainKey) {
+    try {
+      let creds = {};
+      if (fs.existsSync(this.secureKeysPath)) {
+        try {
+          creds = JSON.parse(fs.readFileSync(this.secureKeysPath, 'utf8'));
+        } catch (e) {}
+      }
+
+      if (!plainKey) {
+        delete creds[provider];
+      } else {
+        const { safeStorage } = electron;
+        if (safeStorage && safeStorage.isEncryptionAvailable()) {
+          const encBuffer = safeStorage.encryptString(plainKey);
+          creds[provider] = encBuffer.toString('base64');
+        } else {
+          // Fallback simple base64 encode
+          creds[provider] = Buffer.from(plainKey, 'utf8').toString('base64');
+        }
+      }
+
+      fs.writeFileSync(this.secureKeysPath, JSON.stringify(creds, null, 2), 'utf8');
+      return true;
+    } catch (e) {
+      console.error(`[SecureStore] Failed to encrypt key for ${provider}:`, e);
+      return false;
+    }
+  }
+
+  hasApiKey(provider) {
+    const key = this.getApiKey(provider);
+    return Boolean(key && key.trim().length > 0);
+  }
+
+  deepMerge(target, source) {
+    const output = Object.assign({}, target);
+    if (this.isObject(target) && this.isObject(source)) {
+      Object.keys(source).forEach(key => {
+        if (this.isObject(source[key])) {
+          if (!(key in target)) {
+            Object.assign(output, { [key]: source[key] });
+          } else {
+            output[key] = this.deepMerge(target[key], source[key]);
+          }
+        } else {
+          Object.assign(output, { [key]: source[key] });
+        }
+      });
+    }
+    return output;
+  }
+
+  isObject(item) {
+    return (item && typeof item === 'object' && !Array.isArray(item));
+  }
+}
+
+module.exports = new SecureStore();

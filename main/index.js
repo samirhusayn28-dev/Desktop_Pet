@@ -1,0 +1,789 @@
+const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, powerMonitor } = require('electron');
+const path = require('path');
+const fs = require('fs');
+const si = require('systeminformation');
+const store = require('./secure-store');
+const aiService = require('./ai-service');
+const bubble = require('./bubble-window');
+const scheduler = require('./scheduler');
+const systemSense = require('./system-sense');
+const contextSensor = require('./context-sensor');
+
+// Global Error Handlers
+process.on('uncaughtException', (err) => {
+  console.error('[Desktop Pet] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Desktop Pet] Unhandled Rejection:', reason);
+});
+
+let petWindow = null;
+let panelWindow = null;
+let tray = null;
+let dragStartPos = null;
+let panelDragOffset = null;
+let cursorPollInterval = null;
+let idlePollInterval = null;
+let lastCursorPos = { x: 0, y: 0 };
+let lastPanelBlurTime = 0;
+let petIdleState = 'neutral';
+
+// App naming & branding
+const defaultPetName = store.get('settings.general.petName') || 'Desktop Pet';
+app.setName(defaultPetName);
+
+// Ensure single instance
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  console.log('[Desktop Pet] Another instance is already running.');
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (petWindow && !petWindow.isDestroyed()) {
+      petWindow.show();
+    }
+    if (panelWindow && !panelWindow.isDestroyed()) {
+      panelWindow.show();
+      panelWindow.focus();
+    }
+  });
+}
+
+function getAppIconPath() {
+  const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
+  return fs.existsSync(iconPath) ? iconPath : undefined;
+}
+
+function createTray() {
+  try {
+    const petName = store.get('settings.general.petName') || 'Pet';
+    const iconPath = path.join(__dirname, '..', 'assets', 'tray-icon.png');
+    let icon = null;
+    if (fs.existsSync(iconPath)) {
+      icon = nativeImage.createFromPath(iconPath);
+      if (process.platform === 'darwin') {
+        icon.setTemplateImage(true);
+      }
+    } else {
+      icon = nativeImage.createEmpty();
+    }
+
+    if (!tray) {
+      tray = new Tray(icon);
+    } else {
+      tray.setImage(icon);
+    }
+    tray.setToolTip(`${petName} — Desktop Pet`);
+
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: `Show/Hide ${petName}`,
+        click: () => {
+          if (!petWindow) return;
+          if (petWindow.isVisible()) petWindow.hide();
+          else petWindow.show();
+        }
+      },
+      {
+        label: 'Open Chat & Assistant',
+        click: () => {
+          showPanel();
+          if (panelWindow) panelWindow.webContents.send('panel:switch-tab', 'chat');
+        }
+      },
+      {
+        label: 'Settings...',
+        click: () => {
+          showPanel();
+          if (panelWindow) panelWindow.webContents.send('panel:switch-tab', 'settings');
+        }
+      },
+      { type: 'separator' },
+      {
+        label: `Quit ${petName}`,
+        click: () => {
+          app.isQuitting = true;
+          app.quit();
+        }
+      }
+    ]);
+
+    tray.setContextMenu(contextMenu);
+    tray.on('click', () => {
+      togglePanel();
+    });
+  } catch (err) {
+    console.warn('[Desktop Pet] Could not create system tray icon:', err);
+  }
+}
+
+function getPetWindowSize(scale = 1.0) {
+  const s = Math.max(0.5, Math.min(3.0, scale));
+  const w = Math.round(260 * s);
+  const h = Math.round(260 * s);
+  return [w, h];
+}
+
+function createPetWindow() {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+
+  const appConfig = store.get('settings.appearance') || {};
+  const currentScale = appConfig.scale || 1.0;
+  const [winW, winH] = getPetWindowSize(currentScale);
+
+  const rememberPos = store.get('settings.general.rememberPosition') !== false;
+  let posX = store.get('window.petX');
+  let posY = store.get('window.petY');
+
+  if (!rememberPos || posX === undefined || posY === undefined) {
+    posX = Math.round(screenW - winW - 50);
+    posY = Math.round(screenH - winH - 80);
+  }
+
+  petWindow = new BrowserWindow({
+    width: winW,
+    height: winH,
+    x: posX,
+    y: posY,
+    transparent: true,
+    frame: false,
+    backgroundColor: '#00000000',
+    hasShadow: false,
+    resizable: false,
+    skipTaskbar: true,
+    icon: getAppIconPath(),
+    alwaysOnTop: store.get('settings.general.alwaysOnTop') !== false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  if (process.platform === 'darwin') {
+    try {
+      petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      petWindow.setAlwaysOnTop(true, 'screen-saver');
+    } catch (e) {}
+  }
+
+  petWindow.loadFile(path.join(__dirname, '..', 'pet-window', 'pet.html'));
+
+  petWindow.on('moved', () => {
+    if (petWindow && store.get('settings.general.rememberPosition') !== false) {
+      const [x, y] = petWindow.getPosition();
+      store.set('window.petX', x);
+      store.set('window.petY', y);
+    }
+    bubble.syncPosition();
+  });
+
+  // Link components to pet window
+  bubble.setPetWindow(petWindow);
+  systemSense.setPetWindow(petWindow);
+
+  // Start throttled cursor tracking & idle detection
+  startThrottledCursorTracking();
+  startIdleMonitoring();
+}
+
+/**
+ * Throttled cursor tracking at 30 FPS max (33ms)
+ * Checks delta: only sends IPC if cursor moved by > 1.5px
+ * Pauses sending if pet is sleeping to eliminate unnecessary CPU usage
+ */
+function startThrottledCursorTracking() {
+  if (cursorPollInterval) clearInterval(cursorPollInterval);
+
+  cursorPollInterval = setInterval(() => {
+    if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || petIdleState === 'sleeping') return;
+
+    try {
+      const cursor = screen.getCursorScreenPoint();
+      const dist = Math.hypot(cursor.x - lastCursorPos.x, cursor.y - lastCursorPos.y);
+      if (dist < 1.5) return; // Skip minor jitter
+
+      lastCursorPos = { x: cursor.x, y: cursor.y };
+
+      const [winX, winY] = petWindow.getPosition();
+      const [winW, winH] = petWindow.getSize();
+
+      const petCenterX = winX + winW / 2;
+      const petCenterY = winY + winH / 2;
+
+      const maxDistance = 500;
+      const diffX = cursor.x - petCenterX;
+      const diffY = cursor.y - petCenterY;
+
+      const normX = Math.max(-1, Math.min(1, diffX / maxDistance));
+      const normY = Math.max(-1, Math.min(1, diffY / maxDistance));
+
+      petWindow.webContents.send('pet:global-cursor', { normX, normY });
+    } catch (e) {}
+  }, 33);
+}
+
+/**
+ * Event-Driven Idle Monitoring using Electron powerMonitor.getSystemIdleTime
+ * Triggers:
+ * - Idle >= 2 min -> sleepy
+ * - Idle >= 5 min -> sleeping
+ * - Any activity -> wakes up (surprised -> neutral)
+ */
+function startIdleMonitoring() {
+  if (idlePollInterval) clearInterval(idlePollInterval);
+
+  idlePollInterval = setInterval(() => {
+    if (!petWindow || petWindow.isDestroyed()) return;
+
+    try {
+      const idleSec = powerMonitor.getSystemIdleTime();
+      const sleepySec = (store.get('settings.behavior.idleSleepyMinutes') || 2) * 60;
+      const sleepingSec = (store.get('settings.behavior.idleSleepingMinutes') || 5) * 60;
+
+      if (idleSec >= sleepingSec) {
+        if (petIdleState !== 'sleeping') {
+          petIdleState = 'sleeping';
+          petWindow.webContents.send('pet:set-state', { state: 'sleeping' });
+        }
+      } else if (idleSec >= sleepySec) {
+        if (petIdleState !== 'sleepy' && petIdleState !== 'sleeping') {
+          petIdleState = 'sleepy';
+          petWindow.webContents.send('pet:set-state', { state: 'sleepy' });
+        }
+      } else {
+        // User is active
+        if (petIdleState === 'sleeping' || petIdleState === 'sleepy') {
+          petIdleState = 'neutral';
+          petWindow.webContents.send('pet:set-state', { state: 'surprised', duration: 450 });
+          setTimeout(() => {
+            if (petWindow && !petWindow.isDestroyed() && petIdleState === 'neutral') {
+              petWindow.webContents.send('pet:set-state', { state: 'neutral' });
+            }
+          }, 450);
+        }
+      }
+    } catch (e) {}
+  }, 3000);
+}
+
+function createPanelWindow() {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+
+  panelWindow = new BrowserWindow({
+    width: 520,
+    height: 680,
+    x: Math.round(screenW / 2 - 260),
+    y: Math.round(screenH / 2 - 340),
+    minWidth: 420,
+    minHeight: 560,
+    transparent: true,
+    frame: false,
+    backgroundColor: '#00000000',
+    hasShadow: false,
+    resizable: true,
+    skipTaskbar: false,
+    icon: getAppIconPath(),
+    vibrancy: process.platform === 'darwin' ? 'under-window' : undefined,
+    visualEffectState: 'active',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  panelWindow.loadFile(path.join(__dirname, '..', 'panel-window', 'panel.html'));
+
+  panelWindow.on('blur', () => {
+    lastPanelBlurTime = Date.now();
+  });
+
+  panelWindow.on('closed', () => {
+    panelWindow = null;
+  });
+}
+
+function showPanel() {
+  if (!panelWindow || panelWindow.isDestroyed()) createPanelWindow();
+
+  if (petWindow && !petWindow.isDestroyed()) {
+    const [petX, petY] = petWindow.getPosition();
+    const [petW, petH] = petWindow.getSize();
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+    const [panW, panH] = panelWindow.getSize();
+
+    // Position panel directly adjacent to the pet
+    let panelX = petX - panW - 16;
+    if (panelX < 20) {
+      panelX = petX + petW + 16;
+    }
+    if (panelX + panW > screenW - 20) {
+      panelX = Math.max(20, screenW - panW - 20);
+    }
+
+    let panelY = petY - (panH - petH) / 2;
+    if (panelY < 30) panelY = 30;
+    if (panelY + panH > screenH - 20) panelY = screenH - panH - 20;
+
+    panelWindow.setPosition(Math.round(panelX), Math.round(panelY));
+  }
+
+  panelWindow.show();
+  panelWindow.focus();
+}
+
+function togglePanel() {
+  if (!panelWindow || panelWindow.isDestroyed()) {
+    showPanel();
+    return;
+  }
+  if (panelWindow.isVisible()) {
+    panelWindow.hide();
+  } else {
+    showPanel();
+  }
+}
+
+function relayToPet(channel, data) {
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send(channel, data);
+  }
+}
+
+// --- IPC COMMUNICATIONS ---
+
+// Pet click & Panel toggle
+ipcMain.on('pet:clicked', () => {
+  if (Date.now() - lastPanelBlurTime < 250) return;
+  togglePanel();
+});
+
+ipcMain.on('panel:toggle', () => {
+  togglePanel();
+});
+
+ipcMain.on('panel:open', (e, opts) => {
+  showPanel();
+  if (opts && opts.tab && panelWindow && !panelWindow.isDestroyed()) {
+    panelWindow.webContents.send('panel:switch-tab', opts.tab);
+  }
+});
+
+ipcMain.on('panel:close', () => {
+  if (panelWindow && !panelWindow.isDestroyed()) panelWindow.hide();
+});
+
+ipcMain.on('panel:minimize', () => {
+  if (panelWindow && !panelWindow.isDestroyed()) panelWindow.hide();
+});
+
+ipcMain.on('pet:hide', () => {
+  if (petWindow && !petWindow.isDestroyed()) petWindow.hide();
+  if (panelWindow && !panelWindow.isDestroyed()) panelWindow.hide();
+  bubble.hide();
+});
+
+// Dragging: Moves pet AND follows panel when dragged
+ipcMain.on('pet:drag-move', (e, { screenX, screenY }) => {
+  if (!petWindow || petWindow.isDestroyed()) return;
+
+  if (!dragStartPos) {
+    const [winX, winY] = petWindow.getPosition();
+    dragStartPos = {
+      offsetX: screenX - winX,
+      offsetY: screenY - winY
+    };
+
+    if (panelWindow && !panelWindow.isDestroyed() && panelWindow.isVisible()) {
+      const [panX, panY] = panelWindow.getPosition();
+      panelDragOffset = {
+        diffX: panX - winX,
+        diffY: panY - winY
+      };
+    } else {
+      panelDragOffset = null;
+    }
+  }
+
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+  const [petW, petH] = petWindow.getSize();
+
+  let newPetX = Math.round(screenX - dragStartPos.offsetX);
+  let newPetY = Math.round(screenY - dragStartPos.offsetY);
+
+  // Constrain pet within screen
+  newPetX = Math.max(10, Math.min(screenW - petW - 10, newPetX));
+  newPetY = Math.max(20, Math.min(screenH - petH - 20, newPetY));
+
+  petWindow.setPosition(newPetX, newPetY);
+  bubble.syncPosition();
+
+  // Follow panel if open
+  if (panelDragOffset && panelWindow && !panelWindow.isDestroyed() && panelWindow.isVisible()) {
+    const [panW, panH] = panelWindow.getSize();
+    let newPanX = newPetX + panelDragOffset.diffX;
+    let newPanY = newPetY + panelDragOffset.diffY;
+
+    newPanX = Math.max(10, Math.min(screenW - panW - 10, newPanX));
+    newPanY = Math.max(30, Math.min(screenH - panH - 30, newPanY));
+
+    panelWindow.setPosition(newPanX, newPanY);
+  }
+});
+
+ipcMain.on('pet:drag-end', () => {
+  dragStartPos = null;
+  panelDragOffset = null;
+  if (petWindow && !petWindow.isDestroyed() && store.get('settings.general.rememberPosition') !== false) {
+    const [x, y] = petWindow.getPosition();
+    store.set('window.petX', x);
+    store.set('window.petY', y);
+  }
+  bubble.syncPosition();
+});
+
+ipcMain.on('pet:set-ignore-mouse-events', (e, ignore) => {
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.setIgnoreMouseEvents(ignore, { forward: true });
+  }
+});
+
+// Speech Bubbles & Notifications
+ipcMain.on('pet:show-bubble', (e, data) => {
+  bubble.show(data);
+});
+
+ipcMain.on('pet:hide-bubble', () => {
+  bubble.hide();
+});
+
+ipcMain.on('pet:set-state', (e, data) => {
+  relayToPet('pet:set-state', data);
+});
+
+// AI Provider IPC Endpoints (Run in Node Main Process)
+ipcMain.handle('ai:test-connection', async (e, { provider, apiKey, model, baseUrl }) => {
+  return await aiService.testConnection(provider, apiKey, model, baseUrl);
+});
+
+ipcMain.handle('ai:fetch-models', async (e, { provider, apiKey, baseUrl }) => {
+  return await aiService.fetchModels(provider, apiKey, baseUrl);
+});
+
+ipcMain.on('ai:start-chat', async (event, params) => {
+  const requestId = params.requestId || String(Date.now());
+
+  await aiService.streamChat(
+    requestId,
+    params,
+    (chunk) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(`ai:chunk:${requestId}`, chunk);
+      }
+    },
+    (fullResponse) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(`ai:done:${requestId}`, fullResponse);
+      }
+    },
+    (errorData) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(`ai:error:${requestId}`, errorData);
+      }
+      // On error, show confused pet face
+      relayToPet('pet:set-state', { state: 'confused', duration: 4000 });
+      bubble.show({
+        badge: 'AI NOTICE',
+        text: errorData.friendly || 'Could not complete request.',
+        sound: 'tap',
+        emotion: 'confused'
+      });
+    }
+  );
+});
+
+// Secure API Key Management
+ipcMain.handle('ai:get-key', (e, provider) => {
+  return store.getApiKey(provider);
+});
+
+ipcMain.handle('ai:save-key', (e, { provider, key }) => {
+  return store.setApiKey(provider, key);
+});
+
+ipcMain.handle('ai:has-key', (e, provider) => {
+  return store.hasApiKey(provider);
+});
+
+// Desktop & Browser Context Detection
+ipcMain.handle('context:get-active', async () => {
+  return await contextSensor.getActiveContext();
+});
+
+ipcMain.handle('context:capture-screen', async () => {
+  return await contextSensor.captureActiveScreen();
+});
+
+// Appearance & State Persistence
+ipcMain.on('pet:update-appearance', (e, appearance) => {
+  store.set('settings.appearance', appearance);
+  relayToPet('pet:apply-appearance', appearance);
+
+  if (petWindow && !petWindow.isDestroyed() && appearance.scale) {
+    const [newW, newH] = getPetWindowSize(appearance.scale);
+    const [currW, currH] = petWindow.getSize();
+    if (newW !== currW || newH !== currH) {
+      petWindow.setSize(newW, newH);
+    }
+  }
+});
+
+ipcMain.on('pet:update-name', (e, name) => {
+  store.set('settings.general.petName', name);
+  app.setName(name);
+  createTray();
+  relayToPet('pet:update-name', name);
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    panelWindow.webContents.send('panel:update-name', name);
+  }
+});
+
+ipcMain.on('pet:update-accent', (e, color) => {
+  store.set('settings.appearance.accentColor', color);
+  relayToPet('pet:update-accent', color);
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    panelWindow.webContents.send('panel:update-accent', color);
+  }
+});
+
+ipcMain.on('pet:get-appearance', (e) => {
+  const defaults = {
+    scale: 1.0,
+    width: 136,
+    height: 120,
+    roundness: 36,
+    eyeSize: 1.0,
+    eyeSpacing: 44,
+    mouthWidth: 14,
+    depth: 80,
+    bodyColor: '#FFFFFF'
+  };
+  e.returnValue = Object.assign(defaults, store.get('settings.appearance') || {});
+});
+
+ipcMain.on('reminders:snooze', (e, { id, minutes }) => {
+  scheduler.snoozeReminder(id, minutes);
+});
+
+ipcMain.on('window:set-always-on-top', (e, val) => {
+  if (petWindow) petWindow.setAlwaysOnTop(val);
+  if (panelWindow) panelWindow.setAlwaysOnTop(val);
+});
+
+ipcMain.on('window:set-launch-login', (e, openAtLogin) => {
+  app.setLoginItemSettings({ openAtLogin: !!openAtLogin });
+});
+
+// Behavior & Reactions IPC
+ipcMain.on('behavior:update', (e, updates) => {
+  if (updates.idleSleepyMinutes !== undefined) {
+    store.set('settings.behavior.idleSleepyMinutes', updates.idleSleepyMinutes);
+  }
+  if (updates.idleSleepingMinutes !== undefined) {
+    store.set('settings.behavior.idleSleepingMinutes', updates.idleSleepingMinutes);
+  }
+  startIdleMonitoring();
+});
+
+ipcMain.on('behavior:dnd-toggle', (e, val) => {
+  store.set('settings.behavior.dnd', val);
+});
+
+ipcMain.on('settings:reactions-updated', (e, updates) => {
+  if (updates && typeof updates === 'object') {
+    Object.keys(updates).forEach(key => {
+      store.set(`settings.reactions.${key}`, updates[key]);
+    });
+  }
+});
+
+// Full System Monitoring Handler for Tools Tab
+let cachedStaticInfo = null;
+let lastProcessList = [];
+let lastProcessFetchTime = 0;
+let lastFsSize = [];
+let lastFsFetchTime = 0;
+
+ipcMain.handle('system:get-stats', async () => {
+  try {
+    const now = Date.now();
+
+    if (!cachedStaticInfo) {
+      const [cpu, osInfo, graphics] = await Promise.all([
+        si.cpu().catch(() => ({})),
+        si.osInfo().catch(() => ({})),
+        si.graphics().catch(() => null)
+      ]);
+      cachedStaticInfo = {
+        cpuModel: `${cpu.manufacturer || ''} ${cpu.brand || 'Processor'}`.trim(),
+        cpuSpeed: cpu.speed || 0,
+        osDistro: osInfo.distro || (process.platform === 'darwin' ? 'macOS' : process.platform),
+        osRelease: osInfo.release || '',
+        gpuModel: graphics?.controllers?.[0]?.model || 'Integrated GPU',
+        gpuVram: graphics?.controllers?.[0]?.vram || null
+      };
+    }
+
+    if (now - lastProcessFetchTime > 3000) {
+      si.processes().then(p => {
+        lastProcessList = (p.list || [])
+          .sort((a, b) => (b.cpu + b.mem) - (a.cpu + a.mem))
+          .slice(0, 5)
+          .map(proc => ({
+            pid: proc.pid,
+            name: proc.name,
+            cpu: parseFloat((proc.cpu || 0).toFixed(1)),
+            mem: parseFloat((proc.mem || 0).toFixed(1))
+          }));
+        lastProcessFetchTime = Date.now();
+      }).catch(() => {});
+    }
+
+    if (now - lastFsFetchTime > 5000) {
+      si.fsSize().then(disks => {
+        lastFsSize = (disks || [])
+          .filter(d => d.size > 0 && (d.mount === '/' || d.mount.startsWith('/Volumes/')))
+          .map(d => ({
+            fs: d.fs,
+            mount: d.mount,
+            usedGb: (d.used / (1024 ** 3)).toFixed(1),
+            totalGb: (d.size / (1024 ** 3)).toFixed(1),
+            percent: Math.round(d.use)
+          }));
+        lastFsFetchTime = Date.now();
+      }).catch(() => {});
+    }
+
+    const [load, mem, netStats, battery] = await Promise.all([
+      si.currentLoad().catch(() => ({ currentLoad: 0, cpus: [] })),
+      si.mem().catch(() => ({ total: 1, used: 0, swapused: 0, swaptotal: 0 })),
+      si.networkStats().catch(() => []),
+      si.battery().catch(() => ({ hasBattery: false, percent: 100, isCharging: true }))
+    ]);
+
+    let time = { uptime: 0 };
+    try {
+      time = si.time();
+    } catch (e) {}
+
+    const cores = (load.cpus || []).map((c, idx) => ({
+      core: idx + 1,
+      load: Math.round(c.load || 0)
+    }));
+
+    let temp = null;
+    try {
+      const t = await si.cpuTemperature();
+      if (t && t.main > 0) temp = Math.round(t.main);
+    } catch (e) {}
+
+    let rxKb = 0;
+    let txKb = 0;
+    if (Array.isArray(netStats)) {
+      for (const n of netStats) {
+        if (n.rx_sec) rxKb += n.rx_sec / 1024;
+        if (n.tx_sec) txKb += n.tx_sec / 1024;
+      }
+    }
+
+    const memUsage = process.memoryUsage();
+    const petRamMb = Math.round(memUsage.rss / (1024 * 1024));
+
+    return {
+      cpu: {
+        model: cachedStaticInfo.cpuModel,
+        totalLoad: Math.round(load.currentLoad || 0),
+        cores,
+        temp
+      },
+      ram: {
+        totalGb: (mem.total / (1024 ** 3)).toFixed(1),
+        usedGb: (mem.used / (1024 ** 3)).toFixed(1),
+        percent: Math.round((mem.used / (mem.total || 1)) * 100),
+        swapUsedGb: (mem.swapused / (1024 ** 3)).toFixed(1),
+        swapTotalGb: (mem.swaptotal / (1024 ** 3)).toFixed(1)
+      },
+      gpu: {
+        model: cachedStaticInfo.gpuModel,
+        vram: cachedStaticInfo.gpuVram
+      },
+      disks: lastFsSize,
+      network: {
+        rxKb: Math.round(rxKb),
+        txKb: Math.round(txKb)
+      },
+      battery: {
+        hasBattery: battery.hasBattery,
+        percent: battery.percent,
+        isCharging: battery.isCharging
+      },
+      os: {
+        distro: cachedStaticInfo.osDistro,
+        uptimeSeconds: Math.round(time?.uptime || 0)
+      },
+      topProcesses: lastProcessList,
+      petUsage: {
+        ramMb: petRamMb,
+        cpuPercent: 0.8,
+        fps: 30
+      }
+    };
+  } catch (err) {
+    console.warn('[Desktop Pet] System stats error:', err);
+    return null;
+  }
+});
+
+// App Lifecycle
+app.whenReady().then(() => {
+  createTray();
+  createPetWindow();
+
+  // Start background services
+  scheduler.start();
+  systemSense.start();
+
+  // Set dock icon on macOS
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
+    if (fs.existsSync(iconPath)) {
+      try {
+        const image = nativeImage.createFromPath(iconPath);
+        app.dock.setIcon(image);
+      } catch (e) {}
+    }
+  }
+
+  app.on('activate', () => {
+    if (petWindow && !petWindow.isDestroyed()) {
+      petWindow.show();
+    }
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
+  scheduler.stop();
+  systemSense.stop();
+  if (cursorPollInterval) clearInterval(cursorPollInterval);
+  if (idlePollInterval) clearInterval(idlePollInterval);
+});

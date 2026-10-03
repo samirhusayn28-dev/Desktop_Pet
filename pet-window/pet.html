@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Desktop Pet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../themes/themes.css">
+  <link rel="stylesheet" href="../character/pet.css">
+  <link rel="stylesheet" href="pet.css">
+</head>
+<body>
+  <div id="pet-root-container" class="pet-app-container">
+    <!-- Floating Speech Bubble -->
+    <div id="speech-bubble" class="speech-bubble hidden">
+      <div id="bubble-text" class="bubble-text">Need help? I'm here!</div>
+      <div class="bubble-arrow"></div>
+    </div>
+
+    <!-- The Layered Pet Container -->
+    <div id="pet-viewport" class="pet-viewport">
+      <!-- Pet SVG dynamically rendered by pet-controller.js -->
+    </div>
+
+    <!-- Quick Context Menu on Right Click -->
+    <div id="quick-menu" class="quick-menu hidden">
+      <div class="menu-item" data-action="panel"><i data-lucide="message-square"></i> Open Chat & Assistant</div>
+      <div class="menu-item" data-action="state-happy"><i data-lucide="sparkles"></i> Make Happy</div>
+      <div class="menu-item" data-action="state-focus"><i data-lucide="headphones"></i> Coding Focus Mode</div>
+      <div class="menu-item" data-action="state-sleep"><i data-lucide="moon"></i> Sleep</div>
+      <div class="menu-separator"></div>
+      <div class="menu-item" data-action="settings"><i data-lucide="settings"></i> Settings</div>
+      <div class="menu-item text-danger" data-action="hide"><i data-lucide="eye-off"></i> Hide Pet</div>
+    </div>
+  </div>
+
+  <script src="../node_modules/lucide/dist/umd/lucide.js"></script>
+  <script src="../themes/theme-manager.js"></script>
+  <script src="../character/pet.js"></script>
+  <script src="../audio/sound-effects.js"></script>
+  <script src="pet-controller.js"></script>
+</body>
+</html>

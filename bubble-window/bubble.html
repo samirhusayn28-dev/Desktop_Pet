@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Desktop Pet Bubble</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      background: transparent !important;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      user-select: none;
+      pointer-events: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .bubble-stage {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-bottom: 12px;
+      pointer-events: none;
+    }
+
+    .glass-bubble {
+      position: relative;
+      background: rgba(20, 20, 24, 0.72);
+      backdrop-filter: blur(24px) saturate(150%);
+      -webkit-backdrop-filter: blur(24px) saturate(150%);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 18px;
+      padding: 10px 16px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+      max-width: 280px;
+      text-align: center;
+      pointer-events: auto;
+      opacity: 0;
+      transform: translateY(12px) scale(0.92);
+      transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .glass-bubble.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .bubble-text-content {
+      font-size: 13px;
+      font-weight: 500;
+      color: #FFFFFF;
+      letter-spacing: -0.1px;
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-break: break-word;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+    }
+
+    .bubble-badge {
+      display: inline-block;
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--accent, #FF7A2F);
+      margin-bottom: 3px;
+    }
+
+    .bubble-tail {
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%) rotate(45deg);
+      width: 12px;
+      height: 12px;
+      background: rgba(20, 20, 24, 0.75);
+      border-right: 1px solid rgba(255, 255, 255, 0.15);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    }
+  </style>
+</head>
+<body>
+  <div class="bubble-stage">
+    <div class="glass-bubble" id="glass-bubble">
+      <div class="bubble-badge" id="bubble-badge" style="display: none;"></div>
+      <div class="bubble-text-content" id="bubble-text">...</div>
+      <div class="bubble-tail"></div>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    const bubbleEl = document.getElementById('glass-bubble');
+    const textEl = document.getElementById('bubble-text');
+    const badgeEl = document.getElementById('bubble-badge');
+
+    let currentTimeout = null;
+
+    ipcRenderer.on('bubble:display', (e, { text, badge, duration = 5000, accentColor = '#FF7A2F' }) => {
+      if (currentTimeout) clearTimeout(currentTimeout);
+
+      document.documentElement.style.setProperty('--accent', accentColor);
+      textEl.textContent = text;
+
+      if (badge) {
+        badgeEl.textContent = badge;
+        badgeEl.style.display = 'block';
+      } else {
+        badgeEl.style.display = 'none';
+      }
+
+      bubbleEl.classList.add('visible');
+
+      // Forward mouse events when bubble is hovered
+      ipcRenderer.send('bubble:set-ignore-mouse', false);
+
+      currentTimeout = setTimeout(() => {
+        bubbleEl.classList.remove('visible');
+        ipcRenderer.send('bubble:set-ignore-mouse', true);
+        setTimeout(() => {
+          ipcRenderer.send('bubble:dismissed');
+        }, 300);
+      }, duration);
+    });
+
+    bubbleEl.addEventListener('mouseenter', () => {
+      if (currentTimeout) {
+        clearTimeout(currentTimeout);
+        currentTimeout = null;
+      }
+      ipcRenderer.send('bubble:set-ignore-mouse', false);
+    });
+
+    bubbleEl.addEventListener('mouseleave', () => {
+      ipcRenderer.send('bubble:set-ignore-mouse', true);
+      currentTimeout = setTimeout(() => {
+        bubbleEl.classList.remove('visible');
+        setTimeout(() => {
+          ipcRenderer.send('bubble:dismissed');
+        }, 300);
+      }, 2000);
+    });
+
+    ipcRenderer.on('bubble:hide', () => {
+      if (currentTimeout) clearTimeout(currentTimeout);
+      bubbleEl.classList.remove('visible');
+      ipcRenderer.send('bubble:set-ignore-mouse', true);
+      setTimeout(() => {
+        ipcRenderer.send('bubble:dismissed');
+      }, 300);
+    });
+  </script>
+</body>
+</html>

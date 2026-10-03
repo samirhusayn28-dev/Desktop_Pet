@@ -1,0 +1,124 @@
+/**
+ * Desktop Pet — Floating Window Styling with 3D Perspective & Unclipped Padding
+ * Real glassmorphic translucent speech bubbles and popups.
+ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background: transparent !important;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  user-select: none;
+  font-family: var(--font-sans);
+  pointer-events: none; /* Clicks outside pet pass through to desktop */
+}
+
+.pet-app-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  perspective: 700px;
+  overflow: visible;
+}
+
+/* Pet Viewport & Interactive 3D Surface */
+.pet-viewport {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  pointer-events: auto;
+  transform-style: preserve-3d;
+  will-change: transform;
+  overflow: visible;
+}
+
+.pet-viewport:active {
+  cursor: grabbing;
+}
+
+/* Dangling Pose during mouse drag */
+.pet-viewport.dangling {
+  animation: petDangle 0.5s ease-in-out infinite alternate;
+  transform: scale(0.96) translateY(-4px);
+}
+
+@keyframes petDangle {
+  0% { transform: rotate(-5deg) translateY(-4px); }
+  100% { transform: rotate(5deg) translateY(-4px); }
+}
+
+/* Drop Bounce */
+.pet-viewport.bounce-drop {
+  animation: petDropBounce 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes petDropBounce {
+  0% { transform: scale(1.12, 0.88) translateY(6px); }
+  45% { transform: scale(0.94, 1.06) translateY(-8px); }
+  75% { transform: scale(1.03, 0.97) translateY(2px); }
+  100% { transform: scale(1, 1) translateY(0); }
+}
+
+/* Context Menu */
+.quick-menu {
+  position: absolute;
+  top: 40px;
+  left: 20px;
+  background: rgba(22, 22, 26, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 190px;
+  pointer-events: auto;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.quick-menu.hidden {
+  display: none;
+}
+
+.menu-item {
+  font-size: 12px;
+  font-weight: 600;
+  color: #D3D5E4;
+  padding: 7px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-item:hover {
+  background: var(--accent-soft, rgba(255, 122, 47, 0.15));
+  color: #FFFFFF;
+}
+
+.menu-item.text-danger:hover {
+  background: rgba(245, 80, 54, 0.2);
+  color: #FF705A;
+}
+
+.menu-separator {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 2px;
+}

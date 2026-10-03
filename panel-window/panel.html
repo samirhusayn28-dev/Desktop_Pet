@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Desktop Pet</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="../themes/themes.css">
+  <link rel="stylesheet" href="../character/pet.css">
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <!-- First-Run Welcome Modal (Clean Onboarding) -->
+  <div class="first-run-overlay hidden" id="first-run-modal">
+    <div class="first-run-card">
+      <div class="first-run-icon">
+        <div id="first-run-pet-avatar"></div>
+      </div>
+      <h2 class="first-run-title">Welcome to Desktop Pet!</h2>
+      <p class="first-run-subtitle">Your personal AI pair programmer & desktop companion with live system awareness and real glassmorphism.</p>
+
+      <div class="first-run-form">
+        <div class="setting-item">
+          <label class="setting-label">Name your companion</label>
+          <input type="text" id="onboarding-pet-name" class="terminal-input full-width" value="Bolt" maxlength="20">
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label">Choose AI Provider</label>
+          <select id="onboarding-provider" class="terminal-select full-width">
+            <option value="gemini" selected>Google Gemini (Recommended - Free Tier)</option>
+            <option value="groq">Groq Cloud (Ultra Fast Llama 3.3)</option>
+            <option value="openai">OpenAI (GPT-4o Mini / GPT-4o)</option>
+            <option value="anthropic">Claude (Anthropic 3.5 Sonnet)</option>
+            <option value="ollama">Ollama (Local Private LLM)</option>
+          </select>
+        </div>
+
+        <div class="setting-item" id="onboarding-key-row">
+          <label class="setting-label">API Key (Optional for now)</label>
+          <input type="password" id="onboarding-api-key" class="terminal-input full-width" placeholder="Enter API key or configure later in Settings">
+        </div>
+
+        <button class="theme-btn-primary full-width" id="btn-start-companion">
+          <i data-lucide="sparkles"></i>
+          <span>Start Pair Programming</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-window-shell" id="panel-shell">
+    <!-- 1. Header & Titlebar -->
+    <header class="panel-header">
+      <div class="panel-brand">
+        <!-- Live Mini Pet Face Avatar -->
+        <div class="header-pet-face" id="header-pet-face">
+          <!-- Dynamically filled with mini Pet SVG -->
+        </div>
+        <h1 class="panel-title" id="panel-title-text">Bolt</h1>
+        <span class="provider-pill-badge" id="header-provider-badge">GEMINI</span>
+      </div>
+
+      <div class="panel-window-controls">
+        <button class="win-btn settings-gear-btn" id="btn-header-settings" title="Settings">
+          <i data-lucide="settings"></i>
+        </button>
+        <button class="win-btn win-min-btn" id="btn-win-min" title="Minimize / Hide">
+          <i data-lucide="minus"></i>
+        </button>
+        <button class="win-btn win-close-btn" id="btn-win-close" title="Close Panel">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- 2. Glassmorphic Tab Bar -->
+    <nav class="panel-tabs">
+      <button class="tab-btn active" data-tab="chat" id="tab-btn-chat">
+        <i data-lucide="message-square"></i>
+        <span class="tab-label">Chat</span>
+      </button>
+      <button class="tab-btn" data-tab="todo" id="tab-btn-todo">
+        <i data-lucide="check-square"></i>
+        <span class="tab-label">To-Do</span>
+      </button>
+      <button class="tab-btn" data-tab="timer" id="tab-btn-timer">
+        <i data-lucide="timer"></i>
+        <span class="tab-label">Timer</span>
+      </button>
+      <button class="tab-btn" data-tab="notes" id="tab-btn-notes">
+        <i data-lucide="file-text"></i>
+        <span class="tab-label">Notes</span>
+      </button>
+      <button class="tab-btn" data-tab="reminders" id="tab-btn-reminders">
+        <i data-lucide="bell"></i>
+        <span class="tab-label">Reminders</span>
+      </button>
+      <button class="tab-btn" data-tab="tools" id="tab-btn-tools">
+        <i data-lucide="wrench"></i>
+        <span class="tab-label">Tools</span>
+      </button>
+    </nav>
+
+    <!-- 3. Scrollable Tab Contents -->
+    <main class="panel-main-content">
+      <!-- 1. CHAT TAB -->
+      <section class="tab-pane active" id="pane-chat">
+        <div class="chat-pane-layout">
+          <!-- Glass Card Chat Container -->
+          <div class="chat-glass-card">
+            <!-- Chat Card Header -->
+            <div class="chat-card-header">
+              <div class="chat-header-avatar-col">
+                <div class="chat-pet-mini" id="chat-pet-mini">
+                  <!-- Live SVG avatar -->
+                </div>
+              </div>
+              <div class="chat-header-meta">
+                <span class="chat-header-title" id="chat-assistant-name">Bolt Assistant</span>
+                <button type="button" class="chat-header-subtitle" id="chat-model-info" title="Click to change model in Settings">
+                  gemini • gemini-1.5-flash
+                </button>
+              </div>
+              <button class="chat-broom-btn" id="btn-clear-chat" title="Clear Conversation">
+                <i data-lucide="trash-2"></i>
+              </button>
+            </div>
+
+            <!-- Desktop & Browser Context Banner (Requirement H) -->
+            <div class="chat-context-bar" id="chat-context-bar" title="Context is attached only when sending questions">
+              <i data-lucide="compass"></i>
+              <span id="chat-context-text">Context: Detecting active desktop app...</span>
+            </div>
+
+            <!-- Messages Scrollable Body -->
+            <div class="chat-messages-scroll" id="chat-messages-container">
+              <!-- Dynamically populated messages -->
+            </div>
+
+            <!-- Pill Input Bar (No paperclip icon) -->
+            <div class="chat-input-wrapper">
+              <div class="chat-input-bar">
+                <textarea id="chat-input-field" class="chat-input-textarea" rows="1" placeholder="Ask something... (e.g. explain a function, debug code)"></textarea>
+                <button class="chat-send-btn" id="btn-chat-send" title="Send message (Enter)">
+                  <i data-lucide="send"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. TO-DO TAB -->
+      <section class="tab-pane" id="pane-todo">
+        <div class="todo-pane-layout">
+          <!-- Progress Bar Card -->
+          <div class="todo-progress-card">
+            <div class="todo-progress-header">
+              <span class="progress-title">Daily Sprint Progress</span>
+              <span class="progress-ratio" id="todo-progress-ratio">2 / 5</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill" id="todo-progress-fill" style="width: 40%;"></div>
+            </div>
+          </div>
+
+          <!-- Add Task Input Row -->
+          <div class="todo-input-row">
+            <input type="text" id="todo-new-input" class="terminal-input" placeholder="Add a new task (Enter)...">
+            <button class="theme-btn-primary" id="btn-add-todo">
+              <i data-lucide="plus"></i>
+              <span>Add</span>
+            </button>
+          </div>
+
+          <!-- Tasks List -->
+          <div class="todo-list-scroll" id="todo-items-list">
+            <!-- Dynamically populated tasks -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. TIMER TAB -->
+      <section class="tab-pane" id="pane-timer">
+        <div class="timer-pane-layout">
+          <div class="timer-card-glass">
+            <!-- Mode Pills -->
+            <div class="timer-mode-pills">
+              <button class="timer-mode-btn active" data-mode="pomodoro">Pomodoro (25m)</button>
+              <button class="timer-mode-btn" data-mode="short-break">Short Break (5m)</button>
+              <button class="timer-mode-btn" data-mode="long-break">Long Break (15m)</button>
+            </div>
+
+            <!-- Circular Progress & Display -->
+            <div class="timer-clock-display">
+              <div class="time-large-text" id="timer-display-digits">25:00</div>
+              <span class="timer-state-label" id="timer-state-label">FOCUS TIME</span>
+            </div>
+
+            <!-- Timer Controls -->
+            <div class="timer-actions-row">
+              <button class="timer-ctl-btn primary" id="btn-timer-start">
+                <i data-lucide="play" id="icon-timer-toggle"></i>
+                <span id="text-timer-toggle">Start</span>
+              </button>
+              <button class="timer-ctl-btn secondary" id="btn-timer-reset">
+                <i data-lucide="rotate-ccw"></i>
+                <span>Reset</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. NOTES TAB -->
+      <section class="tab-pane" id="pane-notes">
+        <div class="notes-pane-layout">
+          <div class="notes-top-bar">
+            <div class="search-input-wrap">
+              <i data-lucide="search"></i>
+              <input type="text" id="notes-search-input" class="terminal-input" placeholder="Search notes...">
+            </div>
+            <button class="theme-btn-primary" id="btn-new-note">
+              <i data-lucide="plus"></i>
+              <span>New</span>
+            </button>
+          </div>
+
+          <div class="notes-cards-scroll" id="notes-cards-list">
+            <!-- Dynamically populated notes -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. REMINDERS TAB -->
+      <section class="tab-pane" id="pane-reminders">
+        <div class="reminders-pane-layout">
+          <!-- Add Reminder Card -->
+          <div class="reminder-create-card">
+            <div class="create-card-title">
+              <i data-lucide="bell-plus"></i>
+              <span>Create Reminder</span>
+            </div>
+            <div class="reminder-fields-grid">
+              <input type="text" id="reminder-title-input" class="terminal-input" placeholder="Reminder title (e.g. Code Review)">
+              <div class="reminder-time-row">
+                <input type="time" id="reminder-time-input" class="terminal-input mono" value="16:00">
+                <select id="reminder-repeat-select" class="terminal-select">
+                  <option value="once">Once</option>
+                  <option value="daily">Daily</option>
+                  <option value="every-hour">Every Hour</option>
+                </select>
+                <button class="theme-btn-primary" id="btn-add-reminder">
+                  <i data-lucide="plus"></i>
+                  <span>Set</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reminders List -->
+          <div class="reminders-list-scroll" id="reminders-items-list">
+            <!-- Dynamically populated reminders -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. TOOLS TAB (No dev test material; useful dev tools only) -->
+      <section class="tab-pane" id="pane-tools">
+        <div class="tools-pane-layout">
+          <!-- Daily Coding Quote -->
+          <div class="quote-glass-card">
+            <div class="quote-header">
+              <i data-lucide="sparkles"></i>
+              <span>DAILY MOTIVATION</span>
+            </div>
+            <p class="quote-text" id="daily-quote-text">"Make it work, make it right, make it fast."</p>
+            <span class="quote-author" id="daily-quote-author">— Kent Beck</span>
+          </div>
+
+          <!-- Complete System Monitor via systeminformation -->
+          <div class="system-monitor-card">
+            <div class="sys-card-header">
+              <div class="sys-title-row">
+                <i data-lucide="activity"></i>
+                <span class="sys-title">SYSTEM MONITOR</span>
+                <span class="sys-live-dot"></span>
+              </div>
+              <div class="sys-badges-row">
+                <span class="sys-badge" id="sys-os-badge">macOS</span>
+                <span class="sys-badge mono" id="sys-uptime-badge">UP: 0h</span>
+              </div>
+            </div>
+
+            <!-- CPU Card with Sparkline & Per-Core Bars -->
+            <div class="sys-metric-card">
+              <div class="sys-metric-top">
+                <div class="sys-metric-label">
+                  <i data-lucide="cpu"></i>
+                  <span>CPU: <strong id="sys-cpu-load">0%</strong></span>
+                  <span class="sys-cpu-model-text" id="sys-cpu-model">Apple M3 Pro</span>
+                </div>
+                <div class="sys-temp-badge" id="sys-cpu-temp-wrap">
+                  <i data-lucide="thermometer"></i>
+                  <span id="sys-cpu-temp">--°C</span>
+                </div>
+              </div>
+
+              <!-- Live CPU Sparkline (60 seconds) -->
+              <div class="sparkline-container">
+                <svg id="sparkline-cpu" class="sys-sparkline" viewBox="0 0 200 40" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="cpu-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="var(--accent, #FF7A2F)" stop-opacity="0.3" />
+                      <stop offset="100%" stop-color="var(--accent, #FF7A2F)" stop-opacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  <path class="spark-fill" id="spark-cpu-fill" d="" fill="url(#cpu-grad)" />
+                  <path class="spark-line" id="spark-cpu-line" d="" fill="none" stroke="var(--accent, #FF7A2F)" stroke-width="1.8" />
+                </svg>
+              </div>
+
+              <!-- Per-Core Load Bars -->
+              <div class="cpu-cores-grid" id="cpu-cores-grid"></div>
+            </div>
+
+            <!-- RAM & Swap Card with Sparkline -->
+            <div class="sys-metric-card">
+              <div class="sys-metric-top">
+                <div class="sys-metric-label">
+                  <i data-lucide="hard-drive"></i>
+                  <span>RAM: <strong id="sys-ram-usage">0 GB / 0 GB (0%)</strong></span>
+                </div>
+                <div class="sys-swap-text">Swap: <span id="sys-swap-usage">0 GB</span></div>
+              </div>
+
+              <div class="sparkline-container">
+                <svg id="sparkline-ram" class="sys-sparkline" viewBox="0 0 200 40" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="ram-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="var(--accent, #FF7A2F)" stop-opacity="0.3" />
+                      <stop offset="100%" stop-color="var(--accent, #FF7A2F)" stop-opacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  <path class="spark-fill" id="spark-ram-fill" d="" fill="url(#ram-grad)" />
+                  <path class="spark-line" id="spark-ram-line" d="" fill="none" stroke="var(--accent, #FF7A2F)" stroke-width="1.8" />
+                </svg>
+              </div>
+            </div>
+
+            <!-- Network & Battery Row -->
+            <div class="sys-dual-grid">
+              <!-- Network Card -->
+              <div class="sys-subcard">
+                <div class="sys-subcard-header">
+                  <div class="sys-metric-title">
+                    <i data-lucide="wifi"></i>
+                    <span>Network</span>
+                  </div>
+                  <div class="net-speeds-row">
+                    <span class="net-speed-dn">↓ <span id="sys-net-rx">0 KB/s</span></span>
+                    <span class="net-speed-up">↑ <span id="sys-net-tx">0 KB/s</span></span>
+                  </div>
+                </div>
+                <div class="sparkline-container small">
+                  <svg id="sparkline-net" class="sys-sparkline" viewBox="0 0 200 32" preserveAspectRatio="none">
+                    <path class="spark-line" id="spark-net-line" d="" fill="none" stroke="var(--accent, #FF7A2F)" stroke-width="1.8" />
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Battery & GPU Card -->
+              <div class="sys-subcard">
+                <div class="sys-subcard-header">
+                  <div class="sys-metric-title">
+                    <i data-lucide="battery-charging" id="sys-battery-icon"></i>
+                    <span>Power & GPU</span>
+                  </div>
+                  <span class="sys-badge" id="sys-battery-badge">--%</span>
+                </div>
+                <div class="sys-gpu-info" id="sys-gpu-model">Integrated Graphics</div>
+              </div>
+            </div>
+
+            <!-- Disks Grid -->
+            <div class="sys-disks-section">
+              <div class="sys-sub-heading">
+                <i data-lucide="disc"></i>
+                <span>Disks</span>
+              </div>
+              <div class="sys-disks-list" id="sys-disks-list"></div>
+            </div>
+
+            <!-- Top Processes Section -->
+            <div class="sys-procs-section">
+              <div class="sys-sub-heading">
+                <i data-lucide="list"></i>
+                <span>Top Processes (by CPU/RAM)</span>
+              </div>
+              <div class="sys-procs-table">
+                <div class="sys-proc-header">
+                  <span>Name</span>
+                  <span>PID</span>
+                  <span>CPU</span>
+                  <span>RAM</span>
+                </div>
+                <div class="sys-proc-rows" id="sys-procs-rows"></div>
+              </div>
+            </div>
+
+            <!-- Pet Resource Usage Row at the Bottom -->
+            <div class="sys-pet-usage-row">
+              <div class="pet-usage-label">
+                <span class="pet-usage-dot"></span>
+                <span>Desktop Pet:</span>
+              </div>
+              <div class="pet-usage-metrics">
+                <span>CPU: <strong id="stat-cpu">0.8%</strong></span>
+                <span>RAM: <strong id="stat-ram">45 MB</strong></span>
+                <span>FPS: <strong id="stat-fps">30 FPS</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Useful Dev Utilities: Clipboard History & Unit Converter -->
+          <div class="useful-tools-grid">
+            <!-- 1. Clipboard History -->
+            <div class="tool-card">
+              <div class="tool-card-header">
+                <i data-lucide="clipboard"></i>
+                <span>Clipboard History</span>
+                <button class="tool-action-btn" id="btn-clear-clipboard" title="Clear History">Clear</button>
+              </div>
+              <div class="clipboard-history-list" id="clipboard-history-list">
+                <div class="empty-hint">Copy text to save snippets here automatically.</div>
+              </div>
+            </div>
+
+            <!-- 2. Developer Unit Converter -->
+            <div class="tool-card">
+              <div class="tool-card-header">
+                <i data-lucide="refresh-cw"></i>
+                <span>Dev Unit Converter</span>
+              </div>
+              <div class="converter-box">
+                <div class="converter-row">
+                  <input type="number" id="conv-px-input" class="terminal-input mono" placeholder="16 px">
+                  <span class="conv-arrow">↔</span>
+                  <input type="number" id="conv-rem-input" class="terminal-input mono" placeholder="1.0 rem" step="0.125">
+                </div>
+                <div class="converter-row">
+                  <input type="text" id="conv-hex-input" class="terminal-input mono" placeholder="#FF7A2F">
+                  <span class="conv-arrow">↔</span>
+                  <input type="text" id="conv-rgb-input" class="terminal-input mono" placeholder="rgb(255, 122, 47)">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. SETTINGS TAB (Clean Organized Sections: General, Behavior, Reactions, Appearance, AI Provider, Privacy) -->
+      <section class="tab-pane" id="pane-settings">
+        <div class="settings-pane-layout">
+
+          <!-- SECTION 1: GENERAL -->
+          <div class="settings-group-card">
+            <div class="settings-group-title">
+              <i data-lucide="user"></i>
+              <span>General Settings</span>
+            </div>
+            
+            <div class="setting-item">
+              <label class="setting-label" for="setting-pet-name">Name your pet (max 20 characters)</label>
+              <input type="text" id="setting-pet-name" class="terminal-input full-width" maxlength="20" placeholder="Pet">
+              <span class="setting-hint">Appears in header, assistant title, speech bubbles, and AI prompt</span>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Always on Top</div>
+                <div class="toggle-desc">Keep pet floating above other apps</div>
+              </div>
+              <input type="checkbox" id="setting-always-on-top" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Remember Position</div>
+                <div class="toggle-desc">Save desktop location between app restarts</div>
+              </div>
+              <input type="checkbox" id="setting-remember-pos" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Launch at Login</div>
+                <div class="toggle-desc">Start coding companion when computer boots</div>
+              </div>
+              <input type="checkbox" id="setting-launch-login" class="toggle-checkbox">
+            </div>
+          </div>
+
+          <!-- SECTION 2: BEHAVIOR -->
+          <div class="settings-group-card">
+            <div class="settings-group-title">
+              <i data-lucide="sliders"></i>
+              <span>Behavior & Idle Timers</span>
+            </div>
+
+            <div class="setting-item">
+              <div class="slider-label-row">
+                <label class="setting-label" for="setting-idle-sleepy">Sleepy After Inactivity</label>
+                <span class="slider-val" id="disp-idle-sleepy">2 min</span>
+              </div>
+              <input type="range" id="setting-idle-sleepy" min="1" max="10" step="1" value="2" class="terminal-slider">
+            </div>
+
+            <div class="setting-item">
+              <div class="slider-label-row">
+                <label class="setting-label" for="setting-idle-sleeping">Sleeping (Power-Save) After</label>
+                <span class="slider-val" id="disp-idle-sleeping">5 min</span>
+              </div>
+              <input type="range" id="setting-idle-sleeping" min="3" max="20" step="1" value="5" class="terminal-slider">
+            </div>
+
+            <div class="setting-item">
+              <div class="slider-label-row">
+                <label class="setting-label" for="setting-bubble-duration">Notification Bubble Duration</label>
+                <span class="slider-val" id="disp-bubble-duration">5 sec</span>
+              </div>
+              <input type="range" id="setting-bubble-duration" min="2" max="12" step="1" value="5" class="terminal-slider">
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Notification Sounds</div>
+                <div class="toggle-desc">Play gentle robot chirps on alerts and reminders</div>
+              </div>
+              <input type="checkbox" id="setting-sounds" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Do Not Disturb (DND)</div>
+                <div class="toggle-desc">Mute speech bubbles and notifications during focus work</div>
+              </div>
+              <input type="checkbox" id="setting-dnd" class="toggle-checkbox">
+            </div>
+          </div>
+
+          <!-- SECTION 3: SYSTEM AWARENESS REACTIONS -->
+          <div class="settings-group-card">
+            <div class="settings-group-title">
+              <i data-lucide="zap"></i>
+              <span>SystemSense Reactions</span>
+            </div>
+            <span class="setting-hint">Pet dynamically reacts to hardware, audio, power, and environment</span>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Screen Brightness</div>
+                <div class="toggle-desc">Dull look on low brightness, squint on max</div>
+              </div>
+              <input type="checkbox" id="reaction-brightness" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Audio Volume</div>
+                <div class="toggle-desc">Irritated when max, quiet when muted</div>
+              </div>
+              <input type="checkbox" id="reaction-volume" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Battery & Charger</div>
+                <div class="toggle-desc">Low battery warning below 20%, energized when plugged in</div>
+              </div>
+              <input type="checkbox" id="reaction-battery" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Music & Media Vibe</div>
+                <div class="toggle-desc">Groovy head-bob and musical notes when music plays</div>
+              </div>
+              <input type="checkbox" id="reaction-media" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Heavy CPU / RAM Load</div>
+                <div class="toggle-desc">Stressed expression with sweat drop when load > 85%</div>
+              </div>
+              <input type="checkbox" id="reaction-highload" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Late Night Coder</div>
+                <div class="toggle-desc">Friendly sleepy nudge when coding past midnight</div>
+              </div>
+              <input type="checkbox" id="reaction-latenight" class="toggle-checkbox" checked>
+            </div>
+          </div>
+
+          <!-- SECTION 4: APPEARANCE -->
+          <div class="settings-group-card appearance-group-card">
+            <div class="settings-group-title">
+              <div class="title-with-icon">
+                <i data-lucide="palette"></i>
+                <span>Appearance & Glass Customization</span>
+              </div>
+              <button class="theme-btn-secondary reset-appearance-btn" id="btn-reset-appearance">
+                <i data-lucide="rotate-ccw"></i>
+                <span>Reset</span>
+              </button>
+            </div>
+
+            <!-- Live 3D Pet Preview -->
+            <div class="appearance-preview-card">
+              <div class="preview-pet-stage" id="settings-pet-preview"></div>
+              <div class="preview-caption-row">
+                <span class="preview-pill-badge">LIVE PREVIEW</span>
+                <span class="preview-caption-hint">Syncs instantly with floating desktop companion</span>
+              </div>
+            </div>
+
+            <div class="appearance-sliders-grid">
+              <!-- Panel Transparency Slider (Default 30%) -->
+              <div class="setting-item">
+                <div class="slider-label-row">
+                  <label class="setting-label" for="setting-panel-transparency">Panel Transparency</label>
+                  <span class="slider-val" id="disp-panel-transparency">30%</span>
+                </div>
+                <input type="range" id="setting-panel-transparency" min="15" max="95" step="5" value="30" class="terminal-slider">
+              </div>
+
+              <!-- Blur Amount Slider (Default 24px) -->
+              <div class="setting-item">
+                <div class="slider-label-row">
+                  <label class="setting-label" for="setting-panel-blur">Blur Amount</label>
+                  <span class="slider-val" id="disp-panel-blur">24 px</span>
+                </div>
+                <input type="range" id="setting-panel-blur" min="0" max="50" step="1" value="24" class="terminal-slider">
+              </div>
+
+              <!-- Overall Size Scale -->
+              <div class="setting-item">
+                <div class="slider-label-row">
+                  <label class="setting-label" for="setting-pet-scale">Size (Overall Scale)</label>
+                  <span class="slider-val" id="disp-pet-scale">100%</span>
+                </div>
+                <input type="range" id="setting-pet-scale" min="0.5" max="3.0" step="0.05" value="1.0" class="terminal-slider">
+              </div>
+
+              <!-- Body Width -->
+              <div class="setting-item">
+                <div class="slider-label-row">
+                  <label class="setting-label" for="setting-pet-width">Body Width</label>
+                  <span class="slider-val" id="disp-pet-width">136 px</span>
+                </div>
+                <input type="range" id="setting-pet-width" min="60" max="200" step="2" value="136" class="terminal-slider">
+              </div>
+
+              <!-- Body Height -->
+              <div class="setting-item">
+                <div class="slider-label-row">
+                  <label class="setting-label" for="setting-pet-height">Body Height</label>
+                  <span class="slider-val" id="disp-pet-height">120 px</span>
+                </div>
+                <input type="range" id="setting-pet-height" min="60" max="200" step="2" value="120" class="terminal-slider">
+              </div>
+
+              <!-- Corner Roundness -->
+              <div class="setting-item">
+                <div class="slider-label-row">
+                  <label class="setting-label" for="setting-pet-roundness">Roundness</label>
+                  <span class="slider-val" id="disp-pet-roundness">36%</span>
+                </div>
+                <input type="range" id="setting-pet-roundness" min="0" max="50" step="1" value="36" class="terminal-slider">
+              </div>
+
+              <!-- Eye Size -->
+              <div class="setting-item">
+                <div class="slider-label-row">
+                  <label class="setting-label" for="setting-pet-eyesize">Eye Size</label>
+                  <span class="slider-val" id="disp-pet-eyesize">1.0x</span>
+                </div>
+                <input type="range" id="setting-pet-eyesize" min="0.5" max="2.0" step="0.05" value="1.0" class="terminal-slider">
+              </div>
+
+              <!-- Eye Spacing -->
+              <div class="setting-item">
+                <div class="slider-label-row">
+                  <label class="setting-label" for="setting-pet-eyespacing">Eye Spacing</label>
+                  <span class="slider-val" id="disp-pet-eyespacing">44 px</span>
+                </div>
+                <input type="range" id="setting-pet-eyespacing" min="20" max="70" step="1" value="44" class="terminal-slider">
+              </div>
+
+              <!-- Mouth Width -->
+              <div class="setting-item">
+                <div class="slider-label-row">
+                  <label class="setting-label" for="setting-pet-mouthwidth">Mouth Width</label>
+                  <span class="slider-val" id="disp-pet-mouthwidth">14 px</span>
+                </div>
+                <input type="range" id="setting-pet-mouthwidth" min="6" max="28" step="1" value="14" class="terminal-slider">
+              </div>
+
+              <!-- Depth / 3D Intensity -->
+              <div class="setting-item">
+                <div class="slider-label-row">
+                  <label class="setting-label" for="setting-pet-depth">Depth (3D Clay Effect)</label>
+                  <span class="slider-val" id="disp-pet-depth">80%</span>
+                </div>
+                <input type="range" id="setting-pet-depth" min="0" max="100" step="1" value="80" class="terminal-slider">
+              </div>
+
+              <!-- Accent Color Picker -->
+              <div class="setting-item full-width-item accent-color-item">
+                <div class="accent-title-row">
+                  <label class="setting-label" for="setting-accent-color">Accent Color</label>
+                  <button type="button" class="btn-accent-default" id="btn-accent-default" title="Reset to default orange">Reset to default</button>
+                </div>
+                <div class="accent-picker-row">
+                  <input type="color" id="setting-accent-color" value="#FF7A2F">
+                  <input type="text" id="disp-accent-color" class="terminal-input mono" value="#FF7A2F" readonly>
+                  <div class="accent-swatches">
+                    <button type="button" class="swatch-btn active" data-color="#FF7A2F" style="background:#FF7A2F;" title="Classic Amber (Default)"></button>
+                    <button type="button" class="swatch-btn" data-color="#38BDF8" style="background:#38BDF8;" title="Sky Blue"></button>
+                    <button type="button" class="swatch-btn" data-color="#10B981" style="background:#10B981;" title="Emerald Green"></button>
+                    <button type="button" class="swatch-btn" data-color="#A855F7" style="background:#A855F7;" title="Neon Purple"></button>
+                    <button type="button" class="swatch-btn" data-color="#F43F5E" style="background:#F43F5E;" title="Rose Pink"></button>
+                    <button type="button" class="swatch-btn" data-color="#EAB308" style="background:#EAB308;" title="Cyber Yellow"></button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Body Color Picker -->
+              <div class="setting-item full-width-item">
+                <label class="setting-label" for="setting-pet-bodycolor">Body Color (Default White)</label>
+                <div class="color-picker-row">
+                  <input type="color" id="setting-pet-bodycolor" value="#FFFFFF">
+                  <input type="text" id="disp-pet-bodycolor" class="terminal-input mono" value="#FFFFFF" readonly>
+                  <button class="tool-action-btn" id="btn-bodycolor-white" title="Reset to White">Pure White</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 5: AI PROVIDER CONFIGURATION -->
+          <div class="settings-group-card">
+            <div class="settings-group-title">
+              <i data-lucide="cpu"></i>
+              <span>AI Provider Configuration</span>
+            </div>
+            
+            <div class="setting-item">
+              <label class="setting-label" for="setting-ai-provider">Active Provider</label>
+              <select id="setting-ai-provider" class="terminal-select full-width">
+                <option value="gemini" selected>Google Gemini (Free Tier / Flash)</option>
+                <option value="groq">Groq Cloud (Fast Llama 3.3)</option>
+                <option value="openai">OpenAI (ChatGPT / GPT-4o)</option>
+                <option value="anthropic">Claude (Anthropic)</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="qwen">Qwen AI</option>
+                <option value="ollama">Ollama (Local / Private)</option>
+                <option value="custom">Custom (OpenAI-Compatible)</option>
+              </select>
+            </div>
+
+            <div class="setting-item" id="setting-apikey-row">
+              <label class="setting-label" for="setting-ai-key">API Key</label>
+              <input type="password" id="setting-ai-key" class="terminal-input full-width" placeholder="Enter key (stored securely in OS keychain)">
+            </div>
+
+            <div class="setting-item" id="setting-model-row">
+              <div class="setting-label-row">
+                <label class="setting-label" for="setting-ai-model">Model</label>
+                <button type="button" class="btn-refresh-models" id="btn-refresh-models" title="Fetch available models from API">
+                  <i data-lucide="refresh-cw"></i>
+                  <span>Refresh</span>
+                </button>
+              </div>
+              <div class="model-select-wrap">
+                <select id="setting-ai-model" class="terminal-select full-width">
+                  <option value="default">Loading dynamic models...</option>
+                </select>
+              </div>
+              <div class="model-status-hint" id="model-status-hint"></div>
+            </div>
+
+            <div class="setting-item" id="setting-baseurl-row">
+              <label class="setting-label" for="setting-ai-baseurl">Custom Base URL (optional)</label>
+              <input type="text" id="setting-ai-baseurl" class="terminal-input full-width" placeholder="e.g. https://api.groq.com/openai/v1 or http://localhost:11434">
+            </div>
+
+            <!-- Test Connection & Save Action Buttons -->
+            <div class="ai-actions-row">
+              <button class="theme-btn-secondary" id="btn-test-ai-connection">
+                <i data-lucide="activity"></i>
+                <span>Test Connection</span>
+              </button>
+              <button class="theme-btn-primary" id="btn-save-ai-settings">
+                <i data-lucide="check"></i>
+                <span>Save Configuration</span>
+              </button>
+            </div>
+
+            <!-- Test Connection Feedback Box -->
+            <div class="test-feedback-box hidden" id="test-feedback-box">
+              <div class="feedback-badge" id="feedback-badge">PASS</div>
+              <div class="feedback-text" id="feedback-text">Connection successful!</div>
+            </div>
+          </div>
+
+          <!-- SECTION 6: PRIVACY & CONTEXT -->
+          <div class="settings-group-card">
+            <div class="settings-group-title">
+              <i data-lucide="shield-check"></i>
+              <span>Privacy & Context Awareness</span>
+            </div>
+            <span class="setting-hint">Strict privacy: Context is checked ONLY when you send a prompt, never in background.</span>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Desktop & Browser Context Awareness</div>
+                <div class="toggle-desc">Allows companion to read active window title / URL for smart coding answers</div>
+              </div>
+              <input type="checkbox" id="privacy-context" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Allow Screen Capture for Vision Queries</div>
+                <div class="toggle-desc">Captures screen thumbnail only when asking "what is on my screen" or visual questions</div>
+              </div>
+              <input type="checkbox" id="privacy-screenshots" class="toggle-checkbox">
+            </div>
+
+            <div class="setting-item">
+              <label class="setting-label">Privacy Blocklist (auto-redacted words)</label>
+              <textarea id="privacy-blocklist" class="terminal-input full-width mono" rows="3" placeholder="1password, bitwarden, bank, login, incognito"></textarea>
+              <span class="setting-hint">Windows or URLs containing these words are never sent to AI providers</span>
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script src="../node_modules/lucide/dist/umd/lucide.js"></script>
+  <script src="../themes/theme-manager.js"></script>
+  <script src="../character/pet.js"></script>
+  <script src="../audio/sound-effects.js"></script>
+  <script src="tabs/chat-tab.js"></script>
+  <script src="tabs/todo-tab.js"></script>
+  <script src="tabs/timer-tab.js"></script>
+  <script src="tabs/notes-tab.js"></script>
+  <script src="tabs/reminders-tab.js"></script>
+  <script src="tabs/tools-tab.js"></script>
+  <script src="tabs/settings-tab.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>

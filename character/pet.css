@@ -1,0 +1,139 @@
+/**
+ * Desktop Pet — Minimal Face-Bot Styling & Smooth Micro-Animations (60fps)
+ */
+
+:root {
+  --facebot-feature-color: #181820;
+  --facebot-body-white: #FFFFFF;
+}
+
+.facebot-svg {
+  display: block;
+  user-select: none;
+  overflow: visible;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.facebot-root {
+  transform-origin: 110px 112px;
+}
+
+/* Face tracking group transition */
+.facebot-face {
+  transition: transform 0.12s ease-out;
+}
+
+/* 1. Subtle Idle Slow Breathing Animation */
+.emotion-neutral .facebot-body-wrap {
+  transform-origin: 110px 172px;
+  animation: facebotIdleBreathe 4s ease-in-out infinite alternate;
+}
+
+@keyframes facebotIdleBreathe {
+  0% { transform: scale(1, 1); }
+  100% { transform: scale(1.015, 1.025); }
+}
+
+/* 2. Happy Tiny Body Bounce */
+.emotion-happy .facebot-body-wrap {
+  transform-origin: 110px 172px;
+  animation: facebotHappyBounce 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) infinite alternate;
+}
+
+@keyframes facebotHappyBounce {
+  0% { transform: translateY(0px) scale(1, 1); }
+  100% { transform: translateY(-5px) scale(0.99, 1.02); }
+}
+
+/* 3. Laugh Joyful Body Wiggle */
+.emotion-laugh .facebot-body-wrap {
+  transform-origin: 110px 112px;
+  animation: facebotLaughWiggle 0.32s ease-in-out infinite alternate;
+}
+
+@keyframes facebotLaughWiggle {
+  0% { transform: rotate(-2.5deg) scale(1.02); }
+  100% { transform: rotate(2.5deg) scale(1.03); }
+}
+
+/* 4. Surprised Jump */
+.emotion-surprised .facebot-body-wrap {
+  animation: facebotPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 1;
+}
+
+@keyframes facebotPop {
+  0% { transform: scale(0.95); }
+  50% { transform: scale(1.05) translateY(-6px); }
+  100% { transform: scale(1); }
+}
+
+/* 5. Sad Droop */
+.emotion-sad .facebot-body-wrap {
+  transform: translateY(3px) scale(0.99);
+  transition: transform 0.4s ease;
+}
+
+/* 6. Love Heart Gentle Pulse */
+.emotion-love .facebot-face .eye-left,
+.emotion-love .facebot-face .eye-right {
+  transform-origin: center;
+  animation: heartPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes heartPulse {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.18); }
+  50% { transform: scale(1); }
+  70% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+/* 7. Sleeping Slow Deep Breathing & Z's */
+.emotion-sleeping .facebot-body-wrap {
+  transform-origin: 110px 172px;
+  animation: facebotSleepBreathe 3.6s ease-in-out infinite alternate;
+}
+
+@keyframes facebotSleepBreathe {
+  0% { transform: translateY(0px) scale(1, 1); }
+  100% { transform: translateY(2px) scale(1.02, 0.98); }
+}
+
+.sleep-z-drift text {
+  animation: zDriftFloat 3.2s ease-in-out infinite;
+}
+
+.sleep-z-drift text:nth-child(1) { animation-delay: 0s; }
+.sleep-z-drift text:nth-child(2) { animation-delay: 1s; }
+.sleep-z-drift text:nth-child(3) { animation-delay: 2s; }
+
+@keyframes zDriftFloat {
+  0% { opacity: 0.2; transform: translateY(0px) scale(0.85); }
+  50% { opacity: 0.95; }
+  100% { opacity: 0; transform: translateY(-18px) scale(1.15); }
+}
+
+/* 8. Thinking Side-to-Side Scanning Eyes & Floating Bubble */
+.emotion-thinking .thinking-eye {
+  animation: eyeScan 2.4s ease-in-out infinite alternate;
+}
+
+@keyframes eyeScan {
+  0% { transform: translateX(0px); }
+  50% { transform: translateX(6px) translateY(2px); }
+  100% { transform: translateX(-4px) translateY(-1px); }
+}
+
+.emotion-thinking .thought-dots-bubble {
+  animation: thoughtBubbleFloat 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes thoughtBubbleFloat {
+  0% { transform: translate(142px, 42px); }
+  100% { transform: translate(144px, 35px); }
+}
+
+/* 9. Focus Mode Calm Hover */
+.emotion-focus .facebot-body-wrap {
+  transform: translateY(1px);
+}
