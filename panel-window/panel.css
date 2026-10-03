@@ -135,245 +135,270 @@ svg.lucide {
 }
 
 /* ==========================================================================
-   1. MAIN WINDOW SHELL (REAL GLASSMORPHISM)
+   1. MAIN WINDOW SHELL (REAL GLASSMORPHISM & CSS GRID ROOT)
    ========================================================================== */
 .panel-window-shell {
-  width: 100%;
-  height: 100%;
-  container-type: inline-size;
-  container-name: panel;
-  background: rgba(20, 20, 24, var(--panel-alpha, var(--panel-transparency, 0.30)));
-  backdrop-filter: blur(var(--blur, var(--panel-blur, 24px))) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--blur, var(--panel-blur, 24px))) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 28px;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-  position: relative;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  width: 100vw;
+  height: 100vh;
+  display: grid !important;
+  grid-template-rows: 56px auto 1fr !important;
+  overflow: hidden !important;
+  background: rgba(20, 20, 24, var(--panel-alpha, var(--panel-transparency, 0.35))) !important;
+  backdrop-filter: blur(var(--blur, var(--panel-blur, 28px))) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(var(--blur, var(--panel-blur, 28px))) saturate(150%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 28px !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 /* ==========================================================================
-   2. HEADER & TITLEBAR
+   2. HEADER & TITLEBAR (FIXED 56PX ROW, ALIGNED IN ONE LINE)
    ========================================================================== */
 .panel-header {
-  height: 52px;
-  background: rgba(255, 255, 255, 0.02);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  -webkit-app-region: drag;
-  flex-shrink: 0;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 16px !important;
+  -webkit-app-region: drag !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+  z-index: 10 !important;
 }
 
 .panel-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  -webkit-app-region: drag !important;
 }
 
-/* Mini live pet face avatar in place of asterisk logo */
+/* Mini live pet face avatar */
 .header-pet-face {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  cursor: pointer;
-  border-radius: 8px;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  -webkit-app-region: no-drag;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  cursor: pointer !important;
+  border-radius: 8px !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  -webkit-app-region: no-drag !important;
 }
 
 .header-pet-face:hover {
-  transform: scale(1.1);
+  transform: scale(1.1) !important;
 }
 
 .header-pet-face svg {
-  width: 28px;
-  height: 28px;
-  display: block;
+  width: 28px !important;
+  height: 28px !important;
+  display: block !important;
 }
 
-.brand-title {
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -0.3px;
-  color: #FFFFFF;
+.panel-title {
+  font-size: 15.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.2px !important;
+  color: #FFFFFF !important;
+  line-height: 1 !important;
+  margin: 0 !important;
 }
 
 .provider-pill-badge {
-  background: var(--theme-primary-alpha, rgba(255, 122, 47, 0.15));
-  border: 1px solid var(--theme-card-border, rgba(255, 122, 47, 0.35));
-  color: var(--theme-primary, #FF7A2F);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 800;
-  padding: 2.5px 8px;
-  border-radius: 999px;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  transition: var(--transition-theme);
+  background: var(--theme-primary-alpha, rgba(255, 122, 47, 0.16)) !important;
+  border: 1px solid rgba(255, 122, 47, 0.35) !important;
+  color: var(--theme-primary, #FF7A2F) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  padding: 3px 8px !important;
+  border-radius: 999px !important;
+  letter-spacing: 0.8px !important;
+  text-transform: uppercase !important;
+  transition: var(--transition-theme) !important;
+  line-height: 1 !important;
 }
 
+.panel-window-controls,
 .window-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  -webkit-app-region: no-drag;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  -webkit-app-region: no-drag !important;
 }
 
+/* Consistent 32x32 window control buttons */
 .win-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 14px;
-  font-family: var(--font-sans);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition: var(--transition-fast);
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  font-size: 14px !important;
+  font-family: var(--font-sans) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  transition: var(--transition-fast) !important;
+  -webkit-app-region: no-drag !important;
 }
 
 .win-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.22);
-  color: #FFFFFF;
-  transform: translateY(-0.5px);
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  color: #FFFFFF !important;
+  transform: translateY(-0.5px) !important;
 }
 
+.win-btn.settings-gear-btn.active,
 .win-btn.win-settings.active {
-  background: var(--theme-primary-alpha, rgba(255, 122, 47, 0.2));
-  border-color: var(--theme-primary, #FF7A2F);
-  color: var(--theme-primary, #FF7A2F);
+  background: var(--theme-primary-alpha, rgba(255, 122, 47, 0.2)) !important;
+  border-color: var(--theme-primary, #FF7A2F) !important;
+  color: var(--theme-primary, #FF7A2F) !important;
 }
 
+.win-btn.win-close-btn:hover,
 .win-btn.win-close:hover {
-  background: rgba(245, 80, 54, 0.35);
-  border-color: rgba(245, 80, 54, 0.55);
-  color: #FF5A45;
+  background: rgba(245, 80, 54, 0.35) !important;
+  border-color: rgba(245, 80, 54, 0.55) !important;
+  color: #FF5A45 !important;
 }
 
 /* ==========================================================================
-   3. TAB BAR UNDER HEADER
+   3. TAB BAR UNDER HEADER (ONE HORIZONTAL ROW, NEVER VERTICAL)
    Active tab = solid white rounded pill with black text/icon!
    ========================================================================== */
+.panel-tabs,
 .panel-tabs-bar {
-  display: flex;
-  background: rgba(0, 0, 0, 0.32);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  margin: 8px 12px 10px 12px;
-  padding: 4px;
-  gap: 3px;
-  justify-content: space-between;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  -webkit-app-region: no-drag;
-  flex-shrink: 0;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  background: rgba(0, 0, 0, 0.32) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  margin: 0 !important;
+  padding: 8px 12px !important;
+  gap: 6px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  -webkit-app-region: no-drag !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
 }
 
+.panel-tabs::-webkit-scrollbar,
 .panel-tabs-bar::-webkit-scrollbar {
-  display: none;
+  display: none !important;
 }
 
 .tab-btn {
-  flex: 1 1 0;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.65);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 7px 3px;
-  border-radius: 11px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  height: 32px !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: rgba(255, 255, 255, 0.65) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  -webkit-app-region: no-drag !important;
 }
 
 .tab-btn:hover {
-  color: #FFFFFF;
-  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF !important;
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* Active tab = solid white rounded pill with black text/icon */
 .tab-btn.active {
   background: #FFFFFF !important;
   color: #111218 !important;
-  font-weight: 700;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  border-color: #FFFFFF !important;
+  font-weight: 700 !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.30) !important;
 }
 
-.tab-btn.active .tab-icon {
-  filter: none;
-}
-
-.tab-icon {
-  font-size: 12px;
-  line-height: 1;
+.tab-btn.active svg,
+.tab-btn.active i[data-lucide] svg,
+.tab-btn.active i[data-lucide] {
+  color: #111218 !important;
+  stroke: #111218 !important;
 }
 
 .tab-label {
-  letter-spacing: -0.2px;
-  white-space: nowrap;
+  letter-spacing: -0.2px !important;
+  white-space: nowrap !important;
 }
 
-@container panel (max-width: 480px) {
+/* Icons only when narrower than ~460px */
+@media (max-width: 460px) {
+  .tab-btn {
+    padding: 0 6px !important;
+    gap: 0 !important;
+  }
   .tab-btn .tab-label {
     display: none !important;
-  }
-  .tab-btn {
-    padding: 7px 6px !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .tab-btn .tab-label {
-    display: none !important;
-  }
-  .tab-btn {
-    padding: 7px 6px !important;
   }
 }
 
 /* ==========================================================================
-   4. TAB CONTENT AREA
+   4. SCROLLABLE CONTENT AREA (ONLY THIS AREA SCROLLS)
    ========================================================================== */
+.panel-main-content,
 .panel-tab-content-area {
-  flex: 1;
-  overflow: hidden;
-  position: relative;
+  min-height: 0 !important; /* CRITICAL: Enables child to scroll within CSS Grid */
+  height: 100% !important;
+  overflow: hidden !important;
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
 }
 
 .tab-pane {
-  display: none;
-  width: 100%;
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 4px 16px 16px 16px;
+  display: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 12px 16px 16px 16px !important;
+  box-sizing: border-box !important;
 }
 
 .tab-pane.active {
-  display: block;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 /* Custom Scrollbar */
@@ -732,66 +757,117 @@ svg.lucide {
   color: #FF6B5A;
 }
 
-/* Bottom Glass Pill Input Bar (Text Field + Send Button only) */
+/* Rebuilt Glass Pill Input Bar: [input flex:1; min-width:0][send button 36x36, flex:none] */
+.chat-input-wrapper {
+  flex-shrink: 0 !important;
+  width: 100% !important;
+  padding: 4px 0 0 0 !important;
+}
+
 .chat-input-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  padding: 5px 6px 5px 14px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  transition: all 0.2s ease;
-  flex-shrink: 0;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  padding: 6px !important;
+  overflow: hidden !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 999px !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
 }
 
 .chat-input-bar:focus-within {
-  border-color: rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 20px var(--theme-primary-alpha, rgba(255, 122, 47, 0.15));
+  border-color: var(--theme-primary, #FF7A2F) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 0 16px var(--theme-primary-alpha, rgba(255, 122, 47, 0.22)) !important;
 }
 
+.chat-input-textarea,
 .chat-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: #FFFFFF;
-  font-family: var(--font-sans);
-  font-size: 13.5px;
-  outline: none;
-  padding: 7px 4px;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  min-height: 36px !important;
+  max-height: 100px !important;
+  height: 36px !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: #FFFFFF !important;
+  font-family: var(--font-sans) !important;
+  font-size: 13.5px !important;
+  line-height: 1.4 !important;
+  padding: 8px 12px !important;
+  resize: none !important;
+  box-sizing: border-box !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
+.chat-input-textarea::placeholder,
 .chat-input::placeholder {
-  color: rgba(255, 255, 255, 0.38);
+  color: rgba(255, 255, 255, 0.38) !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
-/* White Rounded-Square Send Button with Black Arrow */
+/* 36x36 Circular Send Button sitting fully INSIDE the pill */
 .chat-send-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: #FFFFFF;
-  color: #111218;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
-  transition: all 0.18s ease;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  flex: none !important;
+  border-radius: 50% !important;
+  background: #FFFFFF !important;
+  color: #111218 !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  transition: transform 0.15s ease, background 0.15s ease !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 .chat-send-btn:hover {
-  background: #F2F2F6;
-  transform: scale(1.05);
+  background: #F2F2F6 !important;
+  transform: scale(1.05) !important;
 }
 
 .chat-send-btn svg {
-  transform: translate(1px, -0.5px);
+  width: 16px !important;
+  height: 16px !important;
+  stroke: #111218 !important;
+  transform: translate(1px, -0.5px) !important;
+}
+
+/* Non-selectable UI Chrome; only chat messages, code, inputs selectable */
+body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo-progress-card {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.chat-msg, .chat-msg *, input, textarea, code, pre, .inline-code {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+::selection {
+  background: var(--theme-primary, #FF7A2F) !important;
+  color: #FFFFFF !important;
+}
+::-moz-selection {
+  background: var(--theme-primary, #FF7A2F) !important;
+  color: #FFFFFF !important;
 }
 
 /* ==========================================================================
@@ -2531,5 +2607,492 @@ svg.lucide {
   gap: 12px;
   text-align: left;
 }
+
+/* ==========================================================================
+   7. SENSOR DIAGNOSTICS & RESOURCE MONITOR STYLING
+   ========================================================================== */
+.sensor-status-card {
+  margin-top: 14px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sensor-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sensor-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.70);
+  font-family: var(--font-mono);
+}
+
+.sensor-header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-sensor-action {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: var(--transition-fast);
+}
+
+.btn-sensor-action:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #FFFFFF;
+}
+
+.sensor-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sensor-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: background 0.15s ease;
+}
+
+.sensor-status-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sensor-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sensor-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.sensor-detail {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.45);
+  font-family: var(--font-mono);
+}
+
+.status-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2.5px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-family: var(--font-mono);
+}
+
+.status-pill-ok {
+  background: rgba(16, 185, 129, 0.18);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.status-pill-muted {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.status-pill-warn {
+  background: rgba(245, 158, 11, 0.18);
+  color: #F59E0B;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+/* Live Usage Card in Settings -> Performance */
+.live-usage-card {
+  margin-top: 10px;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 12px;
+}
+
+.usage-stat-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.usage-label {
+  font-size: 9.5px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.5px;
+}
+
+.usage-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: #FFFFFF;
+  font-family: var(--font-mono);
+}
+
+.usage-val.highlight.pass {
+  color: #10B981;
+}
+
+.usage-val.highlight.warn {
+  color: #F59E0B;
+}
+
+/* ==========================================================================
+   11. UNIFIED DESIGN SYSTEM ENHANCEMENTS (Requirement 2, 4, 6)
+   ========================================================================== */
+
+/* Universal Focus Rings using dynamic accent */
+:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent, #FF7A2F) !important;
+  outline-offset: 1px !important;
+}
+
+/* Scrollbars using dynamic accent */
+.tab-pane::-webkit-scrollbar-thumb:hover,
+.chat-messages-scroll::-webkit-scrollbar-thumb:hover,
+.notes-grid-scroll::-webkit-scrollbar-thumb:hover,
+.todo-list-scroll::-webkit-scrollbar-thumb:hover,
+.reminders-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-scrollbar-hover, rgba(255, 122, 47, 0.45)) !important;
+}
+
+/* Standardized Empty States for all tabs */
+.tab-empty-state {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 36px 20px !important;
+  text-align: center !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px dashed rgba(255, 255, 255, 0.12) !important;
+  border-radius: 16px !important;
+  gap: 8px !important;
+  margin: 12px 0 !important;
+}
+
+.tab-empty-state i,
+.tab-empty-state svg {
+  width: 32px !important;
+  height: 32px !important;
+  color: var(--accent, #FF7A2F) !important;
+  stroke: var(--accent, #FF7A2F) !important;
+  opacity: 0.85 !important;
+  margin-bottom: 4px !important;
+}
+
+.tab-empty-state .empty-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #FFFFFF !important;
+}
+
+.tab-empty-state .empty-subtitle {
+  font-size: 12px !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  max-width: 280px !important;
+  line-height: 1.4 !important;
+}
+
+/* Permissions Card UI (Requirement 4) */
+.permissions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.perm-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.perm-item-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.perm-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.perm-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.perm-title-row i,
+.perm-title-row svg {
+  width: 15px;
+  height: 15px;
+  stroke: var(--accent, #FF7A2F);
+  flex-shrink: 0;
+}
+
+.perm-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.perm-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.perm-badge.granted {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.perm-badge.denied {
+  background: rgba(245, 158, 11, 0.15);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.perm-desc {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.35;
+}
+
+.perm-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.perm-dev-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 10px;
+  color: #7DD3FC;
+  font-size: 11.5px;
+  margin-top: 8px;
+  margin-bottom: 6px;
+}
+
+.perm-dev-notice i,
+.perm-dev-notice svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+/* Enhanced To-Do Item Actions */
+.todo-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.todo-move-btn,
+.todo-edit-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.todo-move-btn:hover,
+.todo-edit-btn:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.todo-move-btn[disabled] {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.todo-move-btn svg,
+.todo-edit-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.todo-inline-edit {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--accent, #FF7A2F);
+  border-radius: 6px;
+  color: #FFFFFF;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  padding: 4px 8px;
+  outline: none;
+}
+
+/* Enhanced Reminder Items */
+.reminder-snooze-btn,
+.reminder-edit-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.reminder-snooze-btn:hover,
+.reminder-edit-btn:hover {
+  color: #FFFFFF;
+  border-color: var(--accent, #FF7A2F);
+  background: var(--accent-soft, rgba(255, 122, 47, 0.16));
+}
+
+.reminder-snooze-btn svg,
+.reminder-edit-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.reminder-time-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent, #FF7A2F);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.reminder-time-badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.reminder-repeat-badge {
+  text-transform: capitalize;
+  opacity: 0.7;
+}
+
+/* Enhanced Timer Stats & Mode Pills */
+.timer-stats-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 6px 14px;
+  margin-top: 4px;
+}
+
+.timer-stats-pill svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--accent, #FF7A2F);
+}
+
+.timer-stats-pill strong {
+  color: #FFFFFF;
+}
+
+/* Notes Cards Header & Timestamp */
+.note-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.note-timestamp {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.note-copy-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+  color: #FFFFFF;
+}
+
+.note-copy-btn:hover {
+  opacity: 1;
+  color: var(--accent, #FF7A2F);
+}
+
 
 

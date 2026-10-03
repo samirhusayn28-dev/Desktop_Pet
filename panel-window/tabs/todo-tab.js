@@ -1,18 +1,21 @@
 /**
  * Desktop Pet — To-Do Tab Controller
  * Replicates the "Working on it... 70%" progress card from the reference art
+ * Supports: add, edit, complete, delete, reorder, progress bar, pet celebration reaction
  */
 
 class TodoTab {
   constructor() {
-    this.container = document.getElementById('todo-items-container');
-    this.inputField = document.getElementById('todo-input-field');
-    this.addBtn = document.getElementById('btn-todo-add');
+    this.container = document.getElementById('todo-items-container') || document.getElementById('todo-items-list');
+    this.inputField = document.getElementById('todo-input-field') || document.getElementById('todo-new-input');
+    this.addBtn = document.getElementById('btn-todo-add') || document.getElementById('btn-add-todo');
     this.statusTextEl = document.getElementById('todo-status-text');
     this.percentTextEl = document.getElementById('todo-percent-text');
+    this.progressRatioEl = document.getElementById('todo-progress-ratio');
     this.progressFillEl = document.getElementById('todo-progress-fill');
 
     this.todos = [];
+    this.editingId = null;
     this.init();
   }
 
@@ -25,11 +28,11 @@ class TodoTab {
   loadTodos() {
     if (!window.panelController) return;
     this.todos = window.panelController.store.get('todos') || [
-      { id: '1', text: 'Read docs', done: true },
-      { id: '2', text: 'Write code', done: true },
-      { id: '3', text: 'Test and debug', done: false },
-      { id: '4', text: 'Build application', done: false },
-      { id: '5', text: 'Take a break', done: false }
+      { id: '1', text: 'Review project architecture', done: true },
+      { id: '2', text: 'Optimize system sensing loops', done: true },
+      { id: '3', text: 'Build responsive glass cards', done: true },
+      { id: '4', text: 'Verify pet animations & emotions', done: false },
+      { id: '5', text: 'Test packaged local Intel build', done: false }
     ];
     this.render();
   }
@@ -41,15 +44,20 @@ class TodoTab {
   }
 
   setupEvents() {
-    this.addBtn.addEventListener('click', () => this.addTodo());
-    this.inputField.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        this.addTodo();
-      }
-    });
+    if (this.addBtn) {
+      this.addBtn.addEventListener('click', () => this.addTodo());
+    }
+    if (this.inputField) {
+      this.inputField.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          this.addTodo();
+        }
+      });
+    }
   }
 
   addTodo() {
+    if (!this.inputField) return;
     const text = this.inputField.value.trim();
     if (!text) return;
 
@@ -77,56 +85,154 @@ class TodoTab {
 
       // Check if all completed -> celebrate!
       if (this.todos.length > 0 && this.todos.every(t => t.done)) {
-        window.panelController.notifyPet('pet:set-state', { state: 'celebrating', duration: 3500 });
-        window.panelController.notifyPet('pet:show-bubble', { text: "All tasks completed! Amazing work!", duration: 4000 });
+        window.panelController.notifyPet('pet:set-state', { state: 'celebrating', duration: 4000 });
+        const name = (window.panelController.store.get('settings.general.userName') || '').trim();
+        const msg = name ? `All tasks done, ${name}! You crushed it today!` : 'All tasks completed! Amazing work!';
+        window.panelController.notifyPet('pet:show-bubble', { text: msg, duration: 4500, emotion: 'happy', badge: 'SPRINT COMPLETE' });
         if (window.soundEffects) window.soundEffects.playHappy();
       }
     }
+  }
+
+  startEdit(id, textEl) {
+    const item = this.todos.find(t => t.id === id);
+    if (!item) return;
+
+    const currentText = item.text;
+    const editInput = document.createElement('input');
+    editInput.type = 'text';
+    editInput.className = 'todo-inline-edit';
+    editInput.value = currentText;
+
+    const commit = () => {
+      const val = editInput.value.trim();
+      if (val && val !== currentText) {
+        item.text = val;
+        this.saveTodos();
+      }
+      this.render();
+    };
+
+    editInput.addEventListener('blur', commit);
+    editInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        editInput.blur();
+      } else if (e.key === 'Escape') {
+        this.render();
+      }
+    });
+
+    textEl.replaceWith(editInput);
+    editInput.focus();
+    editInput.select();
+  }
+
+  moveTodo(id, direction) {
+    const index = this.todos.findIndex(t => t.id === id);
+    if (index === -1) return;
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= this.todos.length) return;
+
+    const [moved] = this.todos.splice(index, 1);
+    this.todos.splice(newIndex, 0, moved);
+    this.saveTodos();
+    this.render();
+    if (window.soundEffects) window.soundEffects.playTap();
   }
 
   deleteTodo(id) {
     this.todos = this.todos.filter(t => t.id !== id);
     this.saveTodos();
     this.render();
+    if (window.soundEffects) window.soundEffects.playTap();
   }
 
   updateProgress() {
-    if (this.todos.length === 0) {
-      this.percentTextEl.textContent = '0%';
-      this.progressFillEl.style.width = '0%';
-      this.statusTextEl.textContent = 'All clear!';
-      return;
-    }
-
     const doneCount = this.todos.filter(t => t.done).length;
-    const percent = Math.round((doneCount / this.todos.length) * 100);
+    const total = this.todos.length;
+    const percent = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
-    this.percentTextEl.textContent = `${percent}%`;
-    this.progressFillEl.style.width = `${percent}%`;
+    if (this.percentTextEl) this.percentTextEl.textContent = `${percent}%`;
+    if (this.progressRatioEl) this.progressRatioEl.textContent = `${doneCount} / ${total} (${percent}%)`;
+    if (this.progressFillEl) this.progressFillEl.style.width = `${percent}%`;
 
-    if (percent === 100) {
-      this.statusTextEl.textContent = 'All done!';
-    } else if (percent >= 50) {
-      this.statusTextEl.textContent = 'Working on it...';
-    } else {
-      this.statusTextEl.textContent = 'Getting started...';
+    if (this.statusTextEl) {
+      if (total === 0) {
+        this.statusTextEl.textContent = 'All clear!';
+      } else if (percent === 100) {
+        this.statusTextEl.textContent = 'All done!';
+      } else if (percent >= 50) {
+        this.statusTextEl.textContent = 'Working on it...';
+      } else {
+        this.statusTextEl.textContent = 'Getting started...';
+      }
     }
   }
 
   render() {
+    if (!this.container) return;
     this.container.innerHTML = '';
-    this.todos.forEach(item => {
+
+    if (this.todos.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'tab-empty-state';
+      empty.innerHTML = `
+        <i data-lucide="check-circle-2"></i>
+        <span class="empty-title">All tasks completed</span>
+        <span class="empty-subtitle">Add a new task above to stay productive!</span>
+      `;
+      this.container.appendChild(empty);
+      this.updateProgress();
+      if (window.panelController && typeof window.panelController.refreshIcons === 'function') {
+        window.panelController.refreshIcons();
+      }
+      return;
+    }
+
+    this.todos.forEach((item, index) => {
       const el = document.createElement('div');
       el.className = `todo-item ${item.done ? 'done' : ''}`;
       el.innerHTML = `
-        <input type="checkbox" class="todo-checkbox" ${item.done ? 'checked' : ''}>
-        <span class="todo-text">${item.text}</span>
-        <button class="todo-delete-btn" title="Delete"><i data-lucide="trash-2"></i></button>
+        <input type="checkbox" class="todo-checkbox" ${item.done ? 'checked' : ''} title="Mark task done">
+        <span class="todo-text" title="Double click to edit">${item.text}</span>
+        <div class="todo-item-actions">
+          <button class="todo-move-btn" data-action="up" title="Move Up" ${index === 0 ? 'disabled' : ''}>
+            <i data-lucide="chevron-up"></i>
+          </button>
+          <button class="todo-move-btn" data-action="down" title="Move Down" ${index === this.todos.length - 1 ? 'disabled' : ''}>
+            <i data-lucide="chevron-down"></i>
+          </button>
+          <button class="todo-edit-btn" title="Edit Task">
+            <i data-lucide="edit-3"></i>
+          </button>
+          <button class="todo-delete-btn" title="Delete Task">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
       `;
 
       el.querySelector('.todo-checkbox').addEventListener('change', () => {
         this.toggleTodo(item.id);
       });
+
+      const textSpan = el.querySelector('.todo-text');
+      textSpan.addEventListener('dblclick', () => {
+        this.startEdit(item.id, textSpan);
+      });
+
+      el.querySelector('.todo-edit-btn').addEventListener('click', () => {
+        this.startEdit(item.id, textSpan);
+      });
+
+      const upBtn = el.querySelector('[data-action="up"]');
+      if (upBtn) {
+        upBtn.addEventListener('click', () => this.moveTodo(item.id, -1));
+      }
+
+      const downBtn = el.querySelector('[data-action="down"]');
+      if (downBtn) {
+        downBtn.addEventListener('click', () => this.moveTodo(item.id, 1));
+      }
 
       el.querySelector('.todo-delete-btn').addEventListener('click', () => {
         this.deleteTodo(item.id);
@@ -134,6 +240,7 @@ class TodoTab {
 
       this.container.appendChild(el);
     });
+
     this.updateProgress();
     if (window.panelController && typeof window.panelController.refreshIcons === 'function') {
       window.panelController.refreshIcons();

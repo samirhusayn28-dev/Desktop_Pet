@@ -174,6 +174,91 @@ class AIService {
   }
 
   /**
+   * Identifies specialized, regional, embedding, audio, vision-only, or moderation models
+   * that MUST be excluded from auto-selection/defaults.
+   */
+  isExcludedFromAutoSelection(id) {
+    if (!id) return true;
+    const s = id.toLowerCase();
+    const excludedKeywords = [
+      'allam', 'whisper', 'audio', 'tts', 'embedding', 'embed',
+      'moderation', 'guard', 'safeguard', 'distil-whisper', 'bilingual',
+      'rerank', 'dall-e', 'clip', 'text-embedding', 'vision-preview',
+      'deepseek-vl', 'qwen-vl', 'vl-'
+    ];
+    return excludedKeywords.some(kw => s.includes(kw));
+  }
+
+  /**
+   * Chooses the highest priority general-purpose chat model from an available list
+   */
+  getPriorityDefaultModel(provider, availableModels = []) {
+    const modelIds = availableModels.map(m => (typeof m === 'string' ? m : m.id));
+    const eligible = modelIds.filter(id => !this.isExcludedFromAutoSelection(id));
+
+    const priorityLists = {
+      groq: [
+        'llama-3.3-70b-versatile',
+        'llama-3.1-70b-versatile',
+        'llama-3.1-8b-instant',
+        'llama-3.2-3b-preview',
+        'llama3-70b-8192',
+        'llama3-8b-8192',
+        'mixtral-8x7b-32768',
+        'gemma2-9b-it'
+      ],
+      gemini: [
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-8b',
+        'gemini-2.0-flash-lite',
+        'gemini-1.5-pro'
+      ],
+      openai: [
+        'gpt-4o-mini',
+        'gpt-4o',
+        'gpt-3.5-turbo',
+        'o3-mini',
+        'o1-mini'
+      ],
+      anthropic: [
+        'claude-3-5-sonnet-20241022',
+        'claude-3-5-haiku-20241022',
+        'claude-3-haiku-20240307'
+      ],
+      deepseek: [
+        'deepseek-chat',
+        'deepseek-reasoner'
+      ],
+      ollama: [
+        'llama3.3:latest',
+        'llama3.2:latest',
+        'llama3.1:latest',
+        'llama3:latest',
+        'mistral:latest',
+        'qwen2.5:latest'
+      ]
+    };
+
+    const prios = priorityLists[provider] || [];
+    for (const p of prios) {
+      const match = eligible.find(id => id.toLowerCase() === p.toLowerCase() || id.toLowerCase().startsWith(p.toLowerCase()));
+      if (match) return match;
+    }
+
+    if (eligible.length > 0) return eligible[0];
+
+    // Fixed sensible defaults if list is empty
+    if (provider === 'groq') return 'llama-3.3-70b-versatile';
+    if (provider === 'gemini') return 'gemini-1.5-flash';
+    if (provider === 'openai') return 'gpt-4o-mini';
+    if (provider === 'anthropic') return 'claude-3-5-sonnet-20241022';
+    if (provider === 'deepseek') return 'deepseek-chat';
+    if (provider === 'ollama') return 'llama3:latest';
+    return modelIds[0] || 'default';
+  }
+
+  /**
    * Fetch dynamic model list per provider
    */
   async fetchModels(provider, apiKey, baseUrl) {
@@ -203,7 +288,12 @@ class AIService {
             };
           });
 
-        list.sort((a, b) => (b.isFlash ? 1 : 0) - (a.isFlash ? 1 : 0));
+        list.sort((a, b) => {
+          const aEx = this.isExcludedFromAutoSelection(a.id);
+          const bEx = this.isExcludedFromAutoSelection(b.id);
+          if (aEx !== bEx) return aEx ? 1 : -1;
+          return (b.isFlash ? 1 : 0) - (a.isFlash ? 1 : 0);
+        });
         return list;
       }
 
@@ -217,9 +307,20 @@ class AIService {
           }
         });
         const data = JSON.parse(res.body);
-        return (data.data || [])
-          .filter(m => !m.id.includes('whisper'))
-          .map(m => ({ id: m.id, name: m.id }));
+        const list = (data.data || []).map(m => ({ id: m.id, name: m.id }));
+
+        // Sort: General-purpose chat models at the top, specialized/regional models at the bottom
+        list.sort((a, b) => {
+          const aEx = this.isExcludedFromAutoSelection(a.id);
+          const bEx = this.isExcludedFromAutoSelection(b.id);
+          if (aEx !== bEx) return aEx ? 1 : -1;
+          const aLlama = a.id.includes('llama-3.3') || a.id.includes('llama-3.1');
+          const bLlama = b.id.includes('llama-3.3') || b.id.includes('llama-3.1');
+          if (aLlama !== bLlama) return bLlama ? 1 : -1;
+          return a.id.localeCompare(b.id);
+        });
+
+        return list;
       }
 
       if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'qwen' || provider === 'custom') {
@@ -234,7 +335,16 @@ class AIService {
 
         const res = await this.makeRequest(`${root}/models`, { method: 'GET', headers });
         const data = JSON.parse(res.body);
-        return (data.data || []).map(m => ({ id: m.id, name: m.id }));
+        const list = (data.data || []).map(m => ({ id: m.id, name: m.id }));
+
+        list.sort((a, b) => {
+          const aEx = this.isExcludedFromAutoSelection(a.id);
+          const bEx = this.isExcludedFromAutoSelection(b.id);
+          if (aEx !== bEx) return aEx ? 1 : -1;
+          return a.id.localeCompare(b.id);
+        });
+
+        return list;
       }
 
       if (provider === 'ollama') {
@@ -275,12 +385,19 @@ class AIService {
         };
       }
 
+      // Auto-correct model if excluded from general chat
+      let activeModel = model;
+      if (!activeModel || this.isExcludedFromAutoSelection(activeModel)) {
+        activeModel = this.getPriorityDefaultModel(provider);
+        store.set(`settings.ai.models.${provider}`, activeModel);
+      }
+
       // 1. Google Gemini Test
       if (provider === 'gemini') {
         const root = (baseUrl || 'https://generativelanguage.googleapis.com').replace(/\/+$/, '');
-        let activeModel = (model || 'gemini-1.5-flash').replace(/^models\//, '');
+        let cleanModel = activeModel.replace(/^models\//, '');
 
-        const url = `${root}/v1beta/models/${encodeURIComponent(activeModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const url = `${root}/v1beta/models/${encodeURIComponent(cleanModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
         const payload = JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
           generationConfig: { maxOutputTokens: 3 }
@@ -293,7 +410,7 @@ class AIService {
 
         return {
           success: true,
-          friendly: `Connection successful! ${activeModel} is active and ready.`,
+          friendly: `Connection successful! ${cleanModel} is active and ready.`,
           details: 'OK 200'
         };
       }
@@ -301,7 +418,6 @@ class AIService {
       // 2. Groq Test
       if (provider === 'groq') {
         const root = (baseUrl || 'https://api.groq.com/openai/v1').replace(/\/+$/, '');
-        const activeModel = model || 'llama-3.3-70b-versatile';
 
         const payload = JSON.stringify({
           model: activeModel,
@@ -441,10 +557,22 @@ class AIService {
 
     const apiKey = (passedKey || store.getApiKey(provider) || '').trim();
 
-    // Prepare system prompt with pet personality and desktop context
-    let fullSystemPrompt = systemPrompt || `You are Bolt, a minimal, friendly desktop pet companion. Keep answers clear, helpful, and concise. Format code in markdown with language tags.`;
+    // Prepare system prompt with pet personality, user name, and desktop context
+    const petName = store.get('settings.general.petName') || 'Desktop Pet';
+    const userName = (store.get('settings.general.userName') || '').trim();
+    let fullSystemPrompt = systemPrompt || `You are ${petName}, a friendly desktop pet assistant. Always reply in the same language as the user's last message (default English). Keep answers concise.`;
+    if (userName) {
+      fullSystemPrompt += ` The user's name is ${userName}. Address them by name occasionally and naturally, not in every sentence.`;
+    }
     if (contextInfo) {
       fullSystemPrompt += `\n\n[Current Desktop Context: User is in "${contextInfo.appName || 'an application'}" - Window: "${contextInfo.windowTitle || ''}"${contextInfo.url ? ` - URL: ${contextInfo.url}` : ''}]`;
+    }
+
+    // Auto-correct model if excluded from general chat (e.g. allam-2-7b)
+    let activeModel = model;
+    if (!activeModel || this.isExcludedFromAutoSelection(activeModel)) {
+      activeModel = this.getPriorityDefaultModel(provider);
+      store.set(`settings.ai.models.${provider}`, activeModel);
     }
 
     // Attempt streaming with retry fallback
@@ -453,7 +581,7 @@ class AIService {
         if (provider === 'gemini') {
           return await this.streamGemini(requestId, {
             apiKey,
-            model: (model || 'gemini-1.5-flash').replace(/^models\//, ''),
+            model: (activeModel || 'gemini-1.5-flash').replace(/^models\//, ''),
             baseUrl,
             messages,
             systemPrompt: fullSystemPrompt,
@@ -466,7 +594,7 @@ class AIService {
           return await this.streamOpenAICompatible(requestId, {
             provider,
             apiKey,
-            model,
+            model: activeModel,
             baseUrl,
             messages,
             systemPrompt: fullSystemPrompt,
@@ -478,7 +606,7 @@ class AIService {
         if (provider === 'anthropic') {
           return await this.streamAnthropic(requestId, {
             apiKey,
-            model: model || 'claude-3-5-sonnet-20241022',
+            model: activeModel || 'claude-3-5-sonnet-20241022',
             baseUrl,
             messages,
             systemPrompt: fullSystemPrompt,

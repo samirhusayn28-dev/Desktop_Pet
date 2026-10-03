@@ -1,34 +1,139 @@
 /**
- * Desktop Pet — Floating Window Styling with 3D Perspective & Unclipped Padding
- * Real glassmorphic translucent speech bubbles and popups.
+ * Desktop Pet — Floating Window Styling with Solid Cute Material Aesthetic
+ * Zero transparency/blur on pet face or bubble; compositor-driven transform/opacity only.
  */
 
+:root {
+  --bg: #111113;
+  --surface-1: #17171A;
+  --surface-2: #1F1F24;
+  --surface-3: #2A2A31;
+  --border: #2E2E35;
+  --text: #F4F4F5;
+  --text-muted: #9A9AA3;
+  --accent: #FF7A2F;
+  --accent-glow: rgba(255, 122, 47, 0.35);
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
 * {
-  box-sizing: border-box;
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
 }
 
 html, body {
   background: transparent !important;
   width: 100%;
   height: 100%;
-  overflow: visible;
+  overflow: hidden;
   user-select: none;
+  -webkit-user-select: none;
   font-family: var(--font-sans);
-  pointer-events: none; /* Clicks outside pet pass through to desktop */
+  pointer-events: none; /* Clicks outside pet/bubble pass straight through */
 }
 
 .pet-app-container {
+  position: relative;
   width: 100%;
   height: 100%;
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
+  padding-bottom: 10px;
   perspective: 700px;
   overflow: visible;
+  pointer-events: none;
+}
+
+/* Solid Cute Material Speech Bubble (No blur, no transparency lag) */
+.pet-speech-bubble {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 270px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px 14px;
+  color: var(--text);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--border);
+  pointer-events: auto;
+  z-index: 100;
+  text-align: center;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.pet-speech-bubble.fade-in {
+  animation: bubbleFadeIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.pet-speech-bubble.fade-out {
+  animation: bubbleFadeOut 0.18s ease forwards;
+}
+
+@keyframes bubbleFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes bubbleFadeOut {
+  from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px) scale(0.95);
+  }
+}
+
+.bubble-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 4px;
+  line-height: 1;
+}
+
+.bubble-text {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text);
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bubble-tail {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12px;
+  height: 12px;
+  background: var(--surface-1);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 /* Pet Viewport & Interactive 3D Surface */
@@ -42,15 +147,40 @@ html, body {
   transform-style: preserve-3d;
   will-change: transform;
   overflow: visible;
+  animation: petBreathing 4.5s ease-in-out infinite;
 }
 
 .pet-viewport:active {
   cursor: grabbing;
 }
 
+/* Slow natural breathing */
+@keyframes petBreathing {
+  0%, 100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.018, 0.988) translateY(1px);
+  }
+}
+
+/* Sleep slow breathing */
+.pet-viewport.sleeping {
+  animation: petSleepBreathing 6.5s ease-in-out infinite !important;
+}
+
+@keyframes petSleepBreathing {
+  0%, 100% {
+    transform: scale(1, 1) translateY(0);
+  }
+  50% {
+    transform: scale(1.025, 0.975) translateY(2px);
+  }
+}
+
 /* Dangling Pose during mouse drag */
 .pet-viewport.dangling {
-  animation: petDangle 0.5s ease-in-out infinite alternate;
+  animation: petDangle 0.45s ease-in-out infinite alternate !important;
   transform: scale(0.96) translateY(-4px);
 }
 
@@ -61,33 +191,33 @@ html, body {
 
 /* Drop Bounce */
 .pet-viewport.bounce-drop {
-  animation: petDropBounce 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: petDropBounce 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }
 
 @keyframes petDropBounce {
-  0% { transform: scale(1.12, 0.88) translateY(6px); }
+  0% { transform: scale(1.14, 0.86) translateY(6px); }
   45% { transform: scale(0.94, 1.06) translateY(-8px); }
   75% { transform: scale(1.03, 0.97) translateY(2px); }
   100% { transform: scale(1, 1) translateY(0); }
 }
 
-/* Context Menu */
+/* Solid Context Menu on Right Click */
 .quick-menu {
   position: absolute;
-  top: 40px;
+  top: 30px;
   left: 20px;
-  background: rgba(22, 22, 26, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  padding: 8px;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
   z-index: 200;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 190px;
+  min-width: 195px;
   pointer-events: auto;
-  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 .quick-menu.hidden {
@@ -95,30 +225,44 @@ html, body {
 }
 
 .menu-item {
-  font-size: 12px;
-  font-weight: 600;
-  color: #D3D5E4;
-  padding: 7px 10px;
-  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.12s ease, color 0.12s ease;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+.menu-item svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: color 0.12s ease;
 }
 
 .menu-item:hover {
-  background: var(--accent-soft, rgba(255, 122, 47, 0.15));
+  background: var(--surface-2);
   color: #FFFFFF;
 }
 
+.menu-item:hover svg {
+  color: var(--accent);
+}
+
 .menu-item.text-danger:hover {
-  background: rgba(245, 80, 54, 0.2);
-  color: #FF705A;
+  background: rgba(239, 68, 68, 0.18);
+  color: #F87171;
+}
+
+.menu-item.text-danger:hover svg {
+  color: #F87171;
 }
 
 .menu-separator {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
-  margin: 4px 2px;
+  background: var(--border);
+  margin: 4px 0;
 }

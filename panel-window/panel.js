@@ -87,10 +87,10 @@ class PanelController {
   }
 
   applyPetName(name) {
-    const finalName = name || this.store.get('settings.general.petName') || 'Pet';
-    const brandTitle = document.getElementById('header-brand-title');
+    const finalName = name || this.store.get('settings.general.petName') || 'Bolt';
+    const brandTitle = document.getElementById('panel-title-text') || document.getElementById('header-brand-title');
     if (brandTitle) brandTitle.textContent = finalName;
-    const chatTitle = document.getElementById('chat-header-title');
+    const chatTitle = document.getElementById('chat-assistant-name') || document.getElementById('chat-header-title');
     if (chatTitle) chatTitle.textContent = `${finalName} Assistant`;
   }
 
@@ -142,8 +142,8 @@ class PanelController {
   }
 
   setupWindowButtons() {
-    const minBtn = document.getElementById('btn-minimize-panel');
-    const closeBtn = document.getElementById('btn-close-panel');
+    const minBtn = document.getElementById('btn-win-min') || document.getElementById('btn-minimize-panel');
+    const closeBtn = document.getElementById('btn-win-close') || document.getElementById('btn-close-panel');
     const settingsBtn = document.getElementById('btn-header-settings');
 
     if (minBtn) {

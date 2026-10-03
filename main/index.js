@@ -1,13 +1,23 @@
-const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, powerMonitor } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, powerMonitor, systemPreferences, desktopCapturer, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const si = require('systeminformation');
+
+let _si = null;
+function getSi() {
+  if (!_si) _si = require('systeminformation');
+  return _si;
+}
+
 const store = require('./secure-store');
 const aiService = require('./ai-service');
 const bubble = require('./bubble-window');
 const scheduler = require('./scheduler');
 const systemSense = require('./system-sense');
 const contextSensor = require('./context-sensor');
+
+app.commandLine.appendSwitch('disable-features', 'Autofill,Translate,MediaRouter,CalculateNativeWinOcclusion,SpareRendererForSitePerProcess');
+app.commandLine.appendSwitch('renderer-process-limit', '2');
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=128');
 
 // Global Error Handlers
 process.on('uncaughtException', (err) => {
@@ -119,8 +129,8 @@ function createTray() {
 
 function getPetWindowSize(scale = 1.0) {
   const s = Math.max(0.5, Math.min(3.0, scale));
-  const w = Math.round(260 * s);
-  const h = Math.round(260 * s);
+  const w = Math.round(280 * s);
+  const h = Math.round(280 * s);
   return [w, h];
 }
 
@@ -156,7 +166,9 @@ function createPetWindow() {
     alwaysOnTop: store.get('settings.general.alwaysOnTop') !== false,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      spellcheck: false,
+      backgroundThrottling: true
     }
   });
 
@@ -188,39 +200,68 @@ function createPetWindow() {
 }
 
 /**
- * Throttled cursor tracking at 30 FPS max (33ms)
- * Checks delta: only sends IPC if cursor moved by > 1.5px
- * Pauses sending if pet is sleeping to eliminate unnecessary CPU usage
+ * Adaptive Cursor Tracking (Max 30 Hz / 33ms only while moving)
+ * - Checks delta: only sends IPC if cursor moved by > 1.5px
+ * - Automatically throttles down to 300ms when cursor is still (0% idle CPU)
+ * - Immediately stops completely when pet is sleeping
  */
+let stillCount = 0;
+
+function pollCursorTick() {
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || petIdleState === 'sleeping') {
+    return;
+  }
+
+  try {
+    const cursor = screen.getCursorScreenPoint();
+    const dist = Math.hypot(cursor.x - lastCursorPos.x, cursor.y - lastCursorPos.y);
+    if (dist < 1.5) {
+      stillCount++;
+      // If still for > 6 ticks (~200ms), drop to slow 300ms polling to eliminate CPU
+      if (stillCount === 7 && cursorPollInterval) {
+        clearInterval(cursorPollInterval);
+        cursorPollInterval = setInterval(pollCursorTick, 300);
+      }
+      return;
+    }
+
+    // Cursor is moving!
+    lastCursorPos = { x: cursor.x, y: cursor.y };
+    if (stillCount >= 7) {
+      // Restore fast 33ms polling
+      clearInterval(cursorPollInterval);
+      cursorPollInterval = setInterval(pollCursorTick, 33);
+    }
+    stillCount = 0;
+
+    const [winX, winY] = petWindow.getPosition();
+    const [winW, winH] = petWindow.getSize();
+
+    const petCenterX = winX + winW / 2;
+    const petCenterY = winY + winH / 2;
+
+    const maxDistance = 500;
+    const diffX = cursor.x - petCenterX;
+    const diffY = cursor.y - petCenterY;
+
+    const normX = Math.max(-1, Math.min(1, diffX / maxDistance));
+    const normY = Math.max(-1, Math.min(1, diffY / maxDistance));
+
+    petWindow.webContents.send('pet:global-cursor', { normX, normY });
+  } catch (e) {}
+}
+
 function startThrottledCursorTracking() {
   if (cursorPollInterval) clearInterval(cursorPollInterval);
+  stillCount = 0;
+  cursorPollInterval = setInterval(pollCursorTick, 33);
+}
 
-  cursorPollInterval = setInterval(() => {
-    if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || petIdleState === 'sleeping') return;
-
-    try {
-      const cursor = screen.getCursorScreenPoint();
-      const dist = Math.hypot(cursor.x - lastCursorPos.x, cursor.y - lastCursorPos.y);
-      if (dist < 1.5) return; // Skip minor jitter
-
-      lastCursorPos = { x: cursor.x, y: cursor.y };
-
-      const [winX, winY] = petWindow.getPosition();
-      const [winW, winH] = petWindow.getSize();
-
-      const petCenterX = winX + winW / 2;
-      const petCenterY = winY + winH / 2;
-
-      const maxDistance = 500;
-      const diffX = cursor.x - petCenterX;
-      const diffY = cursor.y - petCenterY;
-
-      const normX = Math.max(-1, Math.min(1, diffX / maxDistance));
-      const normY = Math.max(-1, Math.min(1, diffY / maxDistance));
-
-      petWindow.webContents.send('pet:global-cursor', { normX, normY });
-    } catch (e) {}
-  }, 33);
+function stopCursorTracking() {
+  if (cursorPollInterval) {
+    clearInterval(cursorPollInterval);
+    cursorPollInterval = null;
+  }
 }
 
 /**
@@ -244,6 +285,8 @@ function startIdleMonitoring() {
       if (idleSec >= sleepingSec) {
         if (petIdleState !== 'sleeping') {
           petIdleState = 'sleeping';
+          systemSense.setSleeping(true);
+          stopCursorTracking();
           petWindow.webContents.send('pet:set-state', { state: 'sleeping' });
         }
       } else if (idleSec >= sleepySec) {
@@ -255,6 +298,8 @@ function startIdleMonitoring() {
         // User is active
         if (petIdleState === 'sleeping' || petIdleState === 'sleepy') {
           petIdleState = 'neutral';
+          systemSense.setSleeping(false);
+          startThrottledCursorTracking();
           petWindow.webContents.send('pet:set-state', { state: 'surprised', duration: 450 });
           setTimeout(() => {
             if (petWindow && !petWindow.isDestroyed() && petIdleState === 'neutral') {
@@ -265,19 +310,101 @@ function startIdleMonitoring() {
       }
     } catch (e) {}
   }, 3000);
+
+  // Pause animations & sensors when screen is locked or system is suspended
+  try {
+    powerMonitor.on('lock-screen', () => {
+      petIdleState = 'sleeping';
+      systemSense.setSleeping(true);
+      stopCursorTracking();
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'sleeping' });
+      }
+    });
+    powerMonitor.on('suspend', () => {
+      petIdleState = 'sleeping';
+      systemSense.setSleeping(true);
+      stopCursorTracking();
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'sleeping' });
+      }
+    });
+    powerMonitor.on('unlock-screen', () => {
+      petIdleState = 'neutral';
+      systemSense.setSleeping(false);
+      startThrottledCursorTracking();
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'neutral' });
+      }
+    });
+    powerMonitor.on('resume', () => {
+      petIdleState = 'neutral';
+      systemSense.setSleeping(false);
+      startThrottledCursorTracking();
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'neutral' });
+      }
+    });
+  } catch (e) {}
+}
+
+function closePanel() {
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    try {
+      const [w, h] = panelWindow.getSize();
+      store.set('window.panelWidth', w);
+      store.set('window.panelHeight', h);
+    } catch (e) {}
+    panelWindow.destroy();
+    panelWindow = null;
+  }
 }
 
 function createPanelWindow() {
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    return;
+  }
+
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+  const workArea = primaryDisplay.workArea; // { x, y, width, height }
+  
+  const savedW = store.get('window.panelWidth') || 520;
+  const savedH = store.get('window.panelHeight') || 680;
+
+  const width = Math.min(Math.max(420, savedW), workArea.width - 32);
+  const height = Math.min(Math.max(560, savedH), workArea.height - 32);
+
+  // Position adjacent to pet, strictly clamped within workArea
+  let targetX = Math.round(workArea.x + (workArea.width - width) / 2);
+  let targetY = Math.round(workArea.y + (workArea.height - height) / 2);
+
+  if (petWindow && !petWindow.isDestroyed()) {
+    const [petX, petY] = petWindow.getPosition();
+    const [petW, petH] = petWindow.getSize();
+
+    targetX = petX - width - 16;
+    if (targetX < workArea.x + 16) {
+      targetX = petX + petW + 16;
+    }
+    if (targetX + width > workArea.x + workArea.width - 16) {
+      targetX = Math.max(workArea.x + 16, workArea.x + workArea.width - width - 16);
+    }
+
+    targetY = Math.round(petY - (height - petH) / 2);
+    if (targetY < workArea.y + 10) targetY = workArea.y + 10;
+    if (targetY + height > workArea.y + workArea.height - 16) {
+      targetY = Math.max(workArea.y + 10, workArea.y + workArea.height - height - 16);
+    }
+  }
 
   panelWindow = new BrowserWindow({
-    width: 520,
-    height: 680,
-    x: Math.round(screenW / 2 - 260),
-    y: Math.round(screenH / 2 - 340),
+    width,
+    height,
+    x: targetX,
+    y: targetY,
     minWidth: 420,
     minHeight: 560,
+    show: false, // Create with show: false to eliminate flicker
     transparent: true,
     frame: false,
     backgroundColor: '#00000000',
@@ -289,11 +416,20 @@ function createPanelWindow() {
     visualEffectState: 'active',
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      spellcheck: false,
+      backgroundThrottling: true
     }
   });
 
   panelWindow.loadFile(path.join(__dirname, '..', 'panel-window', 'panel.html'));
+
+  panelWindow.once('ready-to-show', () => {
+    if (panelWindow && !panelWindow.isDestroyed()) {
+      panelWindow.show();
+      panelWindow.focus();
+    }
+  });
 
   panelWindow.on('blur', () => {
     lastPanelBlurTime = Date.now();
@@ -305,42 +441,17 @@ function createPanelWindow() {
 }
 
 function showPanel() {
-  if (!panelWindow || panelWindow.isDestroyed()) createPanelWindow();
-
-  if (petWindow && !petWindow.isDestroyed()) {
-    const [petX, petY] = petWindow.getPosition();
-    const [petW, petH] = petWindow.getSize();
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
-    const [panW, panH] = panelWindow.getSize();
-
-    // Position panel directly adjacent to the pet
-    let panelX = petX - panW - 16;
-    if (panelX < 20) {
-      panelX = petX + petW + 16;
-    }
-    if (panelX + panW > screenW - 20) {
-      panelX = Math.max(20, screenW - panW - 20);
-    }
-
-    let panelY = petY - (panH - petH) / 2;
-    if (panelY < 30) panelY = 30;
-    if (panelY + panH > screenH - 20) panelY = screenH - panH - 20;
-
-    panelWindow.setPosition(Math.round(panelX), Math.round(panelY));
+  if (!panelWindow || panelWindow.isDestroyed()) {
+    createPanelWindow();
+  } else {
+    panelWindow.show();
+    panelWindow.focus();
   }
-
-  panelWindow.show();
-  panelWindow.focus();
 }
 
 function togglePanel() {
-  if (!panelWindow || panelWindow.isDestroyed()) {
-    showPanel();
-    return;
-  }
-  if (panelWindow.isVisible()) {
-    panelWindow.hide();
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    closePanel();
   } else {
     showPanel();
   }
@@ -372,11 +483,11 @@ ipcMain.on('panel:open', (e, opts) => {
 });
 
 ipcMain.on('panel:close', () => {
-  if (panelWindow && !panelWindow.isDestroyed()) panelWindow.hide();
+  closePanel();
 });
 
 ipcMain.on('panel:minimize', () => {
-  if (panelWindow && !panelWindow.isDestroyed()) panelWindow.hide();
+  closePanel();
 });
 
 ipcMain.on('pet:hide', () => {
@@ -621,11 +732,12 @@ ipcMain.handle('system:get-stats', async () => {
   try {
     const now = Date.now();
 
+    const _s = getSi();
     if (!cachedStaticInfo) {
       const [cpu, osInfo, graphics] = await Promise.all([
-        si.cpu().catch(() => ({})),
-        si.osInfo().catch(() => ({})),
-        si.graphics().catch(() => null)
+        _s.cpu().catch(() => ({})),
+        _s.osInfo().catch(() => ({})),
+        _s.graphics().catch(() => null)
       ]);
       cachedStaticInfo = {
         cpuModel: `${cpu.manufacturer || ''} ${cpu.brand || 'Processor'}`.trim(),
@@ -638,7 +750,7 @@ ipcMain.handle('system:get-stats', async () => {
     }
 
     if (now - lastProcessFetchTime > 3000) {
-      si.processes().then(p => {
+      _s.processes().then(p => {
         lastProcessList = (p.list || [])
           .sort((a, b) => (b.cpu + b.mem) - (a.cpu + a.mem))
           .slice(0, 5)
@@ -653,7 +765,7 @@ ipcMain.handle('system:get-stats', async () => {
     }
 
     if (now - lastFsFetchTime > 5000) {
-      si.fsSize().then(disks => {
+      _s.fsSize().then(disks => {
         lastFsSize = (disks || [])
           .filter(d => d.size > 0 && (d.mount === '/' || d.mount.startsWith('/Volumes/')))
           .map(d => ({
@@ -668,15 +780,15 @@ ipcMain.handle('system:get-stats', async () => {
     }
 
     const [load, mem, netStats, battery] = await Promise.all([
-      si.currentLoad().catch(() => ({ currentLoad: 0, cpus: [] })),
-      si.mem().catch(() => ({ total: 1, used: 0, swapused: 0, swaptotal: 0 })),
-      si.networkStats().catch(() => []),
-      si.battery().catch(() => ({ hasBattery: false, percent: 100, isCharging: true }))
+      _s.currentLoad().catch(() => ({ currentLoad: 0, cpus: [] })),
+      _s.mem().catch(() => ({ total: 1, used: 0, swapused: 0, swaptotal: 0 })),
+      _s.networkStats().catch(() => []),
+      _s.battery().catch(() => ({ hasBattery: false, percent: 100, isCharging: true }))
     ]);
 
     let time = { uptime: 0 };
     try {
-      time = si.time();
+      time = _s.time();
     } catch (e) {}
 
     const cores = (load.cpus || []).map((c, idx) => ({
@@ -686,7 +798,7 @@ ipcMain.handle('system:get-stats', async () => {
 
     let temp = null;
     try {
-      const t = await si.cpuTemperature();
+      const t = await _s.cpuTemperature();
       if (t && t.main > 0) temp = Math.round(t.main);
     } catch (e) {}
 
@@ -747,6 +859,154 @@ ipcMain.handle('system:get-stats', async () => {
   }
 });
 
+// Sensor Status & Settings Pane
+ipcMain.handle('system:get-sensor-status', async () => {
+  return await systemSense.getSensorStatus();
+});
+
+// System Permissions Diagnostics & Actions (Requirement 4)
+async function checkSystemPermissions() {
+  if (process.platform !== 'darwin') {
+    return {
+      platform: process.platform,
+      isDev: !app.isPackaged,
+      accessibility: 'granted',
+      screenRecording: 'granted',
+      automation: 'granted'
+    };
+  }
+
+  // 1. Accessibility
+  let accessibility = 'denied';
+  try {
+    accessibility = systemPreferences.isTrustedAccessibilityClient(false) ? 'granted' : 'denied';
+  } catch (e) {
+    accessibility = 'denied';
+  }
+
+  // 2. Screen Recording
+  let screenRecording = 'denied';
+  try {
+    const status = systemPreferences.getMediaAccessStatus('screen');
+    screenRecording = status === 'granted' ? 'granted' : 'denied';
+  } catch (e) {
+    screenRecording = 'denied';
+  }
+
+  // 3. Automation (Apple Events)
+  let automation = 'denied';
+  try {
+    const { execSync } = require('child_process');
+    execSync(`osascript -e 'tell application "System Events" to get name of current user'`, { timeout: 1200, stdio: 'pipe' });
+    automation = 'granted';
+  } catch (e) {
+    automation = 'denied';
+  }
+
+  return {
+    platform: 'darwin',
+    isDev: !app.isPackaged,
+    accessibility,
+    screenRecording,
+    automation
+  };
+}
+
+ipcMain.handle('system:get-permissions-status', async () => {
+  return await checkSystemPermissions();
+});
+
+ipcMain.handle('system:request-permission', async (event, type) => {
+  if (process.platform !== 'darwin') return await checkSystemPermissions();
+
+  if (type === 'accessibility') {
+    try {
+      systemPreferences.isTrustedAccessibilityClient(true);
+    } catch (e) {}
+  } else if (type === 'screen' || type === 'screenRecording') {
+    try {
+      await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1, height: 1 } });
+    } catch (e) {}
+  } else if (type === 'automation') {
+    try {
+      const { exec } = require('child_process');
+      exec(`osascript -e 'tell application "System Events" to get name of current user'`);
+    } catch (e) {}
+  }
+
+  return await checkSystemPermissions();
+});
+
+ipcMain.on('system:open-permission-settings', (event, type) => {
+  if (process.platform !== 'darwin') return;
+  let url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
+  if (type === 'screen' || type === 'screenRecording') {
+    url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture';
+  } else if (type === 'automation') {
+    url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation';
+  } else if (type === 'notifications') {
+    url = 'x-apple.systempreferences:com.apple.preference.notifications';
+  }
+  shell.openExternal(url).catch(() => {});
+});
+
+ipcMain.on('system:open-settings-pane', (event, pane) => {
+  if (process.platform === 'darwin') {
+    let url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
+    if (pane === 'screen' || pane === 'screenRecording') {
+      url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture';
+    } else if (pane === 'automation') {
+      url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation';
+    } else if (pane === 'notifications') {
+      url = 'x-apple.systempreferences:com.apple.preference.notifications';
+    }
+    shell.openExternal(url).catch(() => {});
+  }
+});
+
+// User Name Setting Handler (Requirement 5)
+ipcMain.on('settings:user-name-changed', (event, name) => {
+  store.set('settings.general.userName', name);
+  systemSense.setUserName(name);
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    panelWindow.webContents.send('settings:user-name-updated', name);
+  }
+});
+
+// Real-time Process Resource Metrics (RAM & CPU)
+ipcMain.handle('system:get-app-metrics', async () => {
+  try {
+    const metrics = app.getAppMetrics();
+    let totalRamBytes = 0;
+    let totalCpu = 0;
+
+    for (const m of metrics) {
+      if (m.memory && m.memory.workingSetSize) {
+        totalRamBytes += m.memory.workingSetSize * 1024;
+      }
+      if (m.cpu && m.cpu.percentCPUUsage) {
+        totalCpu += m.cpu.percentCPUUsage;
+      }
+    }
+
+    const memUsage = process.memoryUsage();
+    const finalRamMB = Math.round((totalRamBytes > 0 ? totalRamBytes : memUsage.rss) / (1024 * 1024));
+
+    return {
+      totalRamMB: finalRamMB,
+      totalCpu: Math.round(totalCpu * 10) / 10,
+      processCount: metrics.length
+    };
+  } catch (e) {
+    const memUsage = process.memoryUsage();
+    return {
+      totalRamMB: Math.round(memUsage.rss / (1024 * 1024)),
+      totalCpu: 0.5,
+      processCount: 1
+    };
+  }
+});
+
 // App Lifecycle
 app.whenReady().then(() => {
   createTray();
@@ -756,15 +1016,11 @@ app.whenReady().then(() => {
   scheduler.start();
   systemSense.start();
 
-  // Set dock icon on macOS
+  // Hide dock icon on macOS (Menu-bar only desktop pet assistant)
   if (process.platform === 'darwin' && app.dock) {
-    const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
-    if (fs.existsSync(iconPath)) {
-      try {
-        const image = nativeImage.createFromPath(iconPath);
-        app.dock.setIcon(image);
-      } catch (e) {}
-    }
+    try {
+      app.dock.hide();
+    } catch (e) {}
   }
 
   app.on('activate', () => {

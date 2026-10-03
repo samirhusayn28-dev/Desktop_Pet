@@ -19,6 +19,17 @@
     "productName": "Desktop Pet",
     "mac": {
       "icon": "assets/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "Desktop Pet needs Automation permissions to detect current browser tabs, media playback, and active applications for context awareness.",
+        "NSScreenCaptureUsageDescription": "Desktop Pet needs Screen Recording permissions to sense display brightness, full-screen apps, and active windows.",
+        "NSAccessibilityUsageDescription": "Desktop Pet needs Accessibility permissions to detect active window titles and system interactions."
+      },
       "target": [
         {
           "target": "dmg",
@@ -32,9 +43,7 @@
             "x64"
           ]
         }
-      ],
-      "category": "public.app-category.developer-tools",
-      "identity": null
+      ]
     },
     "dmg": {
       "title": "Desktop Pet",

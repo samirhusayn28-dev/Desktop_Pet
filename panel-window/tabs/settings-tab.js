@@ -28,6 +28,7 @@ class SettingsTab {
 
     // 1. General Settings
     this.petNameInput = document.getElementById('setting-pet-name');
+    this.userNameInput = document.getElementById('setting-user-name');
     this.alwaysOnTopToggle = document.getElementById('setting-always-on-top');
     this.rememberPosToggle = document.getElementById('setting-remember-pos');
     this.launchLoginToggle = document.getElementById('setting-launch-login');
@@ -47,8 +48,33 @@ class SettingsTab {
     this.reactionVolume = document.getElementById('reaction-volume');
     this.reactionBattery = document.getElementById('reaction-battery');
     this.reactionMedia = document.getElementById('reaction-media');
+    this.reactionNetwork = document.getElementById('reaction-network');
+    this.reactionHeadphones = document.getElementById('reaction-headphones');
+    this.reactionScreenUnlock = document.getElementById('reaction-screenunlock');
     this.reactionHighload = document.getElementById('reaction-highload');
     this.reactionLatenight = document.getElementById('reaction-latenight');
+
+    this.btnRefreshSensors = document.getElementById('btn-refresh-sensors');
+    this.btnOpenAccessibility = document.getElementById('btn-open-accessibility');
+    this.sensorStatusList = document.getElementById('sensor-status-list');
+
+    // 3.5. System Permissions (Requirement 4)
+    this.btnRecheckPermissions = document.getElementById('btn-recheck-permissions');
+    this.permDevNotice = document.getElementById('perm-dev-notice');
+    this.badgePermAccessibility = document.getElementById('badge-perm-accessibility');
+    this.badgePermScreen = document.getElementById('badge-perm-screen');
+    this.badgePermAutomation = document.getElementById('badge-perm-automation');
+    this.btnOpenPermAccessibility = document.getElementById('btn-open-perm-accessibility');
+    this.btnRequestPermAccessibility = document.getElementById('btn-request-perm-accessibility');
+    this.btnOpenPermScreen = document.getElementById('btn-open-perm-screen');
+    this.btnRequestPermScreen = document.getElementById('btn-request-perm-screen');
+    this.btnOpenPermAutomation = document.getElementById('btn-open-perm-automation');
+    this.btnRequestPermAutomation = document.getElementById('btn-request-perm-automation');
+
+    // 3.6. Performance & Resource Budget (Always On)
+    this.dispLiveRam = document.getElementById('disp-live-ram');
+    this.dispLiveCpu = document.getElementById('disp-live-cpu');
+    this.dispLiveBudget = document.getElementById('disp-live-budget');
 
     // 4. Appearance Controls
     this.previewContainer = document.getElementById('settings-pet-preview');
@@ -128,6 +154,8 @@ class SettingsTab {
     // 1. General
     const petName = store.get('settings.general.petName') || 'Bolt';
     if (this.petNameInput) this.petNameInput.value = petName;
+    const userName = store.get('settings.general.userName') || '';
+    if (this.userNameInput) this.userNameInput.value = userName;
     if (this.alwaysOnTopToggle) this.alwaysOnTopToggle.checked = store.get('settings.general.alwaysOnTop') !== false;
     if (this.rememberPosToggle) this.rememberPosToggle.checked = store.get('settings.general.rememberPosition') !== false;
     if (this.launchLoginToggle) this.launchLoginToggle.checked = store.get('settings.general.launchAtLogin') === true;
@@ -159,8 +187,16 @@ class SettingsTab {
     if (this.reactionVolume) this.reactionVolume.checked = store.get('settings.reactions.volume') !== false;
     if (this.reactionBattery) this.reactionBattery.checked = store.get('settings.reactions.battery') !== false;
     if (this.reactionMedia) this.reactionMedia.checked = store.get('settings.reactions.media') !== false;
+    if (this.reactionNetwork) this.reactionNetwork.checked = store.get('settings.reactions.network') !== false;
+    if (this.reactionHeadphones) this.reactionHeadphones.checked = store.get('settings.reactions.headphones') !== false;
+    if (this.reactionScreenUnlock) this.reactionScreenUnlock.checked = store.get('settings.reactions.screenUnlock') !== false;
     if (this.reactionHighload) this.reactionHighload.checked = store.get('settings.reactions.highLoad') !== false;
     if (this.reactionLatenight) this.reactionLatenight.checked = store.get('settings.reactions.lateNight') !== false;
+
+    // Diagnostics & Resource Budget
+    this.renderSensorStatus();
+    this.refreshPermissions();
+    this.updateLiveAppMetrics();
 
     // 4. Appearance
     const savedApp = store.get('settings.appearance') || {};
@@ -310,24 +346,42 @@ class SettingsTab {
           this.modelSelect.appendChild(opt);
         });
 
+        const isExcluded = (id) => {
+          if (!id) return true;
+          const s = id.toLowerCase();
+          return ['allam', 'whisper', 'audio', 'tts', 'embedding', 'embed', 'guard', 'moderation', 'vision-preview', 'vl-'].some(k => s.includes(k));
+        };
+
         const savedModel = store.get(`settings.ai.models.${providerId}`);
-        const exists = models.some(m => m.id === savedModel);
+        const exists = models.some(m => m.id === savedModel && !isExcluded(m.id));
 
         if (exists) {
           this.modelSelect.value = savedModel;
         } else {
-          // Select sensible default
-          let def = models[0].id;
-          if (providerId === 'gemini') {
-            const flash = models.find(m => m.id.includes('flash'));
+          // Select sensible general-purpose chat default from priority list
+          let def = models.find(m => !isExcluded(m.id))?.id || models[0].id;
+          if (providerId === 'groq') {
+            const p = models.find(m => m.id.includes('llama-3.3-70b-versatile')) ||
+                      models.find(m => m.id.includes('llama-3.1-70b-versatile')) ||
+                      models.find(m => m.id.includes('llama-3.1-8b-instant')) ||
+                      models.find(m => !isExcluded(m.id));
+            if (p) def = p.id;
+          } else if (providerId === 'gemini') {
+            const flash = models.find(m => (m.id.includes('gemini-2.0-flash') || m.id.includes('gemini-1.5-flash')) && !isExcluded(m.id)) ||
+                          models.find(m => m.id.includes('flash') && !isExcluded(m.id));
             if (flash) def = flash.id;
+          } else if (providerId === 'openai') {
+            const mini = models.find(m => m.id.includes('gpt-4o-mini')) ||
+                         models.find(m => m.id.includes('gpt-4o'));
+            if (mini) def = mini.id;
           }
+
           this.modelSelect.value = def;
           store.set(`settings.ai.models.${providerId}`, def);
         }
 
         if (this.modelStatusHint) {
-          this.modelStatusHint.textContent = `${models.length} active models loaded.`;
+          this.modelStatusHint.textContent = `${models.length} active models loaded. Default: ${this.modelSelect.value}`;
           this.modelStatusHint.className = 'model-status-hint success';
         }
       } else {
@@ -407,6 +461,16 @@ class SettingsTab {
         window.panelController.applyPetName(name);
         if (window.panelController.ipcRenderer) {
           window.panelController.ipcRenderer.send('pet:update-name', name);
+        }
+      });
+    }
+
+    if (this.userNameInput) {
+      this.userNameInput.addEventListener('input', (e) => {
+        const name = e.target.value.trim().slice(0, 20);
+        window.panelController.store.set('settings.general.userName', name);
+        if (window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('settings:user-name-changed', name);
         }
       });
     }
@@ -492,6 +556,9 @@ class SettingsTab {
       { el: this.reactionVolume, key: 'volume' },
       { el: this.reactionBattery, key: 'battery' },
       { el: this.reactionMedia, key: 'media' },
+      { el: this.reactionNetwork, key: 'network' },
+      { el: this.reactionHeadphones, key: 'headphones' },
+      { el: this.reactionScreenUnlock, key: 'screenUnlock' },
       { el: this.reactionHighload, key: 'highLoad' },
       { el: this.reactionLatenight, key: 'lateNight' }
     ];
@@ -508,6 +575,83 @@ class SettingsTab {
         });
       }
     });
+
+    // Sensor Status Buttons
+    if (this.btnRefreshSensors) {
+      this.btnRefreshSensors.addEventListener('click', () => {
+        this.renderSensorStatus();
+        if (window.soundEffects) window.soundEffects.playTap();
+      });
+    }
+
+    if (this.btnOpenAccessibility) {
+      this.btnOpenAccessibility.addEventListener('click', () => {
+        if (window.panelController && window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('system:open-settings-pane', 'accessibility');
+        }
+      });
+    }
+
+    // 3.5. System Permissions Events (Requirement 4)
+    if (this.btnRecheckPermissions) {
+      this.btnRecheckPermissions.addEventListener('click', () => {
+        this.refreshPermissions();
+        if (window.soundEffects) window.soundEffects.playTap();
+      });
+    }
+
+    window.addEventListener('focus', () => this.refreshPermissions());
+
+    if (this.btnOpenPermAccessibility) {
+      this.btnOpenPermAccessibility.addEventListener('click', () => {
+        if (window.panelController && window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('system:open-permission-settings', 'accessibility');
+        }
+      });
+    }
+
+    if (this.btnRequestPermAccessibility) {
+      this.btnRequestPermAccessibility.addEventListener('click', async () => {
+        if (window.panelController && window.panelController.ipcRenderer) {
+          await window.panelController.ipcRenderer.invoke('system:request-permission', 'accessibility');
+          this.refreshPermissions();
+        }
+      });
+    }
+
+    if (this.btnOpenPermScreen) {
+      this.btnOpenPermScreen.addEventListener('click', () => {
+        if (window.panelController && window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('system:open-permission-settings', 'screen');
+        }
+      });
+    }
+
+    if (this.btnRequestPermScreen) {
+      this.btnRequestPermScreen.addEventListener('click', async () => {
+        if (window.panelController && window.panelController.ipcRenderer) {
+          await window.panelController.ipcRenderer.invoke('system:request-permission', 'screen');
+          this.refreshPermissions();
+        }
+      });
+    }
+
+    if (this.btnOpenPermAutomation) {
+      this.btnOpenPermAutomation.addEventListener('click', () => {
+        if (window.panelController && window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('system:open-permission-settings', 'automation');
+        }
+      });
+    }
+
+    if (this.btnRequestPermAutomation) {
+      this.btnRequestPermAutomation.addEventListener('click', async () => {
+        if (window.panelController && window.panelController.ipcRenderer) {
+          await window.panelController.ipcRenderer.invoke('system:request-permission', 'automation');
+          this.refreshPermissions();
+        }
+      });
+    }
 
     // 4. Appearance Events
     if (this.panelTransparencySlider) {
@@ -532,8 +676,29 @@ class SettingsTab {
     }
 
     if (this.accentColorInput) {
-      this.accentColorInput.addEventListener('input', (e) => {
-        this.setAccentColor(e.target.value);
+      const applyInput = (val) => {
+        if (val) this.setAccentColor(val);
+      };
+      this.accentColorInput.addEventListener('input', (e) => applyInput(e.target.value));
+      this.accentColorInput.addEventListener('change', (e) => applyInput(e.target.value));
+    }
+
+    if (this.dispAccentColor) {
+      const handleTextInput = (e) => {
+        let val = e.target.value.trim();
+        if (!val.startsWith('#') && /^[0-9A-Fa-f]{6}$/.test(val)) {
+          val = '#' + val;
+        }
+        if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+          this.setAccentColor(val);
+        }
+      };
+      this.dispAccentColor.addEventListener('input', handleTextInput);
+      this.dispAccentColor.addEventListener('change', (e) => {
+        handleTextInput(e);
+        if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value.trim())) {
+          this.dispAccentColor.value = (this.appearance.primaryColor || DEFAULT_ACCENT_COLOR).toUpperCase();
+        }
       });
     }
 
@@ -792,6 +957,77 @@ class SettingsTab {
           });
         }
       });
+    }
+  }
+
+  async renderSensorStatus() {
+    if (!this.sensorStatusList) return;
+    try {
+      let list = [];
+      if (window.panelController && window.panelController.ipcRenderer) {
+        list = await window.panelController.ipcRenderer.invoke('system:get-sensor-status');
+      }
+      if (!Array.isArray(list) || list.length === 0) return;
+
+      this.sensorStatusList.innerHTML = list.map(s => {
+        const isWorking = s.status === 'Working';
+        const badgeClass = isWorking ? 'status-pill-ok' : (s.status.includes('Unavailable') ? 'status-pill-muted' : 'status-pill-warn');
+        return `
+          <div class="sensor-status-row">
+            <div class="sensor-meta">
+              <span class="sensor-name">${s.name}</span>
+              <span class="sensor-detail">${s.detail || ''}</span>
+            </div>
+            <span class="status-pill ${badgeClass}">${s.status}</span>
+          </div>
+        `;
+      }).join('');
+    } catch (e) {
+      console.warn('[SettingsTab] Could not render sensor status:', e);
+    }
+  }
+
+  async refreshPermissions() {
+    if (!window.panelController || !window.panelController.ipcRenderer) return;
+    try {
+      const perms = await window.panelController.ipcRenderer.invoke('system:get-permissions-status');
+      if (!perms) return;
+
+      if (this.permDevNotice) {
+        this.permDevNotice.style.display = perms.isDev ? 'flex' : 'none';
+      }
+
+      this.updatePermBadge(this.badgePermAccessibility, perms.accessibility);
+      this.updatePermBadge(this.badgePermScreen, perms.screenRecording);
+      this.updatePermBadge(this.badgePermAutomation, perms.automation);
+    } catch (e) {
+      console.warn('[SettingsTab] Could not refresh permissions:', e);
+    }
+  }
+
+  updatePermBadge(el, status) {
+    if (!el) return;
+    const isGranted = status === 'granted';
+    el.textContent = isGranted ? 'Granted' : 'Not granted';
+    el.className = `perm-badge ${isGranted ? 'granted' : 'denied'}`;
+  }
+
+  async updateLiveAppMetrics() {
+    try {
+      if (window.panelController && window.panelController.ipcRenderer) {
+        const metrics = await window.panelController.ipcRenderer.invoke('system:get-app-metrics');
+        if (metrics) {
+          if (this.dispLiveRam) this.dispLiveRam.textContent = `${metrics.totalRamMB} MB`;
+          if (this.dispLiveCpu) this.dispLiveCpu.textContent = `${metrics.totalCpu}%`;
+          if (this.dispLiveBudget) {
+            const isGood = metrics.totalRamMB < 220;
+            this.dispLiveBudget.textContent = isGood ? 'PASS (<220MB)' : `${metrics.totalRamMB} MB`;
+            this.dispLiveBudget.className = isGood ? 'usage-val highlight pass' : 'usage-val highlight warn';
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[SettingsTab] Could not update live app metrics:', e);
     }
   }
 }

@@ -163,25 +163,25 @@
           <!-- Progress Bar Card -->
           <div class="todo-progress-card">
             <div class="todo-progress-header">
-              <span class="progress-title">Daily Sprint Progress</span>
-              <span class="progress-ratio" id="todo-progress-ratio">2 / 5</span>
+              <span class="progress-title" id="todo-status-text">Daily Sprint Progress</span>
+              <span class="progress-ratio mono" id="todo-progress-ratio"><span id="todo-percent-text">0%</span></span>
             </div>
             <div class="progress-track">
-              <div class="progress-fill" id="todo-progress-fill" style="width: 40%;"></div>
+              <div class="progress-fill" id="todo-progress-fill" style="width: 0%;"></div>
             </div>
           </div>
 
           <!-- Add Task Input Row -->
           <div class="todo-input-row">
-            <input type="text" id="todo-new-input" class="terminal-input" placeholder="Add a new task (Enter)...">
-            <button class="theme-btn-primary" id="btn-add-todo">
+            <input type="text" id="todo-input-field" class="terminal-input" placeholder="Add a new task (Enter)...">
+            <button class="theme-btn-primary" id="btn-todo-add">
               <i data-lucide="plus"></i>
               <span>Add</span>
             </button>
           </div>
 
           <!-- Tasks List -->
-          <div class="todo-list-scroll" id="todo-items-list">
+          <div class="todo-list-scroll" id="todo-items-container">
             <!-- Dynamically populated tasks -->
           </div>
         </div>
@@ -196,24 +196,31 @@
               <button class="timer-mode-btn active" data-mode="pomodoro">Pomodoro (25m)</button>
               <button class="timer-mode-btn" data-mode="short-break">Short Break (5m)</button>
               <button class="timer-mode-btn" data-mode="long-break">Long Break (15m)</button>
+              <button class="timer-mode-btn" data-mode="stopwatch">Stopwatch</button>
             </div>
 
-            <!-- Circular Progress & Display -->
+            <!-- Clock Display -->
             <div class="timer-clock-display">
-              <div class="time-large-text" id="timer-display-digits">25:00</div>
-              <span class="timer-state-label" id="timer-state-label">FOCUS TIME</span>
+              <div class="time-large-text mono" id="timer-time-display">25:00</div>
+              <span class="timer-state-label" id="timer-sublabel">FOCUS SESSION</span>
             </div>
 
             <!-- Timer Controls -->
             <div class="timer-actions-row">
-              <button class="timer-ctl-btn primary" id="btn-timer-start">
+              <button class="timer-ctl-btn primary" id="btn-timer-toggle">
                 <i data-lucide="play" id="icon-timer-toggle"></i>
-                <span id="text-timer-toggle">Start</span>
+                <span id="text-timer-toggle">Start Focus</span>
               </button>
               <button class="timer-ctl-btn secondary" id="btn-timer-reset">
                 <i data-lucide="rotate-ccw"></i>
                 <span>Reset</span>
               </button>
+            </div>
+
+            <!-- Session Stats -->
+            <div class="timer-stats-pill" id="timer-pet-status">
+              <i data-lucide="award"></i>
+              <span>Completed Sessions: <strong class="mono" id="pomodoro-count">0</strong></span>
             </div>
           </div>
         </div>
@@ -233,7 +240,7 @@
             </button>
           </div>
 
-          <div class="notes-cards-scroll" id="notes-cards-list">
+          <div class="notes-cards-scroll" id="notes-container">
             <!-- Dynamically populated notes -->
           </div>
         </div>
@@ -249,7 +256,7 @@
               <span>Create Reminder</span>
             </div>
             <div class="reminder-fields-grid">
-              <input type="text" id="reminder-title-input" class="terminal-input" placeholder="Reminder title (e.g. Code Review)">
+              <input type="text" id="reminder-text-input" class="terminal-input" placeholder="Reminder title (e.g. Code Review)">
               <div class="reminder-time-row">
                 <input type="time" id="reminder-time-input" class="terminal-input mono" value="16:00">
                 <select id="reminder-repeat-select" class="terminal-select">
@@ -257,7 +264,7 @@
                   <option value="daily">Daily</option>
                   <option value="every-hour">Every Hour</option>
                 </select>
-                <button class="theme-btn-primary" id="btn-add-reminder">
+                <button class="theme-btn-primary" id="btn-save-reminder">
                   <i data-lucide="plus"></i>
                   <span>Set</span>
                 </button>
@@ -266,7 +273,7 @@
           </div>
 
           <!-- Reminders List -->
-          <div class="reminders-list-scroll" id="reminders-items-list">
+          <div class="reminders-list-scroll" id="reminders-list">
             <!-- Dynamically populated reminders -->
           </div>
         </div>
@@ -483,6 +490,12 @@
               <span class="setting-hint">Appears in header, assistant title, speech bubbles, and AI prompt</span>
             </div>
 
+            <div class="setting-item">
+              <label class="setting-label" for="setting-user-name">What should I call you? (max 20 characters)</label>
+              <input type="text" id="setting-user-name" class="terminal-input full-width" maxlength="20" placeholder="e.g. Alex">
+              <span class="setting-hint">Your pet will address you naturally in reminders, reactions, and chat</span>
+            </div>
+
             <div class="setting-toggle-row">
               <div class="setting-toggle-text">
                 <div class="toggle-title">Always on Top</div>
@@ -562,12 +575,12 @@
               <i data-lucide="zap"></i>
               <span>SystemSense Reactions</span>
             </div>
-            <span class="setting-hint">Pet dynamically reacts to hardware, audio, power, and environment</span>
+            <span class="setting-hint">Pet dynamically reacts to hardware, audio, power, and desktop events</span>
 
             <div class="setting-toggle-row">
               <div class="setting-toggle-text">
                 <div class="toggle-title">Screen Brightness</div>
-                <div class="toggle-desc">Dull look on low brightness, squint on max</div>
+                <div class="toggle-desc">Squints on max brightness, gets cozy/dim on low</div>
               </div>
               <input type="checkbox" id="reaction-brightness" class="toggle-checkbox" checked>
             </div>
@@ -575,7 +588,7 @@
             <div class="setting-toggle-row">
               <div class="setting-toggle-text">
                 <div class="toggle-title">Audio Volume</div>
-                <div class="toggle-desc">Irritated when max, quiet when muted</div>
+                <div class="toggle-desc">Covers ears on max volume, quiet speech when muted</div>
               </div>
               <input type="checkbox" id="reaction-volume" class="toggle-checkbox" checked>
             </div>
@@ -591,9 +604,33 @@
             <div class="setting-toggle-row">
               <div class="setting-toggle-text">
                 <div class="toggle-title">Music & Media Vibe</div>
-                <div class="toggle-desc">Groovy head-bob and musical notes when music plays</div>
+                <div class="toggle-desc">Groovy head-bob and music notes for Spotify & Apple Music</div>
               </div>
               <input type="checkbox" id="reaction-media" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Internet & Network</div>
+                <div class="toggle-desc">Notifies if Wi-Fi disconnects or reconnects</div>
+              </div>
+              <input type="checkbox" id="reaction-network" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Headphones Detection</div>
+                <div class="toggle-desc">Enters coding focus mode when headphones are connected</div>
+              </div>
+              <input type="checkbox" id="reaction-headphones" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Screen Unlock / Welcome Back</div>
+                <div class="toggle-desc">Greets you with a warm smile when waking your Mac</div>
+              </div>
+              <input type="checkbox" id="reaction-screenunlock" class="toggle-checkbox" checked>
             </div>
 
             <div class="setting-toggle-row">
@@ -610,6 +647,117 @@
                 <div class="toggle-desc">Friendly sleepy nudge when coding past midnight</div>
               </div>
               <input type="checkbox" id="reaction-latenight" class="toggle-checkbox" checked>
+            </div>
+
+            <!-- Sensor Status Card -->
+            <div class="sensor-status-card" id="sensor-status-card">
+              <div class="sensor-status-header">
+                <div class="sensor-header-left">
+                  <span class="sensor-card-title">Hardware Sensor Diagnostics</span>
+                </div>
+                <div class="sensor-header-actions">
+                  <button type="button" class="btn-sensor-action" id="btn-refresh-sensors" title="Refresh live sensors">
+                    <i data-lucide="refresh-cw"></i>
+                    <span>Refresh</span>
+                  </button>
+                  <button type="button" class="btn-sensor-action" id="btn-open-accessibility" title="Open macOS Security & Privacy">
+                    <i data-lucide="external-link"></i>
+                    <span>Permissions</span>
+                  </button>
+                </div>
+              </div>
+              <div class="sensor-status-list" id="sensor-status-list">
+                <!-- Dynamically populated rows -->
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 3.5: SYSTEM PERMISSIONS (Requirement 4) -->
+          <div class="settings-group-card" id="settings-permissions-card">
+            <div class="settings-group-title">
+              <div class="title-with-icon">
+                <i data-lucide="shield-check"></i>
+                <span>System Permissions</span>
+              </div>
+              <button class="theme-btn-secondary recheck-perm-btn" id="btn-recheck-permissions" title="Re-check permissions">
+                <i data-lucide="refresh-cw"></i>
+                <span>Re-check</span>
+              </button>
+            </div>
+            <div id="perm-dev-notice" class="perm-dev-notice" style="display: none;">
+              <i data-lucide="info"></i>
+              <span>Running in dev mode: macOS assigns permissions to "Electron" or your Terminal application.</span>
+            </div>
+            <div class="permissions-list">
+              <!-- Accessibility -->
+              <div class="perm-item-row" id="perm-row-accessibility">
+                <div class="perm-meta">
+                  <div class="perm-title-row">
+                    <i data-lucide="mouse-pointer"></i>
+                    <span class="perm-name">Accessibility</span>
+                    <span class="perm-badge" id="badge-perm-accessibility">Checking...</span>
+                  </div>
+                  <div class="perm-desc">Required to detect frontmost active window titles and system interactions</div>
+                </div>
+                <div class="perm-actions">
+                  <button class="tool-action-btn" id="btn-open-perm-accessibility">Open Settings</button>
+                  <button class="tool-action-btn primary" id="btn-request-perm-accessibility">Request</button>
+                </div>
+              </div>
+              <!-- Screen Recording -->
+              <div class="perm-item-row" id="perm-row-screen">
+                <div class="perm-meta">
+                  <div class="perm-title-row">
+                    <i data-lucide="monitor"></i>
+                    <span class="perm-name">Screen Recording</span>
+                    <span class="perm-badge" id="badge-perm-screen">Checking...</span>
+                  </div>
+                  <div class="perm-desc">Used for display brightness sensing and full-screen application detection</div>
+                </div>
+                <div class="perm-actions">
+                  <button class="tool-action-btn" id="btn-open-perm-screen">Open Settings</button>
+                  <button class="tool-action-btn primary" id="btn-request-perm-screen">Request</button>
+                </div>
+              </div>
+              <!-- Automation -->
+              <div class="perm-item-row" id="perm-row-automation">
+                <div class="perm-meta">
+                  <div class="perm-title-row">
+                    <i data-lucide="bot"></i>
+                    <span class="perm-name">Automation (Apple Events)</span>
+                    <span class="perm-badge" id="badge-perm-automation">Checking...</span>
+                  </div>
+                  <div class="perm-desc">Senses active browser URLs/tabs and Spotify/Music playback for context</div>
+                </div>
+                <div class="perm-actions">
+                  <button class="tool-action-btn" id="btn-open-perm-automation">Open Settings</button>
+                  <button class="tool-action-btn primary" id="btn-request-perm-automation">Request</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 3.6: PERFORMANCE & RESOURCE BUDGET (Lite Mode Removed) -->
+          <div class="settings-group-card">
+            <div class="settings-group-title">
+              <i data-lucide="gauge"></i>
+              <span>Performance & Resource Budget</span>
+            </div>
+            <span class="setting-hint">Optimized for low-spec machines running all day in the background</span>
+
+            <div class="live-usage-card" id="live-pet-usage">
+              <div class="usage-stat-col">
+                <span class="usage-label">TOTAL APP RAM</span>
+                <span class="usage-val mono" id="disp-live-ram">~95 MB</span>
+              </div>
+              <div class="usage-stat-col">
+                <span class="usage-label">TOTAL CPU</span>
+                <span class="usage-val mono" id="disp-live-cpu">0.2%</span>
+              </div>
+              <div class="usage-stat-col">
+                <span class="usage-label">BUDGET TARGET</span>
+                <span class="usage-val highlight mono" id="disp-live-budget">PASS (&lt;110MB)</span>
+              </div>
             </div>
           </div>
 
@@ -734,7 +882,7 @@
                 </div>
                 <div class="accent-picker-row">
                   <input type="color" id="setting-accent-color" value="#FF7A2F">
-                  <input type="text" id="disp-accent-color" class="terminal-input mono" value="#FF7A2F" readonly>
+                  <input type="text" id="disp-accent-color" class="terminal-input mono" value="#FF7A2F" maxlength="7" placeholder="#HEX">
                   <div class="accent-swatches">
                     <button type="button" class="swatch-btn active" data-color="#FF7A2F" style="background:#FF7A2F;" title="Classic Amber (Default)"></button>
                     <button type="button" class="swatch-btn" data-color="#38BDF8" style="background:#38BDF8;" title="Sky Blue"></button>
