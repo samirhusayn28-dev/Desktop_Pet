@@ -18,10 +18,10 @@
   --theme-primary-alpha: rgba(255, 122, 47, 0.16);
   --theme-primary-alpha-strong: rgba(255, 122, 47, 0.28);
   --theme-accent-light: #FFA86B;
-  --theme-bg: rgba(20, 20, 24, 0.55);
-  --theme-panel: rgba(20, 20, 24, 0.55);
-  --theme-card: rgba(255, 255, 255, 0.04);
-  --theme-card-border: rgba(255, 255, 255, 0.08);
+  --theme-bg: #141418;
+  --theme-panel: #141418;
+  --theme-card: #1e1e24;
+  --theme-card-border: #2a2a34;
   --theme-text-primary: #FFFFFF;
   --theme-text-secondary: rgba(255, 255, 255, 0.65);
   --theme-text-muted: rgba(255, 255, 255, 0.42);
@@ -45,7 +45,7 @@
 html, body {
   width: 100%;
   height: 100%;
-  background: transparent !important;
+  background: #141418;
   overflow: hidden;
   font-family: var(--font-sans);
   color: var(--theme-text-primary, #FFFFFF);
@@ -143,12 +143,10 @@ svg.lucide {
   display: grid !important;
   grid-template-rows: 56px auto 1fr !important;
   overflow: hidden !important;
-  background: rgba(20, 20, 24, var(--panel-alpha, var(--panel-transparency, 0.35))) !important;
-  backdrop-filter: blur(var(--blur, var(--panel-blur, 28px))) saturate(150%) !important;
-  -webkit-backdrop-filter: blur(var(--blur, var(--panel-blur, 28px))) saturate(150%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 28px !important;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  background: #141418 !important;
+  border: none !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
   position: relative !important;
   box-sizing: border-box !important;
   user-select: none !important;
@@ -244,7 +242,7 @@ svg.lucide {
   min-width: 32px !important;
   min-height: 32px !important;
   border-radius: 8px !important;
-  background: rgba(255, 255, 255, 0.08) !important;
+  background: #282830 !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   color: rgba(255, 255, 255, 0.85) !important;
   display: flex !important;
@@ -254,8 +252,6 @@ svg.lucide {
   padding: 0 !important;
   font-size: 14px !important;
   font-family: var(--font-sans) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
   transition: var(--transition-fast) !important;
   -webkit-app-region: no-drag !important;
 }
@@ -291,7 +287,7 @@ svg.lucide {
   flex-direction: row !important;
   align-items: center !important;
   background: rgba(0, 0, 0, 0.32) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-bottom: 1px solid #282830 !important;
   border-top: none !important;
   border-left: none !important;
   border-right: none !important;
@@ -316,7 +312,7 @@ svg.lucide {
   flex: 1 1 0 !important;
   min-width: 0 !important;
   height: 32px !important;
-  background: transparent !important;
+  background: #141418;
   border: 1px solid transparent !important;
   color: rgba(255, 255, 255, 0.65) !important;
   font-family: var(--font-sans) !important;
@@ -336,7 +332,7 @@ svg.lucide {
 
 .tab-btn:hover {
   color: #FFFFFF !important;
-  background: rgba(255, 255, 255, 0.08) !important;
+  background: #282830 !important;
 }
 
 /* Active tab = solid white rounded pill with black text/icon */
@@ -433,13 +429,11 @@ svg.lucide {
   flex-direction: column;
   height: 100%;
   background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid #282830;
   border-radius: 22px;
   padding: 14px;
   gap: 12px;
   overflow: hidden;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
 }
 
 /* Chat Card Header Row */
@@ -456,7 +450,7 @@ svg.lucide {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  background: #282830;
   border: 1px solid rgba(255, 255, 255, 0.14);
   display: flex;
   align-items: center;
@@ -518,8 +512,8 @@ svg.lucide {
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #222228;
+  border: 1px solid #282830;
   color: rgba(255, 255, 255, 0.65);
   display: flex;
   align-items: center;
@@ -567,7 +561,7 @@ svg.lucide {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
+  background: #222228;
   border: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
   align-items: center;
@@ -582,15 +576,13 @@ svg.lucide {
 }
 
 .chat-bubble.ai-glass-bubble {
-  background: rgba(255, 255, 255, 0.06);
+  background: #222228;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px 18px 18px 4px;
   padding: 12px 14px;
   color: #F0F0F5;
   font-size: 13.5px;
   line-height: 1.5;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   position: relative;
 }
@@ -639,7 +631,6 @@ svg.lucide {
   border-radius: 12px;
   margin: 10px 0;
   overflow: hidden;
-  backdrop-filter: blur(10px);
 }
 
 .code-block-header {
@@ -647,7 +638,7 @@ svg.lucide {
   align-items: center;
   justify-content: space-between;
   background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid #222228;
   padding: 6px 12px;
 }
 
@@ -670,7 +661,7 @@ svg.lucide {
 }
 
 .code-copy-btn {
-  background: rgba(255, 255, 255, 0.08);
+  background: #282830;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
   color: rgba(255, 255, 255, 0.75);
@@ -775,8 +766,6 @@ svg.lucide {
   background: rgba(255, 255, 255, 0.05) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 999px !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease !important;
   flex-shrink: 0 !important;
   box-sizing: border-box !important;
@@ -784,7 +773,7 @@ svg.lucide {
 
 .chat-input-bar:focus-within {
   border-color: var(--theme-primary, #FF7A2F) !important;
-  background: rgba(255, 255, 255, 0.08) !important;
+  background: #282830 !important;
   box-shadow: 0 0 16px var(--theme-primary-alpha, rgba(255, 122, 47, 0.22)) !important;
 }
 
@@ -796,7 +785,7 @@ svg.lucide {
   min-height: 36px !important;
   max-height: 100px !important;
   height: 36px !important;
-  background: transparent !important;
+  background: #141418;
   border: none !important;
   outline: none !important;
   color: #FFFFFF !important;
@@ -929,12 +918,10 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 }
 
 .todo-progress-card {
-  background: rgba(255, 255, 255, 0.04);
+  background: #1e1e24;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
   padding: 16px 18px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
 }
 
 .progress-header {
@@ -967,7 +954,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 .progress-track {
   width: 100%;
   height: 8px;
-  background: rgba(255, 255, 255, 0.08);
+  background: #282830;
   border-radius: 999px;
   overflow: hidden;
 }
@@ -1007,14 +994,12 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 12px;
   padding: 11px 14px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   transition: var(--transition-fast);
 }
 
 .todo-item:hover {
   border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
+  background: #222228;
   transform: translateX(2px);
 }
 
@@ -1084,7 +1069,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 .timer-mode-switcher {
   display: flex;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid #282830;
   border-radius: 12px;
   padding: 4px;
   gap: 4px;
@@ -1131,7 +1116,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 
 .timer-circle-bg {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.08);
+  stroke: #282830;
   stroke-width: 8;
 }
 
@@ -1183,7 +1168,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 }
 
 .timer-reset-btn {
-  background: rgba(255, 255, 255, 0.08);
+  background: #282830;
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: #FFFFFF;
   cursor: pointer;
@@ -1242,15 +1227,13 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 }
 
 .note-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #1e1e24;
+  border: 1px solid #282830;
   border-radius: 14px;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   transition: var(--transition-fast);
 }
 
@@ -1284,7 +1267,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid #222228;
   padding-top: 6px;
 }
 
@@ -1311,15 +1294,13 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 }
 
 .reminder-create-card {
-  background: rgba(255, 255, 255, 0.04);
+  background: #1e1e24;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 16px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 
 .create-card-title {
@@ -1361,8 +1342,6 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 12px;
   padding: 11px 14px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .reminder-info {
@@ -1399,12 +1378,10 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 }
 
 .tool-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #1e1e24;
+  border: 1px solid #282830;
   border-radius: 16px;
   padding: 14px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 
 .tool-card.full-width {
@@ -1523,7 +1500,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 }
 
 .quick-action-pill {
-  background: rgba(255, 255, 255, 0.06);
+  background: #222228;
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #E2E4F0;
   border-radius: 999px;
@@ -1551,15 +1528,13 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 }
 
 .settings-group-card {
-  background: rgba(255, 255, 255, 0.04);
+  background: #1e1e24;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 18px;
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
 }
 
 .settings-group-title {
@@ -1591,7 +1566,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   align-items: center;
   justify-content: space-between;
   padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid #1e1e24;
 }
 
 .setting-toggle-text {
@@ -1652,7 +1627,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 .pill-opt-btn {
   flex: 1;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid #282830;
   color: rgba(255, 255, 255, 0.65);
   border-radius: 9px;
   padding: 7px;
@@ -1694,7 +1669,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 }
 
 .reset-appearance-btn {
-  background: rgba(255, 255, 255, 0.08);
+  background: #282830;
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: #ECECF2;
   font-size: 11px;
@@ -1713,7 +1688,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 
 .appearance-preview-card {
   background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid #282830;
   border-radius: 14px;
   padding: 16px 12px;
   display: flex;
@@ -1800,7 +1775,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   align-items: center;
   justify-content: space-between;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid #222228;
 }
 
 .sys-title-wrap {
@@ -1941,7 +1916,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 .core-bar-track {
   width: 100%;
   flex: 1;
-  background: rgba(255, 255, 255, 0.06);
+  background: #222228;
   border-radius: 3px;
   overflow: hidden;
   display: flex;
@@ -2091,7 +2066,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   grid-template-columns: 1fr 50px 48px 48px;
   gap: 6px;
   padding-bottom: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid #282830;
   color: rgba(255, 255, 255, 0.45);
   font-weight: 700;
 }
@@ -2112,7 +2087,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 }
 
 .sys-proc-row:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: #1e1e24;
 }
 
 .proc-name {
@@ -2437,8 +2412,8 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #1e1e24;
+  border: 1px solid #222228;
   border-radius: 8px;
   font-size: 11.5px;
   color: #FFFFFF;
@@ -2554,8 +2529,6 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   width: 100%;
   height: 100%;
   background: rgba(10, 10, 14, 0.85);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -2614,7 +2587,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 .sensor-status-card {
   margin-top: 14px;
   background: rgba(0, 0, 0, 0.28);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid #282830;
   border-radius: 14px;
   padding: 12px 14px;
   display: flex;
@@ -2627,7 +2600,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   align-items: center;
   justify-content: space-between;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid #222228;
 }
 
 .sensor-card-title {
@@ -2645,7 +2618,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 }
 
 .btn-sensor-action {
-  background: rgba(255, 255, 255, 0.08);
+  background: #282830;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
   color: rgba(255, 255, 255, 0.85);
@@ -2719,7 +2692,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 }
 
 .status-pill-muted {
-  background: rgba(255, 255, 255, 0.06);
+  background: #222228;
   color: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -2734,7 +2707,7 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
 .live-usage-card {
   margin-top: 10px;
   background: rgba(0, 0, 0, 0.32);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid #282830;
   border-radius: 12px;
   padding: 12px 14px;
   display: flex;
@@ -2849,7 +2822,7 @@ button:focus-visible {
   gap: 12px;
   padding: 12px 14px;
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid #282830;
   border-radius: 14px;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -2982,7 +2955,7 @@ button:focus-visible {
 
 .todo-inline-edit {
   flex: 1;
-  background: rgba(255, 255, 255, 0.08);
+  background: #282830;
   border: 1px solid var(--accent, #FF7A2F);
   border-radius: 6px;
   color: #FFFFFF;
@@ -2995,7 +2968,7 @@ button:focus-visible {
 /* Enhanced Reminder Items */
 .reminder-snooze-btn,
 .reminder-edit-btn {
-  background: rgba(255, 255, 255, 0.06);
+  background: #222228;
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
@@ -3048,8 +3021,8 @@ button:focus-visible {
   gap: 8px;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #1e1e24;
+  border: 1px solid #282830;
   border-radius: 999px;
   padding: 6px 14px;
   margin-top: 4px;

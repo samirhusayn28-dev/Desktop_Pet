@@ -404,16 +404,15 @@ function createPanelWindow() {
     y: targetY,
     minWidth: 420,
     minHeight: 560,
-    show: false, // Create with show: false to eliminate flicker
-    transparent: true,
+    show: false,
+    transparent: false,
     frame: false,
-    backgroundColor: '#00000000',
-    hasShadow: false,
+    backgroundColor: '#141418',
+    hasShadow: true,
+    roundedCorners: true,
     resizable: true,
     skipTaskbar: false,
     icon: getAppIconPath(),
-    vibrancy: process.platform === 'darwin' ? 'under-window' : undefined,
-    visualEffectState: 'active',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -847,11 +846,24 @@ ipcMain.handle('system:get-stats', async () => {
         uptimeSeconds: Math.round(time?.uptime || 0)
       },
       topProcesses: lastProcessList,
-      petUsage: {
-        ramMb: petRamMb,
-        cpuPercent: 0.8,
-        fps: 30
-      }
+      petUsage: (() => {
+        try {
+          const metrics = app.getAppMetrics();
+          let totalRamBytes = 0;
+          let totalCpu = 0;
+          for (const m of metrics) {
+            if (m.memory && m.memory.workingSetSize) totalRamBytes += m.memory.workingSetSize * 1024;
+            if (m.cpu && m.cpu.percentCPUUsage) totalCpu += m.cpu.percentCPUUsage;
+          }
+          return {
+            ramMb: Math.round((totalRamBytes > 0 ? totalRamBytes : process.memoryUsage().rss) / (1024 * 1024)),
+            cpuPercent: Math.round(totalCpu * 10) / 10,
+            processCount: metrics.length
+          };
+        } catch (e) {
+          return { ramMb: Math.round(process.memoryUsage().rss / (1024 * 1024)), cpuPercent: 0, processCount: 0 };
+        }
+      })()
     };
   } catch (err) {
     console.warn('[Desktop Pet] System stats error:', err);

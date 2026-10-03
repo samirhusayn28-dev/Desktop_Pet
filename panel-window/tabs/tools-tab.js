@@ -10,11 +10,11 @@ class ToolsTab {
     this.pollInterval = null;
     this.isPolling = false;
 
-    // Sparkline history buffers (60 samples)
+    // Sparkline history buffers (start empty, fill with real samples)
     this.historyLength = 60;
-    this.cpuHistory = new Array(this.historyLength).fill(10);
-    this.ramHistory = new Array(this.historyLength).fill(40);
-    this.netHistory = new Array(this.historyLength).fill(5);
+    this.cpuHistory = [];
+    this.ramHistory = [];
+    this.netHistory = [];
 
     // Daily Quote
     this.quoteTextEl = document.getElementById('daily-quote-text');
@@ -280,9 +280,9 @@ class ToolsTab {
       }
 
       // Update CPU sparkline
-      this.cpuHistory.shift();
+      if (this.cpuHistory.length >= this.historyLength) this.cpuHistory.shift();
       this.cpuHistory.push(s.cpu.totalLoad);
-      this.drawSparkline('spark-cpu-line', 'spark-cpu-fill', this.cpuHistory, 100, 40);
+      if (this.cpuHistory.length > 1) this.drawSparkline('spark-cpu-line', 'spark-cpu-fill', this.cpuHistory, 100, 40);
 
       // Render per-core bars
       if (this.cpuCoresGrid && Array.isArray(s.cpu.cores)) {
@@ -307,9 +307,9 @@ class ToolsTab {
       }
 
       // Update RAM sparkline
-      this.ramHistory.shift();
+      if (this.ramHistory.length >= this.historyLength) this.ramHistory.shift();
       this.ramHistory.push(s.ram.percent);
-      this.drawSparkline('spark-ram-line', 'spark-ram-fill', this.ramHistory, 100, 40);
+      if (this.ramHistory.length > 1) this.drawSparkline('spark-ram-line', 'spark-ram-fill', this.ramHistory, 100, 40);
     }
 
     // 4. Network
@@ -325,10 +325,10 @@ class ToolsTab {
       }
 
       // Update Network sparkline
-      const maxNet = Math.max(100, ...this.netHistory);
-      this.netHistory.shift();
+      if (this.netHistory.length >= this.historyLength) this.netHistory.shift();
       this.netHistory.push(rx + tx);
-      this.drawSparkline('spark-net-line', null, this.netHistory, maxNet, 32);
+      const maxNet = Math.max(100, ...this.netHistory);
+      if (this.netHistory.length > 1) this.drawSparkline('spark-net-line', null, this.netHistory, maxNet, 32);
     }
 
     // 5. Battery & GPU
@@ -372,11 +372,15 @@ class ToolsTab {
       `).join('');
     }
 
-    // 8. Pet Resource Usage at the Bottom
+    // 8. Pet Resource Usage (real Electron process totals — no fake data)
     if (s.petUsage) {
-      if (this.petCpuEl) this.petCpuEl.textContent = `${(0.6 + Math.random() * 0.4).toFixed(1)}%`;
-      if (this.petRamEl) this.petRamEl.textContent = `${s.petUsage.ramMb || 45} MB`;
-      if (this.petFpsEl) this.petFpsEl.textContent = `${s.petUsage.fps || 30} FPS`;
+      const cpu = s.petUsage.cpuPercent;
+      const ram = s.petUsage.ramMb;
+      const procs = s.petUsage.processCount || '';
+      if (this.petCpuEl) this.petCpuEl.textContent = `${cpu != null ? cpu.toFixed(1) : '—'}% (${procs} procs)`;
+      if (this.petRamEl) this.petRamEl.textContent = `${ram != null ? ram : '—'} MB`;
+      // Remove FPS display — not measurable from main process
+      if (this.petFpsEl) this.petFpsEl.textContent = '—';
     }
   }
 

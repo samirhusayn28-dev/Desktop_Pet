@@ -248,11 +248,11 @@ class AIService {
 
     if (eligible.length > 0) return eligible[0];
 
-    // Fixed sensible defaults if list is empty
+    // Hardcoded fallbacks if live list is empty (use non-retired models)
     if (provider === 'groq') return 'llama-3.3-70b-versatile';
-    if (provider === 'gemini') return 'gemini-1.5-flash';
+    if (provider === 'gemini') return 'gemini-2.0-flash-lite';
     if (provider === 'openai') return 'gpt-4o-mini';
-    if (provider === 'anthropic') return 'claude-3-5-sonnet-20241022';
+    if (provider === 'anthropic') return 'claude-3-5-haiku-20241022';
     if (provider === 'deepseek') return 'deepseek-chat';
     if (provider === 'ollama') return 'llama3:latest';
     return modelIds[0] || 'default';

@@ -79,10 +79,6 @@ class SettingsTab {
     // 4. Appearance Controls
     this.previewContainer = document.getElementById('settings-pet-preview');
     this.resetAppearanceBtn = document.getElementById('btn-reset-appearance');
-    this.panelTransparencySlider = document.getElementById('setting-panel-transparency');
-    this.dispPanelTransparency = document.getElementById('disp-panel-transparency');
-    this.panelBlurSlider = document.getElementById('setting-panel-blur');
-    this.dispPanelBlur = document.getElementById('disp-panel-blur');
 
     this.accentColorInput = document.getElementById('setting-accent-color');
     this.dispAccentColor = document.getElementById('disp-accent-color');
@@ -205,18 +201,6 @@ class SettingsTab {
     const savedAccent = store.get('settings.appearance.accentColor') || DEFAULT_ACCENT_COLOR;
     this.setAccentColor(savedAccent, false);
 
-    const transparency = Math.round((store.get('settings.appearance.panelTransparency') ?? DEFAULT_PANEL_TRANSPARENCY) * 100);
-    const blur = store.get('settings.appearance.panelBlur') ?? DEFAULT_PANEL_BLUR;
-    if (this.panelTransparencySlider) this.panelTransparencySlider.value = transparency;
-    if (this.dispPanelTransparency) this.dispPanelTransparency.textContent = `${transparency}%`;
-    if (this.panelBlurSlider) this.panelBlurSlider.value = blur;
-    if (this.dispPanelBlur) this.dispPanelBlur.textContent = `${blur} px`;
-
-    const alpha = transparency / 100;
-    document.documentElement.style.setProperty('--panel-transparency', alpha);
-    document.documentElement.style.setProperty('--panel-alpha', alpha);
-    document.documentElement.style.setProperty('--panel-blur', `${blur}px`);
-    document.documentElement.style.setProperty('--blur', `${blur}px`);
 
     // 5. AI Provider
     const activeProvider = store.get('settings.ai.activeProvider') || 'gemini';
@@ -320,7 +304,18 @@ class SettingsTab {
     if (!this.modelSelect) return;
     const store = window.panelController.store;
     const apiKey = this.apiKeyInput ? this.apiKeyInput.value.trim() : '';
+    const savedKey = store.getApiKey ? store.getApiKey(providerId) : (store.get(`settings.ai.keys.${providerId}`) || '');
+    const effectiveKey = apiKey || savedKey || '';
     const baseUrl = this.baseUrlInput ? this.baseUrlInput.value.trim() : '';
+
+    // Don't call model API without a key — avoids repeated 'API key required' errors
+    if (!effectiveKey && providerId !== 'ollama') {
+      if (this.modelStatusHint) {
+        this.modelStatusHint.textContent = 'Enter an API key above to load available models.';
+        this.modelStatusHint.className = 'model-status-hint info';
+      }
+      return;
+    }
 
     if (this.refreshModelsBtn) {
       this.refreshModelsBtn.classList.add('loading');
@@ -385,7 +380,8 @@ class SettingsTab {
           this.modelStatusHint.className = 'model-status-hint success';
         }
       } else {
-        const fallback = providerId === 'gemini' ? 'gemini-1.5-flash' : (providerId === 'groq' ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini');
+        const _fbMap = { gemini: 'gemini-2.0-flash-lite', groq: 'llama-3.3-70b-versatile', openai: 'gpt-4o-mini', anthropic: 'claude-3-5-haiku-20241022', deepseek: 'deepseek-chat' };
+        const fallback = _fbMap[providerId] || 'default';
         this.modelSelect.innerHTML = `<option value="${fallback}">${fallback}</option>`;
         if (this.modelStatusHint) {
           this.modelStatusHint.textContent = 'Using default model profile.';
@@ -654,26 +650,6 @@ class SettingsTab {
     }
 
     // 4. Appearance Events
-    if (this.panelTransparencySlider) {
-      this.panelTransparencySlider.addEventListener('input', (e) => {
-        const percent = parseInt(e.target.value, 10);
-        const alpha = percent / 100;
-        if (this.dispPanelTransparency) this.dispPanelTransparency.textContent = `${percent}%`;
-        window.panelController.store.set('settings.appearance.panelTransparency', alpha);
-        document.documentElement.style.setProperty('--panel-transparency', alpha);
-        document.documentElement.style.setProperty('--panel-alpha', alpha);
-      });
-    }
-
-    if (this.panelBlurSlider) {
-      this.panelBlurSlider.addEventListener('input', (e) => {
-        const blur = parseInt(e.target.value, 10);
-        if (this.dispPanelBlur) this.dispPanelBlur.textContent = `${blur} px`;
-        window.panelController.store.set('settings.appearance.panelBlur', blur);
-        document.documentElement.style.setProperty('--panel-blur', `${blur}px`);
-        document.documentElement.style.setProperty('--blur', `${blur}px`);
-      });
-    }
 
     if (this.accentColorInput) {
       const applyInput = (val) => {
