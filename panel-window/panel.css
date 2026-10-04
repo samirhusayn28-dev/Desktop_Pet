@@ -3291,3 +3291,90 @@ button:focus-visible {
 .timer-ctl-btn.primary {
   flex: 1;
 }
+
+/* About Section Styles (Item W1) */
+.about-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.about-author-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main, #F4F4F5);
+}
+
+.about-github-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 5px 12px;
+  background: var(--surface-2, #1F1F24);
+  border: 1px solid var(--border-subtle, #2E2E35);
+  border-radius: 999px;
+  color: var(--text-muted, #9A9AA3);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.about-github-pill:hover {
+  background: var(--surface-3, #2A2A31);
+  color: var(--text-main, #F4F4F5);
+  border-color: var(--accent, #FF7A2F);
+}
+
+.about-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--surface-2, #1F1F24);
+  border: 1px solid var(--border-subtle, #2E2E35);
+  border-radius: 8px;
+}
+
+.about-meta-label {
+  font-size: 12px;
+  color: var(--text-muted, #9A9AA3);
+}
+
+.about-meta-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--accent, #FF7A2F);
+  font-weight: 600;
+}
+
+.about-actions-grid {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.about-actions-grid button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  font-size: 12.5px;
+}
+
+.about-update-status {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: var(--surface-2, #1F1F24);
+  border: 1px solid var(--border-subtle, #2E2E35);
+  color: var(--text-main, #F4F4F5);
+}
+

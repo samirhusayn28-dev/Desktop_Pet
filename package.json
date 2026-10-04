@@ -88,6 +88,7 @@
       "main/**/*",
       "panel-window/**/*",
       "pet-window/**/*",
+      "welcome-window/**/*",
       "themes/**/*",
       "node_modules/lucide/**/*",
       "node_modules/systeminformation/**/*",

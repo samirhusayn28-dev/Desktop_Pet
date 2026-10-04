@@ -1192,6 +1192,12 @@ app.whenReady().then(async () => {
   createTray();
   createPetWindow();
 
+  // On first launch only, show centered welcome window (Item W1)
+  const isFirstRun = store.get('isFirstRun');
+  if (isFirstRun !== false) {
+    createWelcomeWindow();
+  }
+
   // Start background services
   scheduler.start();
   systemSense.start();
@@ -1223,3 +1229,124 @@ app.on('before-quit', () => {
   if (cursorPollInterval) clearInterval(cursorPollInterval);
   if (idlePollInterval) clearInterval(idlePollInterval);
 });
+
+/**
+ * Centered Welcome Screen Window (Item W1)
+ * 480x660 solid centered window, destroyed after closing, live pet customization
+ */
+let welcomeWindow = null;
+
+function createWelcomeWindow() {
+  if (welcomeWindow && !welcomeWindow.isDestroyed()) {
+    welcomeWindow.focus();
+    return;
+  }
+
+  welcomeWindow = new BrowserWindow({
+    width: 480,
+    height: 660,
+    center: true,
+    resizable: false,
+    frame: false,
+    backgroundColor: '#111113',
+    hasShadow: true,
+    alwaysOnTop: true,
+    show: false,
+    skipTaskbar: false,
+    icon: getAppIconPath(),
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      spellcheck: false
+    }
+  });
+
+  welcomeWindow.loadFile(path.join(__dirname, '..', 'welcome-window', 'welcome.html'));
+
+  welcomeWindow.once('ready-to-show', () => {
+    if (welcomeWindow && !welcomeWindow.isDestroyed()) {
+      welcomeWindow.show();
+    }
+  });
+
+  welcomeWindow.on('closed', () => {
+    welcomeWindow = null;
+  });
+}
+
+// Welcome Window IPC Handlers
+ipcMain.handle('welcome:get-init-data', () => {
+  return {
+    userName: store.get('settings.general.userName') || '',
+    petName: store.get('settings.general.petName') || 'Bolt',
+    glassesEnabled: store.get('settings.appearance.glassesEnabled') || false,
+    appearance: store.get('settings.appearance') || {},
+    aiProvider: store.get('settings.ai.activeProvider') || 'gemini',
+    aiModel: store.get(`settings.ai.models.${store.get('settings.ai.activeProvider') || 'gemini'}`)
+  };
+});
+
+ipcMain.on('welcome:open', () => {
+  createWelcomeWindow();
+});
+
+ipcMain.on('welcome:close', () => {
+  if (welcomeWindow && !welcomeWindow.isDestroyed()) {
+    welcomeWindow.close();
+  }
+});
+
+ipcMain.on('welcome:finish', (e, data) => {
+  if (data && data.save) {
+    if (data.userName !== undefined) {
+      store.set('settings.general.userName', data.userName.trim());
+    }
+    if (data.petName !== undefined) {
+      const pName = data.petName.trim() || 'Bolt';
+      store.set('settings.general.petName', pName);
+      app.setName(pName);
+      createTray();
+      relayToPet('pet:update-name', pName);
+      if (panelWindow && !panelWindow.isDestroyed()) {
+        panelWindow.webContents.send('panel:update-name', pName);
+      }
+    }
+    if (data.glassesEnabled !== undefined) {
+      store.set('settings.appearance.glassesEnabled', !!data.glassesEnabled);
+      relayToPet('pet:update-glasses', !!data.glassesEnabled);
+      if (panelWindow && !panelWindow.isDestroyed()) {
+        panelWindow.webContents.send('panel:update-glasses', !!data.glassesEnabled);
+      }
+    }
+    if (data.appearance) {
+      const current = store.get('settings.appearance') || {};
+      const updated = Object.assign({}, current, data.appearance);
+      store.set('settings.appearance', updated);
+      relayToPet('pet:apply-appearance', updated);
+    }
+    if (data.accentColor) {
+      store.set('settings.appearance.accentColor', data.accentColor);
+      relayToPet('pet:update-accent', data.accentColor);
+      if (panelWindow && !panelWindow.isDestroyed()) {
+        panelWindow.webContents.send('panel:update-accent', data.accentColor);
+      }
+    }
+    if (data.aiProvider) {
+      store.set('settings.ai.activeProvider', data.aiProvider);
+    }
+    if (data.aiModel && data.aiProvider) {
+      store.set(`settings.ai.models.${data.aiProvider}`, data.aiModel);
+    }
+    if (data.apiKey && data.aiProvider) {
+      store.setApiKey(data.aiProvider, data.apiKey);
+    }
+  }
+
+  // Both Save & Skip mark first run completed
+  store.set('isFirstRun', false);
+
+  if (welcomeWindow && !welcomeWindow.isDestroyed()) {
+    welcomeWindow.close();
+  }
+});
+

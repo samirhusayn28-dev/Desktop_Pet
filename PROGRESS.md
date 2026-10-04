@@ -95,11 +95,11 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Verify click 20px outside pet edge passes to background app without opening panel (verified on packaged app)
 
 ## Item W1 — FIRST-LAUNCH WELCOME SCREEN + ABOUT
-- [ ] First-launch centered solid welcome window (480x660), destroyed after closing; live pet reacts to changes
-- [ ] Credits: "Designed & Developed by Samir Husayn" with clickable GitHub link "samirhusayn28-dev"
-- [ ] Inputs: "What should I call you?", "Name your pet", "Customize your pet" (expandable appearance controls + accent color), "Chat" setup (provider, model, key with show/hide, test connection)
-- [ ] Buttons: "Save & Start" (persists everything, safeStorage for keys) and "Skip" (uses defaults, marks first-run done)
-- [ ] Settings -> About: same credits, version, "Check for updates", "Show welcome again"
+- [x] First-launch centered solid welcome window (480x660), destroyed after closing; live pet reacts to changes
+- [x] Credits: "Designed & Developed by Samir Husayn" with clickable GitHub link "samirhusayn28-dev"
+- [x] Inputs: "What should I call you?", "Name your pet", "Customize your pet" (expandable appearance controls + accent color), "Chat" setup (provider, model, key with show/hide, test connection)
+- [x] Buttons: "Save & Start" (persists everything, safeStorage for keys) and "Skip" (uses defaults, marks first-run done)
+- [x] Settings -> About: same credits, version, "Check for updates", "Show welcome again"
 
 ## Item S1 — RESET TO DEFAULT EVERYWHERE
 - [ ] Central defaults object; individual reset icon buttons for controls differing from defaults

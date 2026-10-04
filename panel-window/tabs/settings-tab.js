@@ -124,13 +124,12 @@ class SettingsTab {
     this.privacyScreenshots = document.getElementById('privacy-screenshots');
     this.privacyBlocklist = document.getElementById('privacy-blocklist');
 
-    // First-Run Modal
-    this.firstRunModal = document.getElementById('first-run-modal');
-    this.firstRunPetAvatar = document.getElementById('first-run-pet-avatar');
-    this.btnStartCompanion = document.getElementById('btn-start-companion');
-    this.onboardingPetName = document.getElementById('onboarding-pet-name');
-    this.onboardingProvider = document.getElementById('onboarding-provider');
-    this.onboardingApiKey = document.getElementById('onboarding-api-key');
+    // 7. About (Item W1)
+    this.aboutGithubBtn = document.getElementById('btn-about-github');
+    this.aboutVersionDisplay = document.getElementById('about-version-display');
+    this.aboutCheckUpdatesBtn = document.getElementById('btn-about-check-updates');
+    this.aboutShowWelcomeBtn = document.getElementById('btn-about-show-welcome');
+    this.aboutUpdateStatus = document.getElementById('about-update-status');
 
     this.init();
   }
@@ -217,6 +216,17 @@ class SettingsTab {
     if (this.privacyBlocklist) {
       const blocklist = store.get('settings.privacy.blocklist') || ['1password', 'bitwarden', 'lastpass', 'bank', 'login', 'incognito', 'private'];
       this.privacyBlocklist.value = Array.isArray(blocklist) ? blocklist.join(', ') : blocklist;
+    }
+
+    // 7. About (Item W1)
+    if (this.aboutVersionDisplay) {
+      try {
+        const { app } = typeof require !== 'undefined' ? require('electron') : {};
+        const v = app ? app.getVersion() : '1.0.0';
+        this.aboutVersionDisplay.textContent = `v${v}`;
+      } catch (e) {
+        this.aboutVersionDisplay.textContent = 'v1.0.0';
+      }
     }
   }
 
@@ -999,44 +1009,33 @@ class SettingsTab {
       });
     }
 
-    // First-Run Onboarding Modal Button
-    if (this.btnStartCompanion) {
-      this.btnStartCompanion.addEventListener('click', async () => {
-        const name = this.onboardingPetName ? (this.onboardingPetName.value.trim() || 'Bolt') : 'Bolt';
-        const provider = this.onboardingProvider ? this.onboardingProvider.value : 'gemini';
-        const key = this.onboardingApiKey ? this.onboardingApiKey.value.trim() : '';
+    // 7. About Section Buttons (Item W1)
+    if (this.aboutGithubBtn) {
+      this.aboutGithubBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        try {
+          const { shell } = require('electron');
+          shell.openExternal('https://github.com/samirhusayn28-dev');
+        } catch (err) {}
+      });
+    }
 
-        const store = window.panelController.store;
-        store.set('settings.general.petName', name);
-        store.set('settings.ai.activeProvider', provider);
-        store.set('onboarding.completed', true);
-
-        if (window.panelController.ipcRenderer) {
-          window.panelController.ipcRenderer.send('pet:update-name', name);
-          if (key) {
-            await window.panelController.ipcRenderer.invoke('ai:save-key', { provider, key });
-          }
+    if (this.aboutShowWelcomeBtn) {
+      this.aboutShowWelcomeBtn.addEventListener('click', () => {
+        if (window.panelController && window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('welcome:open');
         }
+      });
+    }
 
-        window.panelController.applyPetName(name);
-        if (this.petNameInput) this.petNameInput.value = name;
-        if (this.providerSelect) this.providerSelect.value = provider;
-        this.updateHeaderBadge(provider);
-
-        if (this.firstRunModal) {
-          this.firstRunModal.classList.add('hidden');
+    if (this.aboutCheckUpdatesBtn) {
+      this.aboutCheckUpdatesBtn.addEventListener('click', () => {
+        if (window.panelController && window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('update:check-now');
         }
-
-        // Welcome greeting from pet
-        if (window.panelController.ipcRenderer) {
-          window.panelController.ipcRenderer.send('pet:set-state', { state: 'happy', duration: 4000 });
-          window.panelController.ipcRenderer.send('pet:show-bubble', {
-            badge: 'HELLO',
-            text: `Hi! I'm ${name}, your desktop pair programming companion! Ready to code!`,
-            duration: 6000,
-            sound: 'chirp',
-            emotion: 'happy'
-          });
+        if (this.aboutUpdateStatus) {
+          this.aboutUpdateStatus.classList.remove('hidden');
+          this.aboutUpdateStatus.textContent = 'Checking for updates...';
         }
       });
     }
