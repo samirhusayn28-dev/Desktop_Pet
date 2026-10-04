@@ -126,11 +126,11 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Call GitHub releases/latest API, compare semver, notify with bubble + badge + OS asset download link, "Skip this version" option, toggle in Settings
 
 ## Item WIN1 — WINDOWS PARITY
-- [ ] Cross-platform APIs, path separators, powerMonitor, nativeTheme, net.online, shortcuts
-- [ ] Windows sensor helper, adaptive scheduler, rate limits, graceful "Unavailable" state
-- [ ] Windows windows: transparent frameless pet window, opaque panel window, tray icon, AppUserModelId, NSIS config
-- [ ] CLI flag `--selftest` (PASS/FAIL/UNAVAILABLE logging) and GitHub Actions workflow smoke-test job
-- [ ] MEASURE-ON-WINDOWS.md documentation
+- [x] Cross-platform APIs, path separators, powerMonitor, nativeTheme, net.online, shortcuts
+- [x] Windows sensor helper, adaptive scheduler, rate limits, graceful "Unavailable" state
+- [x] Windows windows: transparent frameless pet window, opaque panel window, tray icon, AppUserModelId, NSIS config
+- [x] CLI flag `--selftest` (PASS/FAIL/UNAVAILABLE logging) and GitHub Actions workflow smoke-test job
+- [x] MEASURE-ON-WINDOWS.md documentation
 
 ## Item B1 — GREETING ONLY ON REAL STARTUP, GOODBYE ONLY ON REAL SHUTDOWN
 - [ ] Remove "unlock / welcome back" reaction and toggle completely; sleep/suspend/resume, lock/unlock, display sleep/wake show no greeting

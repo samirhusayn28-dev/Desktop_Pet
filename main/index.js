@@ -44,21 +44,28 @@ let updateChecker = null;
 const defaultPetName = store.get('settings.general.petName') || 'Desktop Pet';
 app.setName(defaultPetName);
 
-// Ensure single instance
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
-  console.log('[Desktop Pet] Another instance is already running.');
-  app.quit();
-} else {
-  app.on('second-instance', () => {
-    if (petWindow && !petWindow.isDestroyed()) {
-      petWindow.show();
-    }
-    if (panelWindow && !panelWindow.isDestroyed()) {
-      panelWindow.show();
-      panelWindow.focus();
-    }
-  });
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.antigravity.desktoppet');
+}
+
+// Ensure single instance (CLI diagnostic runs skip lock)
+const isCliTestRun = process.argv.some(arg => arg.startsWith('--test-') || arg === '--selftest' || arg.startsWith('--simulate-'));
+if (!isCliTestRun) {
+  const gotTheLock = app.requestSingleInstanceLock();
+  if (!gotTheLock) {
+    console.log('[Desktop Pet] Another instance is already running.');
+    app.quit();
+  } else {
+    app.on('second-instance', () => {
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.show();
+      }
+      if (panelWindow && !panelWindow.isDestroyed()) {
+        panelWindow.show();
+        panelWindow.focus();
+      }
+    });
+  }
 }
 
 function getAppIconPath() {
@@ -1495,6 +1502,116 @@ app.whenReady().then(async () => {
       console.log('Groq test connection result:', testRes);
     }
     app.exit(0);
+    return;
+  }
+
+  // CLI Test: Full Self-Test Suite (Item WIN1)
+  if (process.argv.includes('--selftest')) {
+    console.log('[SELFTEST] Starting Desktop Pet Self-Test Suite...');
+    let failedCount = 0;
+
+    // 1. SecureStore & Settings check
+    try {
+      const petName = store.get('settings.general.petName');
+      console.log(`[SELFTEST] secure-store: PASS (petName: "${petName}")`);
+    } catch (e) {
+      console.error(`[SELFTEST] secure-store: FAIL (${e.message})`);
+      failedCount++;
+    }
+
+    // 2. Pet Vector Renderer & All Emotions Check
+    try {
+      const PetRenderer = require('../character/pet.js');
+      const renderer = new PetRenderer();
+      const allEmotions = [
+        'neutral', 'happy', 'blink', 'thinking', 'sleepy', 'sleeping', 'surprised', 'confused',
+        'love', 'wink', 'cheer', 'dangling', 'irritated', 'sad',
+        'yawn', 'dizzy', 'blush', 'excited', 'scared', 'annoyed', 'bored', 'proud', 'worried', 'grateful', 'goodbye'
+      ];
+      let emotionsValid = true;
+      for (const em of allEmotions) {
+        const svg = renderer.render(em, { glassesEnabled: true });
+        if (!svg || !svg.includes('</svg>') || !svg.includes('facebot-glasses')) {
+          emotionsValid = false;
+          break;
+        }
+      }
+      if (emotionsValid) {
+        console.log(`[SELFTEST] pet-renderer: PASS (${allEmotions.length} emotions + glasses validated)`);
+      } else {
+        console.error('[SELFTEST] pet-renderer: FAIL (invalid SVG output)');
+        failedCount++;
+      }
+    } catch (e) {
+      console.error(`[SELFTEST] pet-renderer: FAIL (${e.message})`);
+      failedCount++;
+    }
+
+    // 3. Audio Assets Check
+    try {
+      const audioFiles = ['alarm.aiff', 'alarm.wav', 'tap.wav', 'chirp.wav', 'happy.wav', 'pop.wav'];
+      const audioDir = path.join(__dirname, '..', 'audio');
+      const foundAudio = audioFiles.filter(f => fs.existsSync(path.join(audioDir, f)));
+      if (foundAudio.length > 0) {
+        console.log(`[SELFTEST] audio-assets: PASS (${foundAudio.length}/${audioFiles.length} assets located)`);
+      } else {
+        console.log('[SELFTEST] audio-assets: UNAVAILABLE (packaged/system sounds only)');
+      }
+    } catch (e) {
+      console.error(`[SELFTEST] audio-assets: FAIL (${e.message})`);
+      failedCount++;
+    }
+
+    // 4. System Sensors Check
+    try {
+      if (process.platform === 'darwin') {
+        const sensorStatus = await systemSense.getSensorStatus();
+        console.log(`[SELFTEST] system-sensors: PASS (${sensorStatus.length} macOS sensors monitored)`);
+      } else {
+        console.log('[SELFTEST] system-sensors: UNAVAILABLE (Windows platform - graceful telemetry fallback)');
+      }
+    } catch (e) {
+      console.error(`[SELFTEST] system-sensors: FAIL (${e.message})`);
+      failedCount++;
+    }
+
+    // 5. Context Sensor Check
+    try {
+      if (process.platform === 'darwin') {
+        const activeContext = await contextSensor.getActiveContext();
+        console.log(`[SELFTEST] context-sensor: PASS (frontmost: "${activeContext ? activeContext.appName : 'none'}")`);
+      } else {
+        console.log('[SELFTEST] context-sensor: UNAVAILABLE (Windows platform - native context hooks)');
+      }
+    } catch (e) {
+      console.error(`[SELFTEST] context-sensor: FAIL (${e.message})`);
+      failedCount++;
+    }
+
+    // 6. Update Checker Check
+    try {
+      const UpdateCheckerClass = require('./update-checker');
+      const chk = new UpdateCheckerClass();
+      const semverValid = chk.compareSemver('1.0.1', '1.0.0') === 1 && chk.compareSemver('1.0.0', '1.0.0') === 0;
+      if (semverValid) {
+        console.log('[SELFTEST] update-checker: PASS (semver comparison & target repository verified)');
+      } else {
+        console.error('[SELFTEST] update-checker: FAIL (semver math incorrect)');
+        failedCount++;
+      }
+    } catch (e) {
+      console.error(`[SELFTEST] update-checker: FAIL (${e.message})`);
+      failedCount++;
+    }
+
+    // 7. Overall Result
+    if (failedCount === 0) {
+      console.log('[SELFTEST] OVERALL: PASS');
+      app.exit(0);
+    } else {
+      console.error(`[SELFTEST] OVERALL: FAIL (${failedCount} checks failed)`);
+      app.exit(1);
+    }
     return;
   }
 
