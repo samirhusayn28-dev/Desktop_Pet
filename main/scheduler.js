@@ -51,10 +51,11 @@ class Scheduler {
       // Every 45 minutes: water reminder
       if (this.waterCounterMinutes >= 45) {
         this.waterCounterMinutes = 0;
-        const petName = store.get('settings.general.petName') || 'Pet';
+        const userName = (store.get('settings.general.userName') || '').trim();
+        const text = userName ? `Time to drink some water, ${userName}! Stay refreshed and focused!` : `Time to drink some water! Stay refreshed and focused, friend!`;
         bubble.show({
           badge: 'HYDRATION CHECK',
-          text: `Time to drink some water! Stay refreshed and focused, friend!`,
+          text,
           sound: 'chirp',
           emotion: 'happy'
         });
@@ -63,9 +64,11 @@ class Scheduler {
       // Every 90 minutes: stretch reminder
       if (this.stretchCounterMinutes >= 90) {
         this.stretchCounterMinutes = 0;
+        const userName = (store.get('settings.general.userName') || '').trim();
+        const text = userName ? `Stand up and stretch, ${userName}! Roll your shoulders and look away from the screen.` : `Stand up, roll your shoulders, and stretch your spine!`;
         bubble.show({
           badge: 'POSTURE BREAK',
-          text: `Stand up, roll your shoulders, and stretch your spine!`,
+          text,
           sound: 'chirp',
           emotion: 'thinking'
         });
@@ -81,9 +84,11 @@ class Scheduler {
       if (!rem.enabled) continue;
 
       if (rem.time === currentTimeStr) {
+        const userName = (store.get('settings.general.userName') || '').trim();
+        const text = userName ? `${userName}, ${rem.title || 'Scheduled Reminder'}` : (rem.title || 'Scheduled Reminder');
         bubble.show({
           badge: 'REMINDER',
-          text: rem.title || 'Scheduled Reminder',
+          text,
           sound: 'happy',
           emotion: 'happy',
           duration: 6500

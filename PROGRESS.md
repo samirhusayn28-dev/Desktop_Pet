@@ -48,8 +48,8 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [ ] Friendly error on 503 with retry
 
 ## Item 7 — Small remaining items
-- [ ] "What should I call you?" name used in reminders & AI system prompt
-- [ ] Permissions screen: live Granted/Not Granted + deep links (Accessibility, Screen Recording, Automation)
-- [ ] Accent color picker recolors everything (pet window + panel)
-- [ ] Lite mode completely removed (toggle + auto-lite logic)
-- [ ] Dev/test material removed (console logs, test buttons, debug UI)
+- [x] "What should I call you?" name used in reminders & AI system prompt
+- [x] Permissions screen: live Granted/Not Granted + deep links (Accessibility, Screen Recording, Automation)
+- [x] Accent color picker recolors everything (pet window + panel)
+- [x] Lite mode completely removed (toggle + auto-lite logic)
+- [x] Dev/test material removed (console logs, test buttons, debug UI)
