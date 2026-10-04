@@ -18,9 +18,14 @@
 const { exec } = require('child_process');
 const dns = require('dns');
 const os = require('os');
-const { powerMonitor } = require('electron');
+const path = require('path');
+const fs = require('fs');
+const { app, powerMonitor } = require('electron');
 const store = require('./secure-store');
 const bubble = require('./bubble-window');
+
+// Debug volume logging flag (set to true during testing, false in production)
+const DEBUG_VOLUME_LOG = false;
 
 class SystemSense {
   constructor() {
@@ -34,6 +39,10 @@ class SystemSense {
     this.recentChangeDetected = false;
     this.userName = '';
     this.lastHeadphonesCheck = 0;
+    this.volumeTimer = null;
+    this.isCheckingVolume = false;
+    this.currentVolumeBand = null;
+    this.lastVolumeReactionTime = 0;
 
     // Baseline tracker
     this.state = {
@@ -113,9 +122,11 @@ class SystemSense {
   start() {
     this.stop();
 
-    // Initial check after 1.5 seconds
+    this.startVolumeWatcher();
+
+    // Initial check after 1.5 seconds for other sensors
     this.pollTimer = setTimeout(() => this.runAdaptiveCheck(), 1500);
-    console.log('[SystemSense] Active with adaptive energy-efficient scheduler');
+    console.log('[SystemSense] Active with adaptive energy-efficient scheduler and dedicated volume watcher');
   }
 
   async runAdaptiveCheck() {
@@ -144,6 +155,7 @@ class SystemSense {
   }
 
   stop() {
+    this.stopVolumeWatcher();
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
       clearInterval(this.pollTimer);
@@ -175,7 +187,6 @@ class SystemSense {
     if (this.isSleeping) return; // Completely pause polling when pet is sleeping
     try {
       await Promise.allSettled([
-        this.checkVolume(),
         this.checkBrightness(),
         this.checkBattery(),
         this.checkMedia(),
@@ -189,7 +200,53 @@ class SystemSense {
     }
   }
 
-  // --- 1. VOLUME SENSOR ---
+  // --- 1. DEDICATED VOLUME SENSOR & WATCHER ---
+  startVolumeWatcher() {
+    this.stopVolumeWatcher();
+
+    const scheduleNext = () => {
+      let idle = 0;
+      try {
+        if (powerMonitor) idle = powerMonitor.getSystemIdleTime();
+      } catch (e) {}
+
+      // Poll ~1.5s while active (<30s idle), 10s otherwise
+      const delay = (idle < 30 && !this.isSleeping && !this.isScreenLocked && !this.isSuspended) ? 1500 : 10000;
+
+      this.volumeTimer = setTimeout(async () => {
+        if (this.isCheckingVolume) return;
+        this.isCheckingVolume = true;
+        try {
+          await this.checkVolume();
+        } catch (err) {
+          // ignore
+        } finally {
+          this.isCheckingVolume = false;
+          scheduleNext();
+        }
+      }, delay);
+    };
+
+    // First check promptly on startup
+    this.volumeTimer = setTimeout(async () => {
+      this.isCheckingVolume = true;
+      try {
+        await this.checkVolume();
+      } catch (err) {
+      } finally {
+        this.isCheckingVolume = false;
+        scheduleNext();
+      }
+    }, 400);
+  }
+
+  stopVolumeWatcher() {
+    if (this.volumeTimer) {
+      clearTimeout(this.volumeTimer);
+      this.volumeTimer = null;
+    }
+  }
+
   checkVolume() {
     return new Promise((resolve) => {
       if (process.platform !== 'darwin') return resolve();
@@ -204,55 +261,119 @@ class SystemSense {
 
         if (isNaN(vol)) return resolve();
 
-        // Initial assignment
-        if (this.state.volumeLevel === null) {
+        let idle = 0;
+        try {
+          if (powerMonitor) idle = powerMonitor.getSystemIdleTime();
+        } catch (e) {}
+
+        const isMuteOrZero = muted || vol === 0;
+
+        // Band determination with hysteresis
+        let newBand;
+        if (this.currentVolumeBand === null) {
+          if (isMuteOrZero) newBand = 'MUTED';
+          else if (vol >= 98) newBand = 'MAX';
+          else if (vol <= 15) newBand = 'LOW';
+          else newBand = 'NORMAL';
+
+          this.currentVolumeBand = newBand;
           this.state.volumeLevel = vol;
           this.state.isMuted = muted;
+
+          if (DEBUG_VOLUME_LOG) {
+            try {
+              const logPath = path.join(app.getPath('userData'), 'volume-debug.log');
+              fs.appendFileSync(logPath, `[${new Date().toISOString()}] INIT vol=${vol}, muted=${muted}, band=${newBand}, idle=${idle}\n`);
+            } catch (e) {}
+          }
           return resolve();
         }
 
-        // Mute toggle detection
-        if (muted !== this.state.isMuted) {
-          this.state.isMuted = muted;
-          if (muted && this.canReact('volume', 30000)) {
-            this.sendPetEmotion('neutral', 3000);
-            bubble.show({
-              badge: 'AUDIO MUTED',
-              text: 'Shh... Volume muted.',
-              sound: 'tap',
-              emotion: 'neutral'
-            });
-          } else if (!muted && this.canReact('volume', 30000)) {
-            this.sendPetEmotion('happy', 2500);
-          }
+        // Hysteresis calculation against current band
+        if (isMuteOrZero) {
+          newBand = 'MUTED';
+        } else if (this.currentVolumeBand === 'MAX') {
+          // Exit MAX threshold has hysteresis (vol < 92)
+          if (vol <= 15) newBand = 'LOW';
+          else if (vol < 92) newBand = 'NORMAL';
+          else newBand = 'MAX';
+        } else if (this.currentVolumeBand === 'LOW') {
+          // Exit LOW threshold has hysteresis (vol >= 20)
+          if (vol >= 98) newBand = 'MAX';
+          else if (vol >= 20) newBand = 'NORMAL';
+          else newBand = 'LOW';
+        } else if (this.currentVolumeBand === 'MUTED') {
+          // Leaving muted
+          if (vol >= 98) newBand = 'MAX';
+          else if (vol <= 15) newBand = 'LOW';
+          else newBand = 'NORMAL';
+        } else {
+          // Currently NORMAL
+          if (vol >= 98) newBand = 'MAX';
+          else if (vol <= 15) newBand = 'LOW';
+          else newBand = 'NORMAL';
         }
 
-        // Volume level transitions
-        if (!muted) {
-          if (vol >= 95 && this.state.volumeLevel < 95) {
-            if (this.canReact('volume', 45000)) {
+        const isEnabled = store.get('settings.reactions.volume') !== false;
+
+        if (DEBUG_VOLUME_LOG) {
+          try {
+            const logPath = path.join(app.getPath('userData'), 'volume-debug.log');
+            fs.appendFileSync(logPath, `[${new Date().toISOString()}] vol=${vol}, muted=${muted}, prevBand=${this.currentVolumeBand}, newBand=${newBand}, isEnabled=${isEnabled}, idle=${idle}\n`);
+          } catch (e) {}
+        }
+
+        // Threshold crossing reaction
+        if (newBand !== this.currentVolumeBand) {
+          const prevBand = this.currentVolumeBand;
+          this.currentVolumeBand = newBand;
+
+          if (isEnabled && !this.isSleeping) {
+            const name = this.getUserName();
+            if (newBand === 'MAX') {
               this.sendPetEmotion('irritated', 4000);
-              const name = this.getUserName();
               bubble.show({
                 badge: 'MAX VOLUME',
                 text: name ? `Whoa ${name}, too loud! Protecting my little ears!` : 'Whoa, too loud! Protecting my little ears!',
                 sound: 'tap',
-                emotion: 'irritated'
+                emotion: 'irritated',
+                duration: 3000
               });
-            }
-          } else if (vol <= 10 && this.state.volumeLevel > 10) {
-            if (this.canReact('volume', 45000)) {
-              this.sendPetEmotion('relieved', 2500);
+            } else if (newBand === 'MUTED') {
+              // "shh" face: 'dim' emotion
+              this.sendPetEmotion('dim', 3500);
               bubble.show({
-                badge: 'WHISPER QUIET',
-                text: 'Nice and quiet volume.',
-                emotion: 'relieved'
+                badge: 'SHH...',
+                text: 'Whisper quiet mode.',
+                sound: 'tap',
+                emotion: 'dim',
+                duration: 3000
+              });
+            } else if (newBand === 'LOW') {
+              this.sendPetEmotion('sad', 3500);
+              bubble.show({
+                badge: 'LOW VOLUME',
+                text: 'Can barely hear anything down here...',
+                sound: 'tap',
+                emotion: 'sad',
+                duration: 3000
+              });
+            } else if (newBand === 'NORMAL') {
+              // Returned to normal from MAX, LOW, or MUTED: relieved!
+              this.sendPetEmotion('relieved', 3000);
+              bubble.show({
+                badge: 'VOLUME OK',
+                text: 'Ah, that is much better.',
+                sound: 'happy',
+                emotion: 'relieved',
+                duration: 2500
               });
             }
           }
         }
 
         this.state.volumeLevel = vol;
+        this.state.isMuted = muted;
         resolve();
       });
     });

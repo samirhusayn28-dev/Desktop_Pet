@@ -68,8 +68,8 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] CSS reset and audit for unstyled buttons/inputs/selects/checkboxes across all tabs
 
 ## Item F1 — VOLUME REACTION
-- [ ] Poll volume ~1.5s active / 10s idle with hysteresis and threshold crossings
-- [ ] Max volume (100) -> irritated, 0/muted -> shh/quiet, low (<15) -> sad, back to normal -> relieved within 2s
+- [x] Poll volume ~1.5s active / 10s idle with hysteresis and threshold crossings
+- [x] Max volume (100) -> irritated, 0/muted -> shh/quiet, low (<15) -> sad, back to normal -> relieved within 2s
 
 ## Item F2 — REMINDERS
 - [ ] Scheduler, bubble and sound verified in packaged app with panel closed
