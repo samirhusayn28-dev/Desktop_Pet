@@ -41,6 +41,7 @@ let lastPanelBlurTime = 0;
 let petIdleState = 'neutral';
 let updateChecker = null;
 let bootLifecycle = null;
+let isPomodoroFocusActive = false;
 
 // App naming & branding
 const defaultPetName = store.get('settings.general.petName') || 'Desktop Pet';
@@ -183,6 +184,7 @@ function createPetWindow() {
     icon: getAppIconPath(),
     alwaysOnTop: store.get('settings.general.alwaysOnTop') !== false,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
       contextIsolation: false,
       spellcheck: false,
@@ -428,6 +430,11 @@ function startIdleMonitoring() {
       const sleepySec = (store.get('settings.behavior.idleSleepyMinutes') || 2) * 60;
       const sleepingSec = (store.get('settings.behavior.idleSleepingMinutes') || 5) * 60;
 
+      if (isPomodoroFocusActive) {
+        // Pet does not fall asleep during Pomodoro focus
+        return;
+      }
+
       if (idleSec >= sleepingSec) {
         if (petIdleState !== 'sleeping') {
           petIdleState = 'sleeping';
@@ -440,18 +447,29 @@ function startIdleMonitoring() {
           petIdleState = 'sleepy';
           petWindow.webContents.send('pet:set-state', { state: 'sleepy' });
         }
+      } else if (idleSec >= 60) {
+        // Bored at 1 min idle
+        if (petIdleState !== 'bored' && petIdleState !== 'sleepy' && petIdleState !== 'sleeping') {
+          petIdleState = 'bored';
+          petWindow.webContents.send('pet:set-state', { state: 'bored' });
+        }
       } else {
         // User is active
-        if (petIdleState === 'sleeping' || petIdleState === 'sleepy') {
+        if (petIdleState === 'sleeping' || petIdleState === 'sleepy' || petIdleState === 'bored') {
+          const wasSleepingOrSleepy = (petIdleState === 'sleeping' || petIdleState === 'sleepy');
           petIdleState = 'neutral';
           systemSense.setSleeping(false);
           startThrottledCursorTracking();
-          petWindow.webContents.send('pet:set-state', { state: 'surprised', duration: 450 });
-          setTimeout(() => {
-            if (petWindow && !petWindow.isDestroyed() && petIdleState === 'neutral') {
-              petWindow.webContents.send('pet:set-state', { state: 'neutral' });
-            }
-          }, 450);
+          if (wasSleepingOrSleepy) {
+            petWindow.webContents.send('pet:set-state', { state: 'surprised', duration: 450 });
+            setTimeout(() => {
+              if (petWindow && !petWindow.isDestroyed() && petIdleState === 'neutral') {
+                petWindow.webContents.send('pet:set-state', { state: 'neutral' });
+              }
+            }, 450);
+          } else {
+            petWindow.webContents.send('pet:set-state', { state: 'neutral' });
+          }
         }
       }
     } catch (e) {}
@@ -560,6 +578,7 @@ function createPanelWindow() {
     skipTaskbar: false,
     icon: getAppIconPath(),
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
       contextIsolation: false,
       spellcheck: false,
@@ -603,11 +622,197 @@ function togglePanel() {
   }
 }
 
-function relayToPet(channel, data) {
-  if (petWindow && !petWindow.isDestroyed()) {
-    petWindow.webContents.send(channel, data);
+// --- UNIFIED EVENT BUS (Item E3) ---
+function handleAppEvent(type, payload = {}) {
+  if (!type) return;
+
+  switch (type) {
+    case 'pet:show-bubble': {
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:show-bubble', payload);
+      }
+      break;
+    }
+
+    case 'pet:set-emotion':
+    case 'pet:set-state': {
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', payload);
+      }
+      break;
+    }
+
+    case 'todo:completed': {
+      // USER REQUEST: wink: to-do completed
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'wink', duration: 2500, priority: 4, force: true });
+      }
+      break;
+    }
+
+    case 'todo:all-completed': {
+      // USER REQUEST: proud: all to-dos done (at least one to-do exists)
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'proud', duration: 4500, priority: 4, force: true });
+        const name = (store.get('settings.general.userName') || '').trim();
+        const msg = name ? `All tasks done, ${name}! You crushed it!` : 'All tasks completed! Amazing work!';
+        petWindow.webContents.send('pet:show-bubble', { text: msg, duration: 4500, emotion: 'proud', badge: 'SPRINT COMPLETE' });
+      }
+      break;
+    }
+
+    case 'note:saved': {
+      // USER REQUEST: wink: note saved
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'wink', duration: 2500, priority: 4, force: true });
+      }
+      break;
+    }
+
+    case 'note:pinned': {
+      // USER REQUEST: love: the user pins a note
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'love', duration: 4000, priority: 4, force: true });
+        petWindow.webContents.send('pet:show-bubble', { text: 'Pinned with love! ♡', duration: 3500, emotion: 'love', badge: 'FAVORITE' });
+      }
+      break;
+    }
+
+    case 'ai:test-connection-success': {
+      // USER REQUEST: excited: first successful "Test connection"
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'excited', duration: 4000, priority: 4, force: true });
+        petWindow.webContents.send('pet:show-bubble', { text: 'Connection verified! Woohoo! ★', duration: 3500, emotion: 'excited', badge: 'ONLINE' });
+      }
+      break;
+    }
+
+    case 'settings:imported': {
+      // USER REQUEST: excited: successful settings import
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'excited', duration: 4000, priority: 4, force: true });
+        petWindow.webContents.send('pet:show-bubble', { text: 'Settings imported successfully!', duration: 3500, emotion: 'excited', badge: 'SETTINGS' });
+      }
+      break;
+    }
+
+    case 'chat:sent': {
+      const text = typeof payload === 'string' ? payload : (payload?.text || '');
+      // Check grateful
+      const isThanks = /\b(thanks|thank you|thx|shukriya|shukria|jazakallah)\b/i.test(text);
+      // Check love
+      const isLove = /\b(love you|i love you|luv u|love u|pyar)\b/i.test(text);
+
+      if (isThanks) {
+        if (petWindow && !petWindow.isDestroyed()) {
+          petWindow.webContents.send('pet:set-state', { state: 'grateful', duration: 4000, priority: 5, force: true });
+        }
+      } else if (isLove) {
+        if (petWindow && !petWindow.isDestroyed()) {
+          petWindow.webContents.send('pet:set-state', { state: 'love', duration: 4000, priority: 5, force: true });
+        }
+      } else {
+        // USER REQUEST: thinking: from the moment a chat message is sent until the first streamed token
+        if (petWindow && !petWindow.isDestroyed()) {
+          petWindow.webContents.send('pet:set-state', { state: 'thinking', duration: 0, priority: 5, held: true });
+        }
+      }
+      break;
+    }
+
+    case 'chat:token': {
+      // First streamed token: transition to streaming / reading state
+      if (payload && payload.isFirstToken) {
+        if (petWindow && !petWindow.isDestroyed()) {
+          petWindow.webContents.send('pet:set-state', { state: 'reading', duration: 0, priority: 5, held: true });
+        }
+      }
+      break;
+    }
+
+    case 'chat:done': {
+      // USER REQUEST: then happy at the end
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'happy', duration: 3500, priority: 4, force: true });
+      }
+      break;
+    }
+
+    case 'chat:error': {
+      // USER REQUEST: sad: AI error (401/402/429/503/offline)
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'sad', duration: 5000, priority: 5, force: true });
+        const errMsg = payload?.error || payload?.message || 'Encountered an AI error.';
+        petWindow.webContents.send('pet:show-bubble', { text: errMsg, duration: 5000, emotion: 'sad', badge: 'AI ERROR' });
+      }
+      break;
+    }
+
+    case 'pomodoro:start': {
+      // USER REQUEST: focus: while a Pomodoro focus session runs
+      isPomodoroFocusActive = true;
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'focus', duration: 0, priority: 4, held: true, force: true });
+      }
+      break;
+    }
+
+    case 'pomodoro:break': {
+      // USER REQUEST: relaxed during breaks
+      isPomodoroFocusActive = false;
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'happy', duration: 3500, priority: 4, force: true });
+      }
+      break;
+    }
+
+    case 'pomodoro:finish': {
+      isPomodoroFocusActive = false;
+      const count = (payload && payload.completedCount) || 1;
+      // USER REQUEST: excited: every 3rd completed Pomodoro of the day; laugh: when a Pomodoro finishes
+      const emo = (count % 3 === 0) ? 'excited' : 'laugh';
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: emo, duration: 4500, priority: 3, force: true });
+      }
+      break;
+    }
+
+    case 'pomodoro:stop': {
+      isPomodoroFocusActive = false;
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'neutral', duration: 0, priority: 1, force: true });
+      }
+      break;
+    }
+
+    default: {
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send(type, payload);
+      }
+      break;
+    }
   }
 }
+
+function relayToPet(channel, data) {
+  handleAppEvent(channel, data);
+}
+
+// Single Event Bus Entry Point (Item E3)
+ipcMain.on('app:emit', (event, { type, payload } = {}) => {
+  handleAppEvent(type, payload);
+});
+
+// Legacy channel support
+ipcMain.on('panel:relay-to-pet', (event, { channel, data } = {}) => {
+  handleAppEvent(channel, data);
+});
+
+// Single source of truth for app version (Item V1)
+ipcMain.on('app:get-version', (event) => {
+  event.returnValue = app.getVersion();
+});
+ipcMain.handle('app:get-version', () => app.getVersion());
 
 // --- IPC COMMUNICATIONS ---
 
@@ -762,13 +967,13 @@ ipcMain.on('ai:start-chat', async (event, params) => {
       if (!event.sender.isDestroyed()) {
         event.sender.send(`ai:error:${requestId}`, errorData);
       }
-      // On error, show confused pet face
-      relayToPet('pet:set-state', { state: 'confused', duration: 4000 });
+      // On error, show sad pet face (USER REQUEST: sad: AI error (401/402/429/503/offline))
+      relayToPet('pet:set-state', { state: 'sad', duration: 5000, priority: 5, force: true });
       bubble.show({
-        badge: 'AI NOTICE',
+        badge: 'AI ERROR',
         text: errorData.friendly || 'Could not complete request.',
         sound: 'tap',
-        emotion: 'confused'
+        emotion: 'sad'
       });
     }
   );
@@ -1841,7 +2046,15 @@ app.whenReady().then(async () => {
       return true;
     });
 
-    ipcMain.handle('test:inject-sensor', (e, { type, value }) => {
+    ipcMain.handle('test:inject-sensor', (e, arg1, arg2) => {
+      let type, value;
+      if (typeof arg1 === 'object' && arg1 !== null) {
+        type = arg1.type;
+        value = arg1.value;
+      } else {
+        type = arg1;
+        value = arg2;
+      }
       return systemSense.injectSensorReading(type, value);
     });
 
@@ -1960,6 +2173,7 @@ function createWelcomeWindow() {
     skipTaskbar: false,
     icon: getAppIconPath(),
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
       contextIsolation: false,
       spellcheck: false

@@ -187,11 +187,61 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] When ON: play through pet window renderer, lazy Audio element creation, bundled audio files (<50KB), DND mute, release audio resources
 - [x] Comprehensive E2E tests on packaged app with Playwright & `--test-hooks` (ZERO plays with sounds OFF, categories, sub-toggles, volume scale, DND, persistence, reset, export/import, migration)
 
+---
+
+# Bug-Fix & Feature Round (Branch: main)
+
+## Item E3 — 13 EMOTIONS DO NOT WORK (grateful, proud, excited, squint, vibing, dull, focus, thinking, laugh, wink, love, surprised, sad)
+- [x] Linking: Event bus in main process `app.emit(type, payload)` forwarded to pet window; pet window subscribes once
+- [x] Emotion priority: AI states & errors > user interaction on pet > reminder/timer events > system reactions > idle states
+- [x] Event -> emotion map implemented and verified:
+  - [x] surprised: click on pet (then happy ~1.5s), start of drag, reminder due (+ bounce)
+  - [x] sad: AI error (401/402/429/503/offline) and system volume <= 15%
+  - [x] laugh: double click on pet (alternates with wink), pomodoro finishes
+  - [x] wink: double click (alternates), note saved, to-do completed
+  - [x] thinking: chat sent until first token ("..." bubble, eyes up-left, side-to-side) -> streaming (reading eyes, talking mouth) -> happy at end
+  - [x] focus: while Pomodoro focus runs (narrow eyes, held, no sleep); relaxed during breaks
+  - [x] grateful: chat contains thanks, thank you, thx, shukriya, shukria, jazakallah
+  - [x] proud: all to-dos done (at least one exists)
+  - [x] excited: first successful "Test connection", every 3rd completed Pomodoro of day, successful settings import
+  - [x] love: note pinned, or chat contains "love you", "i love you", "luv u", "love u", "pyar", or flag
+  - [x] squint: brightness >= 95% (hysteresis to 90%)
+  - [x] dull: brightness <= 25% (hysteresis to 30%)
+  - [x] vibing: audio playing 5+ seconds system-wide (pmset -g assertions on mac / Core Audio helper, SMTC/peak on win), stopped 5s
+- [x] Rendering: verify SVG shape/CSS exists and differs from neutral with glasses ON & OFF
+- [x] Real UI action tests for all 13 emotions with Playwright on packaged app, output table, re-run full emotion regression
+
+## Item T1 — ALL TIMERS MUST BE CUSTOMIZABLE
+- [ ] Pomodoro: editable focus, short break, long break minutes (defaults 25/5/15), sessions before long break (default 4), auto-start toggle; standalone short & long break
+- [ ] Countdown: custom hours/minutes/seconds stepper inputs, quick preset chips (5, 10, 15, 25, 45, 60 min), label, start/pause/resume/reset
+- [ ] Stopwatch: start/pause/reset + laps
+- [ ] Validation (countdown 1s to 99:59:59, Pomodoro 1 to 180 min), persistence, reset-to-default icon, "Reset section", import/export
+- [ ] Main-process timestamp logic (end time), accurate across panel closed / sleep; end bubble + reaction + sound
+- [ ] Test with real clicks on packaged app: 5s countdown, custom 1m Pomodoro, panel closed, sleep/resume accuracy
+
+## Item R3 — REMINDER "+5m" (SNOOZE) DOES NOT WORK
+- [ ] Reproduce with real click: not yet due postpones 5 min; already fired re-arms 5 min from now and dismisses bubble
+- [ ] Scheduler in main process rescheduled (same id), list updates, persists across restart, fires at new time
+- [ ] Snooze length setting (5/10/15/30 min or custom, default 5, reset icon) and button label follows it
+- [ ] Test: reminder for +1 minute, click snooze before and after it fires, verify both new fire times
+
+## Item B2 — LONG BUBBLE TEXT OVERFLOWS THE BUBBLE
+- [ ] CSS: `max-width: 280px; overflow-wrap: anywhere; word-break: break-word; line-clamp: 4` with ellipsis
+- [ ] Clamped affordance: hover/click to see full text in panel
+- [ ] Dynamic sizing from MEASURED rendered height (render, measure, setBounds); clamp to display work area, flip to side with room; hit-test pet + bubble
+- [ ] Tests: long reminder title, 300-char AI error, long word without spaces, emoji, RTL text, screen edges, max pet size, glasses ON
+
+## Item V1 — VERSION SHOWN IN THE APP = RELEASE VERSION
+- [ ] Single source of truth: `package.json` "version" across git tag, file names, `app.getVersion()`, Settings -> About, tray tooltip, update checker
+- [ ] CI check: release workflow fails early if pushed tag != "v" + package.json version
+
 ## Item PERF — RE-VERIFY RESOURCES
-- [ ] Packaged app 2-minute idle resource verification with glasses OFF and ON via `top -l 4`
-- [ ] Targets: GPU helper < 3% & < 10 wake-ups/s, renderer < 1%, main < 1%, WindowServer < 2%
-- [ ] Check panel-open and sleeping states (~0%)
+- [ ] Measure packaged app via `top -l 4 -pid <pid>`: GPU helper < 3% CPU & < 10 wakeups/s, renderer < 1%, main < 1%, WindowServer increase < 2%
+- [ ] Check panel-open, running timer, held focus, vibing detection, sleeping state (~0%)
 
-
-
-
+## Item REL — RELEASE V1.0.3
+- [ ] Bump version to 1.0.3, update CHANGELOG.md, build packaged app, verify Settings -> About
+- [ ] Update CI smoke test to run on macOS and Windows
+- [ ] Push to main, push tag v1.0.3, monitor CI until both DMG and EXE published
+- [ ] Update checker test from v1.0.2 to v1.0.3
+- [ ] Final reply max 8 lines

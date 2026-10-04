@@ -516,7 +516,7 @@ class AIService {
    * Uses the selected model and returns true result (PASS/FAIL with truthful message).
    */
   async testConnection(provider, apiKey, model, baseUrl) {
-    apiKey = (apiKey || store.getApiKey(provider) || '').trim();
+    apiKey = (apiKey || store.getApiKey(provider) || store.get(`settings.ai.apiKeys.${provider}`) || '').trim();
 
     try {
       if (provider !== 'ollama' && !apiKey) {
@@ -695,7 +695,7 @@ class AIService {
       screenshotBase64
     } = params;
 
-    const apiKey = (passedKey || store.getApiKey(provider) || '').trim();
+    const apiKey = (passedKey || store.getApiKey(provider) || store.get(`settings.ai.apiKeys.${provider}`) || '').trim();
 
     // Required System Prompt:
     // "You are <pet name>, a friendly desktop pet assistant. The user's name is <user name>; use it occasionally. Always reply in the same language and script as the user's last message (English by default; if the user writes Roman Urdu/Hinglish reply in Roman Urdu/Hinglish). Be concise."

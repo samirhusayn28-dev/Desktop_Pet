@@ -12,44 +12,50 @@
 var { ipcRenderer } = typeof require !== 'undefined' ? require('electron') : { ipcRenderer: null };
 
 const EMOTION_PRIORITIES = {
-  // Level 5: ERROR_AI
+  // Level 5: AI states and errors
+  sad: 5,        // sad when from AI error (or volume low: priority 2)
   confused: 5,
   error: 5,
-  // Level 4: USER_INTERACTION
-  dizzy: 4,
-  scared: 4,
-  blush: 4,
-  grateful: 4,
-  proud: 4,
-  celebrating: 4,
-  laugh: 4,
-  wink: 4,
-  love: 4,
-  excited: 4,
-  happy: 4,
-  // Level 3: REMINDER
-  worried: 3,
-  surprised: 3,
-  // Level 2: SYSTEM_REACTION
-  irritated: 2,
-  sad: 2,
+  thinking: 5,
+  reading: 5,
+  grateful: 5,   // user thanked in chat
+  love: 5,       // chat "love you" or pin note
+
+  // Level 4: User interaction on the pet & achievements
+  surprised: 4,  // surprised on click/drag
+  happy: 4,      // happy on hover/click-after
+  dizzy: 4,      // dizzy on fast drag / rapid clicks
+  laugh: 4,      // laugh on double click / pomodoro finish
+  wink: 4,       // wink on double click / todo / note
+  blush: 4,      // blush on 4s hover
+  scared: 4,     // scared on fast cursor approach
+  proud: 4,      // all to-dos completed
+  excited: 4,    // test connection / 3rd pomodoro / import
+  focus: 4,      // pomodoro focus session
+
+  // Level 3: Reminder events
+  celebrating: 3,
+  worried: 3,    // missed reminder
+  'reminder-due': 3,
+
+  // Level 2: System reactions
   squint: 2,
+  dull: 2,
+  dim: 2,
+  vibing: 2,
+  music: 2,
+  irritated: 2,
   'low-battery': 2,
   charging: 2,
   energized: 2,
-  vibing: 2,
-  music: 2,
   stressed: 2,
   relieved: 2,
-  focus: 2,
   annoyed: 2,
   yawn: 2,
-  bored: 2,
   goodbye: 2,
-  dim: 2,
-  dull: 2,
-  thinking: 2,
-  // Level 1: IDLE_BASELINE
+
+  // Level 1: Idle baseline
+  bored: 1,
   neutral: 1,
   sleepy: 1,
   sleeping: 1
@@ -61,6 +67,9 @@ class FaceBotController {
     this.currentEmotion = 'neutral';
     this.baseEmotion = 'neutral';
     this.currentPriority = 1;
+    this.heldState = null;
+    this.isHeld = false;
+    this.lastDblClickEmo = null;
 
     // 2D Eye Offset & Easing
     this.eyeOffset = { x: 0, y: 0 };
@@ -131,6 +140,15 @@ class FaceBotController {
       isBlinking: this.isBlinking,
       idPrefix: 'facebot-win'
     });
+    // Expose data-emotion on all root containers for real test assertions (Item E3)
+    if (this.container) {
+      this.container.setAttribute('data-emotion', this.currentEmotion);
+    }
+    const rootEl = document.getElementById('pet-root-container');
+    if (rootEl) {
+      rootEl.setAttribute('data-emotion', this.currentEmotion);
+    }
+    document.body.setAttribute('data-emotion', this.currentEmotion);
   }
 
   canTransitionTo(newEmotion, priority = null) {
@@ -147,14 +165,25 @@ class FaceBotController {
   }
 
   getBaselineEmotion() {
+    if (this.isHeld && this.heldState) {
+      return this.heldState;
+    }
     return this.baseEmotion || 'neutral';
   }
 
-  setEmotion(newEmotion, durationMs = 0, priority = null, force = false) {
+  setEmotion(newEmotion, durationMs = 0, priority = null, force = false, held = false) {
     const reqPriority = priority !== null ? priority : (EMOTION_PRIORITIES[newEmotion] || 2);
 
     if (!force && !this.canTransitionTo(newEmotion, reqPriority)) {
       return false;
+    }
+
+    if (held) {
+      this.isHeld = true;
+      this.heldState = newEmotion;
+    } else if (newEmotion === 'neutral' || force) {
+      this.isHeld = false;
+      this.heldState = null;
     }
 
     this.currentEmotion = newEmotion;
@@ -202,7 +231,7 @@ class FaceBotController {
         this.emotionTimeout = null;
       }, durationMs);
     } else {
-      if (newEmotion === 'sleeping' || newEmotion === 'sleepy' || newEmotion === 'neutral') {
+      if (newEmotion === 'sleeping' || newEmotion === 'sleepy' || newEmotion === 'neutral' || newEmotion === 'bored') {
         this.baseEmotion = newEmotion;
       }
     }
@@ -555,12 +584,15 @@ class FaceBotController {
       }
     });
 
-    // Double click for playful reaction: only inside pet shape
+    // Double click for playful reaction: strictly alternating laugh and wink (Item E3)
     window.addEventListener('dblclick', (e) => {
       if (this.isInsidePet && e.button === 0) {
-        const doubleEmo = Math.random() < 0.5 ? 'laugh' : 'wink';
-        this.setEmotion(doubleEmo, 2800, 4);
-        if (window.soundEffects) window.soundEffects.playHappy();
+        this.lastDblClickEmo = (this.lastDblClickEmo === 'laugh') ? 'wink' : 'laugh';
+        this.setEmotion(this.lastDblClickEmo, 2800, 4);
+        if (window.soundEffects) {
+          if (this.lastDblClickEmo === 'laugh') window.soundEffects.playHappy();
+          else window.soundEffects.playTap();
+        }
       }
     });
 
@@ -615,11 +647,12 @@ class FaceBotController {
       return;
     }
 
-    this.setEmotion('surprised', 250, 4);
+    // USER REQUIREMENT: surprised: click on the pet (then happy ~1.5 s)
+    this.setEmotion('surprised', 1200, 4);
     this.clickTimeout = setTimeout(() => {
-      this.setEmotion('happy', 2000, 4);
+      this.setEmotion('happy', 1500, 4);
       this.clickTimeout = null;
-    }, 250);
+    }, 1200);
 
     if (window.soundEffects) window.soundEffects.playChirp();
     if (ipcRenderer) {
@@ -708,26 +741,27 @@ class FaceBotController {
     ipcRenderer.on('pet:global-cursor', (event, data) => handleCursorUpdate(data));
     ipcRenderer.on('pet:cursor-pos', (event, data) => handleCursorUpdate(data));
 
-    // 2. Emotion and state triggers (handles both string and { state, duration, priority, force })
+    // 2. Emotion and state triggers (handles string, { state, duration, priority, force, held })
     ipcRenderer.on('pet:set-state', (event, data) => {
       const state = typeof data === 'string' ? data : (data?.state || 'neutral');
       const duration = (typeof data === 'object' && data?.duration !== undefined) ? data.duration : 0;
       const priority = (typeof data === 'object' && data?.priority !== undefined) ? data.priority : null;
       const force = (typeof data === 'object' && data?.force) ? true : false;
+      const held = (typeof data === 'object' && data?.held) ? true : false;
 
       if (force) {
         if (this.emotionTimeout) {
           clearTimeout(this.emotionTimeout);
           this.emotionTimeout = null;
         }
-        if (state === 'sleeping' || state === 'sleepy' || state === 'neutral') {
+        if (state === 'sleeping' || state === 'sleepy' || state === 'neutral' || state === 'bored') {
           this.baseEmotion = state;
         }
-        this.setEmotion(state, duration, priority || 5, true);
-      } else if (state === 'sleeping' || state === 'sleepy' || state === 'neutral') {
+        this.setEmotion(state, duration, priority || 5, true, held);
+      } else if (state === 'sleeping' || state === 'sleepy' || state === 'neutral' || state === 'bored') {
         this.setBaseEmotion(state);
       } else {
-        this.setEmotion(state, duration, priority);
+        this.setEmotion(state, duration, priority, false, held);
       }
     });
 

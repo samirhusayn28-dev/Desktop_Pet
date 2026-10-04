@@ -5,6 +5,14 @@
  */
 
 const { ipcRenderer } = typeof require !== 'undefined' ? require('electron') : { ipcRenderer: null };
+if (!window.app && ipcRenderer) {
+  window.app = {
+    emit: (type, payload) => ipcRenderer.send('app:emit', { type, payload }),
+    on: (ch, l) => ipcRenderer.on(ch, l),
+    send: (ch, ...args) => ipcRenderer.send(ch, ...args),
+    invoke: (ch, ...args) => ipcRenderer.invoke(ch, ...args)
+  };
+}
 const storeModule = typeof require !== 'undefined' ? require('../main/store') : null;
 
 // Browser fallback store if running in plain browser
@@ -263,8 +271,10 @@ class PanelController {
   }
 
   notifyPet(channel, data) {
-    if (this.ipcRenderer) {
-      this.ipcRenderer.send('panel:relay-to-pet', { channel, data });
+    if (window.app && typeof window.app.emit === 'function') {
+      window.app.emit(channel, data);
+    } else if (this.ipcRenderer) {
+      this.ipcRenderer.send('app:emit', { type: channel, payload: data });
     }
   }
 

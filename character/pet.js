@@ -461,6 +461,19 @@
             </g>
           `;
 
+        // 11b. READING / STREAMING
+        case 'reading': {
+          const rRx = (baseRx * 1.1).toFixed(1);
+          const rRy = (baseRy * 0.85).toFixed(1);
+          return `
+            <g ${filterAttr}>
+              <ellipse class="eye-left reading-eye" cx="${lx}" cy="${(ey + 2)}" rx="${rRx}" ry="${rRy}" fill="${c}" />
+              <ellipse class="eye-right reading-eye" cx="${rx}" cy="${(ey + 2)}" rx="${rRx}" ry="${rRy}" fill="${c}" />
+              <path class="mouth talking-mouth" d="M ${(cx - mWidth*0.45).toFixed(1)} ${my} Q ${cx} ${(my + 5)}, ${(cx + mWidth*0.45).toFixed(1)} ${my}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+            </g>
+          `;
+        }
+
         // 12. FOCUS
         case 'focus': {
           const fRx = (baseRx * 1.15).toFixed(1);

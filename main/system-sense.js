@@ -61,6 +61,10 @@ class SystemSense {
       isLateNightNudged: false
     };
 
+    this.currentBrightnessBand = null;
+    this.audioStartTime = null;
+    this.audioStoppedTime = null;
+
     this.setupPowerEvents();
   }
 
@@ -211,9 +215,9 @@ class SystemSense {
     return true;
   }
 
-  sendPetEmotion(state, duration = 3500) {
+  sendPetEmotion(state, duration = 3500, priority = 2, force = true, held = false) {
     if (this.petWindowRef && !this.petWindowRef.isDestroyed()) {
-      this.petWindowRef.webContents.send('pet:set-state', { state, duration });
+      this.petWindowRef.webContents.send('pet:set-state', { state, duration, priority, force, held });
     }
   }
 
@@ -438,31 +442,43 @@ class SystemSense {
         const val = parseInt(match[3], 10) || 0;
         const pct = Math.round((val / max) * 100);
 
-        if (this.state.brightnessLevel === null) {
-          this.state.brightnessLevel = pct;
-          return resolve();
-        }
-
-        const prev = this.state.brightnessLevel;
         this.state.brightnessLevel = pct;
 
-        if (pct >= 95 && prev < 95) {
-          if (this.canReact('brightness', 60000)) {
-            this.sendPetEmotion('squint', 3500);
+        // USER REQUEST:
+        // squint: display brightness at or above 95% (hysteresis down to 90%).
+        // dull: display brightness at or below 25% (hysteresis up to 30%).
+        let newBand = this.currentBrightnessBand;
+        if (pct >= 95) {
+          newBand = 'HIGH';
+        } else if (pct <= 25) {
+          newBand = 'LOW';
+        } else if (this.currentBrightnessBand === 'HIGH' && pct < 90) {
+          newBand = 'NORMAL';
+        } else if (this.currentBrightnessBand === 'LOW' && pct > 30) {
+          newBand = 'NORMAL';
+        } else if (!this.currentBrightnessBand) {
+          newBand = (pct >= 90) ? 'HIGH' : ((pct <= 30) ? 'LOW' : 'NORMAL');
+        }
+
+        if (newBand !== this.currentBrightnessBand) {
+          const oldBand = this.currentBrightnessBand;
+          this.currentBrightnessBand = newBand;
+          if (newBand === 'HIGH') {
+            this.sendPetEmotion('squint', 4000);
             bubble.show({
               badge: 'MAX BRIGHTNESS',
               text: 'So bright! Sunglasses recommended!',
               emotion: 'squint'
             });
-          }
-        } else if (pct <= 15 && prev > 15) {
-          if (this.canReact('brightness', 60000)) {
-            this.sendPetEmotion('sleepy', 3500);
+          } else if (newBand === 'LOW') {
+            this.sendPetEmotion('dull', 4000);
             bubble.show({
               badge: 'DIM SCREEN',
-              text: 'Getting cozy in the dark...',
-              emotion: 'sleepy'
+              text: 'Screen is dim and cozy...',
+              emotion: 'dull'
             });
+          } else if (oldBand) {
+            this.sendPetEmotion('relieved', 2000);
           }
         }
 
@@ -577,8 +593,34 @@ class SystemSense {
   // --- 4. MEDIA / MUSIC SENSOR (JXA for Spotify / Apple Music) ---
   checkMedia() {
     return new Promise((resolve) => {
-      if (process.platform !== 'darwin') return resolve();
+      const enabled = store.get('settings.reactions.media') !== false;
+      if (!enabled) return resolve();
 
+      if (process.platform === 'darwin') {
+        // macOS: system-wide audio assertion in pmset -g assertions
+        exec('pmset -g assertions 2>/dev/null', (err, stdout) => {
+          let isAudioActive = false;
+          if (!err && stdout) {
+            isAudioActive = /coreaudiod|AppleHDAEngineOutput|audio-out|com\.apple\.audio/i.test(stdout);
+          }
+          this.processAudioPlayingState(isAudioActive).then(resolve).catch(() => resolve());
+        });
+      } else if (process.platform === 'win32') {
+        this.checkWindowsAudioState().then((isAudioActive) => {
+          this.processAudioPlayingState(isAudioActive).then(resolve).catch(() => resolve());
+        }).catch(() => resolve());
+      } else {
+        resolve();
+      }
+    });
+  }
+
+  async checkWindowsAudioState() {
+    return false;
+  }
+
+  getJxaTrackTitle() {
+    return new Promise((resolve) => {
       const jxa = `
         function run() {
           var track = "";
@@ -601,32 +643,57 @@ class SystemSense {
           return track;
         }
       `;
-
       exec(`osascript -l JavaScript -e '${jxa.replace(/'/g, "'\\''")}' 2>/dev/null`, (err, stdout) => {
-        const info = (stdout || '').trim();
-        const isPlaying = info.length > 0;
-
-        if (isPlaying && !this.state.isMusicPlaying) {
-          this.state.isMusicPlaying = true;
-          this.state.currentTrack = info;
-
-          this.sendPetEmotion('vibing', 6000);
-          if (this.canReact('media', 90000)) {
-            bubble.show({
-              badge: 'VIBING TO MUSIC ♪',
-              text: `Grooving to ${info.replace(/^(Spotify|Music):\s*/, '')}!`,
-              sound: 'happy',
-              emotion: 'vibing'
-            });
-          }
-        } else if (!isPlaying && this.state.isMusicPlaying) {
-          this.state.isMusicPlaying = false;
-          this.state.currentTrack = '';
-        }
-
-        resolve();
+        resolve((stdout || '').trim());
       });
     });
+  }
+
+  async processAudioPlayingState(isAudioActive) {
+    const now = Date.now();
+    if (isAudioActive) {
+      this.audioStoppedTime = null;
+      if (!this.audioStartTime) {
+        this.audioStartTime = now;
+      }
+      const playingDuration = now - this.audioStartTime;
+      // USER REQUEST: audio is playing on the system for 5+ seconds
+      if (playingDuration >= 5000 && !this.state.isMusicPlaying) {
+        this.state.isMusicPlaying = true;
+        let trackTitle = '';
+        if (process.platform === 'darwin') {
+          try {
+            trackTitle = await this.getJxaTrackTitle();
+          } catch (e) {}
+        }
+        this.state.currentTrack = trackTitle;
+        this.sendPetEmotion('vibing', 0, 2, true, true); // held state while vibing
+        const text = trackTitle
+          ? `Grooving to ${trackTitle.replace(/^(Spotify|Music):\s*/, '')}! ♪`
+          : 'Grooving to the beats! ♪';
+        bubble.show({
+          badge: 'VIBING TO MUSIC ♪',
+          text,
+          sound: 'happy',
+          category: 'reactions',
+          emotion: 'vibing'
+        });
+      }
+    } else {
+      this.audioStartTime = null;
+      if (this.state.isMusicPlaying) {
+        if (!this.audioStoppedTime) {
+          this.audioStoppedTime = now;
+        }
+        // USER REQUEST: Stop vibing when audio stops for 5 s
+        if (now - this.audioStoppedTime >= 5000) {
+          this.state.isMusicPlaying = false;
+          this.audioStoppedTime = null;
+          this.state.currentTrack = '';
+          this.sendPetEmotion('relieved', 2000, 2, true, false);
+        }
+      }
+    }
   }
 
   // --- 5. NETWORK / INTERNET SENSOR ---
@@ -876,7 +943,7 @@ class SystemSense {
   }
 
   // --- SYNTHETIC SENSOR INJECTION FOR AUTOMATED TESTING ---
-  injectSensorReading(type, value) {
+  async injectSensorReading(type, value) {
     bubble.hide();
     this.pauseBackgroundPolling(8000);
     switch (type) {
@@ -917,16 +984,35 @@ class SystemSense {
         let emotion = 'neutral';
         if (pct >= 95) {
           emotion = 'squint';
-          this.sendPetEmotion('squint', 3500);
+          this.currentBrightnessBand = 'HIGH';
+          this.sendPetEmotion('squint', 4000);
           bubble.show({ badge: 'MAX BRIGHTNESS', text: 'So bright! Sunglasses recommended!', emotion: 'squint' });
-        } else if (pct <= 15) {
-          emotion = 'sleepy';
-          this.sendPetEmotion('sleepy', 3500);
-          bubble.show({ badge: 'DIM SCREEN', text: 'Getting cozy in the dark...', emotion: 'sleepy' });
+        } else if (pct <= 25) {
+          emotion = 'dull';
+          this.currentBrightnessBand = 'LOW';
+          this.sendPetEmotion('dull', 4000);
+          bubble.show({ badge: 'DIM SCREEN', text: 'Screen is dim and cozy...', emotion: 'dull' });
+        } else if (this.currentBrightnessBand === 'HIGH' && pct >= 90) {
+          emotion = 'squint';
+        } else if (this.currentBrightnessBand === 'LOW' && pct <= 30) {
+          emotion = 'dull';
         } else {
+          this.currentBrightnessBand = 'NORMAL';
           this.sendPetEmotion('neutral', 0);
         }
         return { success: true, brightness: pct, emotion };
+      }
+
+      case 'media': {
+        const isPlaying = Boolean(value);
+        if (isPlaying) {
+          this.audioStartTime = Date.now() - 5200; // simulate 5+ seconds active
+          await this.processAudioPlayingState(true);
+        } else {
+          this.audioStoppedTime = Date.now() - 5200; // simulate 5+ seconds stopped
+          await this.processAudioPlayingState(false);
+        }
+        return { success: true, isPlaying: this.state.isMusicPlaying, emotion: this.state.isMusicPlaying ? 'vibing' : 'relieved' };
       }
 
       case 'battery': {

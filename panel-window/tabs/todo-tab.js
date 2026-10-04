@@ -50,9 +50,8 @@ class TodoTab {
     }
   }
 
-  addTodo() {
-    if (!this.inputField) return;
-    const text = this.inputField.value.trim();
+  addTodo(customText) {
+    const text = (customText || (this.inputField ? this.inputField.value : '')).trim();
     if (!text) return;
 
     this.todos.push({
@@ -61,7 +60,7 @@ class TodoTab {
       done: false
     });
 
-    this.inputField.value = '';
+    if (this.inputField) this.inputField.value = '';
     this.saveTodos();
     this.render();
     if (window.soundEffects) window.soundEffects.playTap();
@@ -73,17 +72,20 @@ class TodoTab {
       item.done = !item.done;
       this.saveTodos();
       this.render();
-      if (item.done && window.soundEffects) {
-        window.soundEffects.playTap();
-      }
-
-      // Check if all completed -> celebrate!
-      if (this.todos.length > 0 && this.todos.every(t => t.done)) {
-        window.panelController.notifyPet('pet:set-state', { state: 'proud', duration: 4500, priority: 4 });
-        const name = (window.panelController.store.get('settings.general.userName') || '').trim();
-        const msg = name ? `All tasks done, ${name}! You crushed it today!` : 'All tasks completed! Amazing work!';
-        window.panelController.notifyPet('pet:show-bubble', { text: msg, duration: 4500, emotion: 'proud', badge: 'SPRINT COMPLETE' });
-        if (window.soundEffects) window.soundEffects.playHappy();
+      if (item.done) {
+        // USER REQUEST: proud: all to-dos done (at least one to-do exists)
+        if (this.todos.length > 0 && this.todos.every(t => t.done)) {
+          if (window.app) {
+            window.app.emit('todo:all-completed', { total: this.todos.length });
+          }
+          if (window.soundEffects) window.soundEffects.playHappy();
+        } else {
+          // USER REQUEST: wink: to-do completed
+          if (window.app) {
+            window.app.emit('todo:completed', { id: item.id });
+          }
+          if (window.soundEffects) window.soundEffects.playTap();
+        }
       }
     }
   }

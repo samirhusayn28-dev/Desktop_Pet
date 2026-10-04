@@ -125,3 +125,20 @@
 .emotion-focus .facebot-body-wrap {
   transform: translateY(1px);
 }
+
+/* 10. Reading & Talking Mouth (Streaming Chat) */
+.emotion-reading .reading-eye {
+  animation: readingScan 1.6s ease-in-out infinite alternate;
+}
+@keyframes readingScan {
+  0% { transform: translateX(-3px); }
+  100% { transform: translateX(3px); }
+}
+.emotion-reading .talking-mouth {
+  animation: talkingMouth 0.4s ease-in-out infinite alternate;
+}
+@keyframes talkingMouth {
+  0% { transform: scaleY(0.7); }
+  100% { transform: scaleY(1.3); }
+}
+

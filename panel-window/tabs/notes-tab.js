@@ -69,6 +69,10 @@ class NotesTab {
       note.content = content || '';
       note.updatedAt = new Date().toISOString();
       this.saveNotes();
+      // USER REQUEST: wink: note saved
+      if (window.app) {
+        window.app.emit('note:saved', { id: note.id, title: note.title });
+      }
     }
   }
 
@@ -81,6 +85,10 @@ class NotesTab {
       this.saveNotes();
       this.render();
       if (window.soundEffects) window.soundEffects.playTap();
+      // USER REQUEST: love: the user pins a note
+      if (note.pinned && window.app) {
+        window.app.emit('note:pinned', { id: note.id });
+      }
     }
   }
 

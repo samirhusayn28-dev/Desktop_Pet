@@ -315,14 +315,29 @@ class SettingsTab {
       this.privacyBlocklist.value = Array.isArray(blocklist) ? blocklist.join(', ') : blocklist;
     }
 
-    // 7. About (Item W1)
+    // 7. About (Item W1 & Item V1)
     if (this.aboutVersionDisplay) {
       try {
-        const { app } = typeof require !== 'undefined' ? require('electron') : {};
-        const v = app ? app.getVersion() : '1.0.0';
-        this.aboutVersionDisplay.textContent = `v${v}`;
+        let v = null;
+        if (typeof require !== 'undefined') {
+          try {
+            const { ipcRenderer } = require('electron');
+            if (ipcRenderer && typeof ipcRenderer.sendSync === 'function') {
+              v = ipcRenderer.sendSync('app:get-version');
+            }
+          } catch (err) {}
+          if (!v) {
+            try {
+              v = require('../../package.json').version;
+            } catch (err) {}
+          }
+        }
+        const platform = (typeof process !== 'undefined' && process.platform === 'darwin')
+          ? 'macOS (Intel x64)'
+          : ((typeof process !== 'undefined' && process.platform === 'win32') ? 'Windows (x64)' : (typeof process !== 'undefined' ? process.platform : ''));
+        this.aboutVersionDisplay.textContent = `v${v || '1.0.2'}${platform ? ` • ${platform}` : ''}`;
       } catch (e) {
-        this.aboutVersionDisplay.textContent = 'v1.0.0';
+        this.aboutVersionDisplay.textContent = 'v1.0.2';
       }
     }
   }
@@ -1167,6 +1182,10 @@ class SettingsTab {
               this.feedbackBadge.textContent = 'PASS';
               this.feedbackText.textContent = res.friendly || 'Connection verified successfully!';
               if (window.soundEffects) window.soundEffects.playHappy();
+              // USER REQUEST: excited: first successful "Test connection"
+              if (window.app) {
+                window.app.emit('ai:test-connection-success');
+              }
             } else {
               this.feedbackBadge.className = 'feedback-badge fail';
               this.feedbackBadge.textContent = 'FAIL';

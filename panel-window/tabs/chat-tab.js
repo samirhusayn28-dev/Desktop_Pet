@@ -173,15 +173,23 @@ class ChatTab {
     this.renderMessages();
     this.scrollToBottom();
 
-    // Pet reaction: grateful on thanks, otherwise thinking
-    const isThanks = /\b(thanks|thank you|thx|ty|shukriya|dhanyawad|arigato)\b/i.test(text);
+    // USER REQUEST:
+    // - grateful: chat contains thanks, thank you, thx, shukriya, shukria, jazakallah
+    // - love: chat contains love you, i love you, luv u, love u, pyar
+    // - thinking: from the moment a chat message is sent until first streamed token
+    const isThanks = /\b(thanks|thank you|thx|shukriya|shukria|jazakallah)\b/i.test(text);
+    const isLove = /\b(love you|i love you|luv u|love u|pyar)\b/i.test(text);
+
     if (isThanks) {
       this.renderMiniAvatar('grateful');
-      window.panelController.notifyPet('pet:set-state', { state: 'grateful', duration: 4000, priority: 4 });
+      if (window.app) window.app.emit('chat:sent', { text, emotion: 'grateful' });
+    } else if (isLove) {
+      this.renderMiniAvatar('love');
+      if (window.app) window.app.emit('chat:sent', { text, emotion: 'love' });
     } else {
       this.renderMiniAvatar('thinking');
       if (this.miniAvatarEl) this.miniAvatarEl.classList.add('animating');
-      window.panelController.notifyPet('pet:set-state', { state: 'thinking', duration: 15000, priority: 2 });
+      if (window.app) window.app.emit('chat:sent', { text, emotion: 'thinking' });
     }
 
     const assistantMsgEl = this.messagesContainer.querySelector(`.chat-msg[data-index="${assistantIndex}"]`);
@@ -192,6 +200,7 @@ class ChatTab {
       const activeProviderId = store.get('settings.ai.activeProvider') || 'gemini';
       const model = store.get(`settings.ai.models.${activeProviderId}`);
       const baseUrl = store.get(`settings.ai.baseUrls.${activeProviderId}`);
+      const apiKey = store.get(`settings.ai.apiKeys.${activeProviderId}`) || '';
       const petName = store.get('settings.general.petName') || 'Bolt';
 
       // Refresh desktop context
@@ -207,6 +216,7 @@ class ChatTab {
       }
 
       let fullAnswer = '';
+      let hasReceivedFirstToken = false;
       const requestId = 'req_' + Date.now();
       const ipc = window.panelController.ipcRenderer;
 
@@ -217,6 +227,11 @@ class ChatTab {
       };
 
       ipc.on(`ai:chunk:${requestId}`, (e, chunk) => {
+        if (!hasReceivedFirstToken) {
+          hasReceivedFirstToken = true;
+          this.renderMiniAvatar('reading');
+          if (window.app) window.app.emit('chat:token', { isFirstToken: true });
+        }
         fullAnswer += chunk;
         this.messages[assistantIndex].content = fullAnswer;
         if (assistantBodyEl) {
@@ -237,7 +252,7 @@ class ChatTab {
 
         this.renderMiniAvatar('happy');
         if (this.miniAvatarEl) this.miniAvatarEl.classList.remove('animating');
-        window.panelController.notifyPet('pet:set-state', { state: 'happy', duration: 3500 });
+        if (window.app) window.app.emit('chat:done', { text: finalText || fullAnswer });
         if (window.soundEffects) window.soundEffects.playHappy();
         this.isGenerating = false;
       });
@@ -272,9 +287,10 @@ class ChatTab {
           }
         }
 
-        this.renderMiniAvatar('confused');
+        // USER REQUEST: sad: AI error (401/402/429/503/offline)
+        this.renderMiniAvatar('sad');
         if (this.miniAvatarEl) this.miniAvatarEl.classList.remove('animating');
-        window.panelController.notifyPet('pet:set-state', { state: 'confused', duration: 4500, priority: 5 });
+        if (window.app) window.app.emit('chat:error', { error: friendlyMsg, status: errData.status });
         this.isGenerating = false;
       });
 
@@ -282,6 +298,7 @@ class ChatTab {
       ipc.send('ai:start-chat', {
         requestId,
         provider: activeProviderId,
+        apiKey,
         model,
         baseUrl,
         messages: this.messages.slice(0, -1).filter(m => !m.isError),

@@ -113,7 +113,8 @@ class TimerTab {
     const name = (window.panelController && window.panelController.store ? window.panelController.store.get('settings.general.userName') : '') || '';
 
     if (this.mode === 'pomodoro' && !this.isBreak) {
-      window.panelController.notifyPet('pet:set-state', { state: 'focus' });
+      if (window.app) window.app.emit('pomodoro:start');
+      window.panelController.notifyPet('pet:set-state', { state: 'focus', priority: 4, held: true, force: true });
       const focusMsg = name ? `Focus mode ON, ${name}! Happy coding!` : 'Focus mode ON! Happy coding!';
       window.panelController.notifyPet('pet:show-bubble', { text: focusMsg, duration: 3500, emotion: 'focus', badge: 'FOCUS' });
     }
@@ -188,10 +189,12 @@ class TimerTab {
         if (this.sublabelEl) this.sublabelEl.textContent = 'SHORT BREAK';
         this.setToggleText('Start Break');
 
-        // Pet celebrates with laugh!
-        window.panelController.notifyPet('pet:set-state', { state: 'laugh', duration: 5000 });
+        // USER REQUEST: laugh when Pomodoro finishes, excited every 3rd completed Pomodoro
+        const finishEmotion = (this.completedSessions % 3 === 0) ? 'excited' : 'laugh';
+        if (window.app) window.app.emit('pomodoro:finish', { count: this.completedSessions, emotion: finishEmotion });
+        window.panelController.notifyPet('pet:set-state', { state: finishEmotion, duration: 5000, priority: 3, force: true });
         const breakMsg = name ? `Great focus session, ${name}! Time for a 5-min break.` : 'Focus block done! Take a 5-min break.';
-        window.panelController.notifyPet('pet:show-bubble', { badge: 'POMODORO COMPLETE', text: breakMsg, duration: 6000, sound: 'alarm', category: 'timer', emotion: 'laugh' });
+        window.panelController.notifyPet('pet:show-bubble', { badge: 'POMODORO COMPLETE', text: breakMsg, duration: 6000, sound: 'alarm', category: 'timer', emotion: finishEmotion });
       } else {
         this.isBreak = false;
         this.totalSeconds = 25 * 60;
