@@ -23,8 +23,8 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [ ] System reactions: volume, battery, brightness, media, load, headphones, unlock, late-night
 
 ## Item 3 — Pet click opens/closes panel; reminders → bubble + sound
-- [ ] Left click < 4 px opens/closes panel (no -webkit-app-region drag on pet)
-- [ ] Reminder fires → speech bubble + sound
+- [x] Left click < 4 px opens/closes panel (no -webkit-app-region drag on pet)
+- [x] Reminder fires → speech bubble + sound
 
 ## Item 4 — UI: solid dark Material, fixed tabs
 - [ ] Tab bar always one horizontal row

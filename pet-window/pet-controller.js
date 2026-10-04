@@ -153,7 +153,9 @@ class FaceBotController {
     if (sound && window.soundEffects) {
       if (sound === 'chirp') window.soundEffects.playChirp();
       else if (sound === 'happy') window.soundEffects.playHappy();
+      else if (sound === 'alarm') window.soundEffects.playAlarm();
       else if (sound === 'tap') window.soundEffects.playTap();
+      else window.soundEffects.playChirp();
     }
 
     if (emotion) {
