@@ -118,8 +118,8 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Re-measure idle with glasses ON (GPU helper < 3% & < 10 wake-ups/s, renderer < 1%, main < 1%)
 
 ## Item I1 — IMPORT / EXPORT SETTINGS AND NOTES
-- [ ] Settings -> Data: Export JSON with version via native save dialog (API keys excluded)
-- [ ] Import: native open dialog, schema/version/size validation, preview counts, notes merge vs replace, automatic backup in userData before applying, friendly error on corrupt files
+- [x] Settings -> Data: Export JSON with version via native save dialog (API keys excluded)
+- [x] Import: native open dialog, schema/version/size validation, preview counts, notes merge vs replace, automatic backup in userData before applying, friendly error on corrupt files
 
 ## Item U3 — UPDATE CHECKER
 - [ ] GITHUB_REPO = "samirhusayn28-dev/Desktop_Pet", check 60s after start and every 24h, plus "Check now" in About

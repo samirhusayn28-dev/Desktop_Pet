@@ -280,6 +280,26 @@ class PanelController {
         window.ThemeManager.applyAccentColor(document, color);
       }
     });
+
+    this.ipcRenderer.on('panel:data-imported', () => {
+      if (this.settingsTab && typeof this.settingsTab.loadSettings === 'function') {
+        this.settingsTab.loadSettings();
+        this.settingsTab.updateAppearanceUI();
+        this.settingsTab.renderLivePreview();
+      }
+      if (this.notesTab && typeof this.notesTab.loadNotes === 'function') {
+        this.notesTab.loadNotes();
+      }
+      if (this.todoTab && typeof this.todoTab.loadTodos === 'function') {
+        this.todoTab.loadTodos();
+      }
+      if (this.remindersTab && typeof this.remindersTab.loadReminders === 'function') {
+        this.remindersTab.loadReminders();
+      }
+      if (this.chatTab && typeof this.chatTab.updateModelBadge === 'function') {
+        this.chatTab.updateModelBadge();
+      }
+    });
   }
 }
 

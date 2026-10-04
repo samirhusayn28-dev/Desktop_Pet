@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, powerMonitor, systemPreferences, desktopCapturer, shell } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, powerMonitor, systemPreferences, desktopCapturer, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -840,6 +840,276 @@ ipcMain.on('window:set-always-on-top', (e, val) => {
 
 ipcMain.on('window:set-launch-login', (e, openAtLogin) => {
   app.setLoginItemSettings({ openAtLogin: !!openAtLogin });
+});
+
+// Helper for scrubbing sensitive keys on export / import
+function deepStripKeys(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(deepStripKeys);
+  }
+  const clean = {};
+  const sensitive = ['apikey', 'key', 'keys', 'apikeys', 'secret', 'token', 'password', 'encryptedbase64'];
+  for (const [k, v] of Object.entries(obj)) {
+    if (sensitive.includes(k.toLowerCase())) continue;
+    clean[k] = deepStripKeys(v);
+  }
+  return clean;
+}
+
+// Data Management IPC (Item I1)
+ipcMain.handle('data:export', async () => {
+  try {
+    const parentWin = (panelWindow && !panelWindow.isDestroyed()) ? panelWindow : null;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const saveRes = await dialog.showSaveDialog(parentWin, {
+      title: 'Export Desktop Pet Data',
+      defaultPath: `desktop-pet-backup-${dateStr}.json`,
+      filters: [{ name: 'JSON Backup', extensions: ['json'] }]
+    });
+
+    if (saveRes.canceled || !saveRes.filePath) {
+      return { canceled: true };
+    }
+
+    const settingsObj = {
+      general: store.get('settings.general') || {},
+      behavior: store.get('settings.behavior') || {},
+      reactions: store.get('settings.reactions') || {},
+      appearance: store.get('settings.appearance') || {},
+      privacy: store.get('settings.privacy') || {},
+      ai: {
+        activeProvider: store.get('settings.ai.activeProvider') || 'gemini',
+        models: store.get('settings.ai.models') || {},
+        baseUrls: store.get('settings.ai.baseUrls') || {}
+      }
+    };
+
+    const notes = store.get('notes') || [];
+    const todos = store.get('todos') || [];
+    const reminders = store.get('reminders') || [];
+
+    const exportPayload = {
+      format: 'desktop-pet-backup',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      appVersion: app.getVersion(),
+      settings: deepStripKeys(settingsObj),
+      notes: deepStripKeys(notes),
+      todos: deepStripKeys(todos),
+      reminders: deepStripKeys(reminders)
+    };
+
+    fs.writeFileSync(saveRes.filePath, JSON.stringify(exportPayload, null, 2), 'utf8');
+
+    return {
+      success: true,
+      filePath: saveRes.filePath,
+      counts: {
+        settings: Object.keys(exportPayload.settings).length,
+        notes: notes.length,
+        todos: todos.length,
+        reminders: reminders.length
+      }
+    };
+  } catch (err) {
+    console.error('[Desktop Pet] Export failed:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('data:select-import-file', async () => {
+  try {
+    const parentWin = (panelWindow && !panelWindow.isDestroyed()) ? panelWindow : null;
+    const openRes = await dialog.showOpenDialog(parentWin, {
+      title: 'Select Desktop Pet Backup File',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON Backup', extensions: ['json'] }]
+    });
+
+    if (openRes.canceled || !openRes.filePaths || openRes.filePaths.length === 0) {
+      return { canceled: true };
+    }
+
+    const filePath = openRes.filePaths[0];
+    const stats = fs.statSync(filePath);
+    if (stats.size > 5 * 1024 * 1024) {
+      return { error: 'File size exceeds maximum allowed limit (5 MB).' };
+    }
+
+    let parsed = null;
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+      parsed = JSON.parse(content);
+    } catch (parseErr) {
+      return { error: 'Invalid file format: Not a valid JSON file (' + parseErr.message + ')' };
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      return { error: 'Invalid backup file: root element must be a valid JSON object.' };
+    }
+
+    const hasSettings = parsed.settings && typeof parsed.settings === 'object';
+    const hasNotes = Array.isArray(parsed.notes);
+    const hasTodos = Array.isArray(parsed.todos);
+    const hasReminders = Array.isArray(parsed.reminders);
+    const isFormat = parsed.format === 'desktop-pet-backup';
+
+    if (!hasSettings && !hasNotes && !hasTodos && !hasReminders && !isFormat) {
+      return { error: 'Unrecognized backup file. No settings, notes, to-dos, or reminders found.' };
+    }
+
+    const sanitized = deepStripKeys(parsed);
+
+    return {
+      success: true,
+      filePath,
+      preview: {
+        format: parsed.format || 'custom',
+        version: parsed.version || 1,
+        exportedAt: parsed.exportedAt || null,
+        counts: {
+          settings: hasSettings ? Object.keys(parsed.settings).length : 0,
+          notes: hasNotes ? parsed.notes.length : 0,
+          todos: hasTodos ? parsed.todos.length : 0,
+          reminders: hasReminders ? parsed.reminders.length : 0
+        }
+      },
+      data: sanitized
+    };
+  } catch (err) {
+    console.error('[Desktop Pet] Select import file failed:', err);
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('data:apply-import', async (e, { data, notesStrategy }) => {
+  try {
+    if (!data || typeof data !== 'object') {
+      return { error: 'No data provided to import.' };
+    }
+
+    // 1. Automatic safety backup before applying
+    const userDataPath = app.getPath('userData');
+    const backupFileName = `backup-before-import-${Date.now()}.json`;
+    const backupPath = path.join(userDataPath, backupFileName);
+
+    const currentData = {
+      format: 'desktop-pet-backup',
+      version: 1,
+      backupReason: 'pre-import-safety',
+      created: new Date().toISOString(),
+      settings: {
+        general: store.get('settings.general') || {},
+        behavior: store.get('settings.behavior') || {},
+        reactions: store.get('settings.reactions') || {},
+        appearance: store.get('settings.appearance') || {},
+        privacy: store.get('settings.privacy') || {},
+        ai: {
+          activeProvider: store.get('settings.ai.activeProvider') || 'gemini',
+          models: store.get('settings.ai.models') || {},
+          baseUrls: store.get('settings.ai.baseUrls') || {}
+        }
+      },
+      notes: store.get('notes') || [],
+      todos: store.get('todos') || [],
+      reminders: store.get('reminders') || []
+    };
+    fs.writeFileSync(backupPath, JSON.stringify(currentData, null, 2), 'utf8');
+
+    // 2. Apply settings
+    if (data.settings && typeof data.settings === 'object') {
+      if (data.settings.general) {
+        store.set('settings.general', Object.assign({}, store.get('settings.general') || {}, data.settings.general));
+      }
+      if (data.settings.behavior) {
+        store.set('settings.behavior', Object.assign({}, store.get('settings.behavior') || {}, data.settings.behavior));
+      }
+      if (data.settings.reactions) {
+        store.set('settings.reactions', Object.assign({}, store.get('settings.reactions') || {}, data.settings.reactions));
+      }
+      if (data.settings.appearance) {
+        store.set('settings.appearance', Object.assign({}, store.get('settings.appearance') || {}, data.settings.appearance));
+      }
+      if (data.settings.privacy) {
+        store.set('settings.privacy', Object.assign({}, store.get('settings.privacy') || {}, data.settings.privacy));
+      }
+      if (data.settings.ai) {
+        if (data.settings.ai.activeProvider) {
+          store.set('settings.ai.activeProvider', data.settings.ai.activeProvider);
+        }
+        if (data.settings.ai.models) {
+          store.set('settings.ai.models', Object.assign({}, store.get('settings.ai.models') || {}, data.settings.ai.models));
+        }
+        if (data.settings.ai.baseUrls) {
+          store.set('settings.ai.baseUrls', Object.assign({}, store.get('settings.ai.baseUrls') || {}, data.settings.ai.baseUrls));
+        }
+      }
+    }
+
+    // 3. Apply Todos
+    if (Array.isArray(data.todos)) {
+      store.set('todos', data.todos);
+    }
+
+    // 4. Apply Reminders
+    if (Array.isArray(data.reminders)) {
+      store.set('reminders', data.reminders);
+    }
+
+    // 5. Apply Notes (Merge vs Replace)
+    if (Array.isArray(data.notes)) {
+      if (notesStrategy === 'replace') {
+        store.set('notes', data.notes);
+      } else {
+        const existingNotes = store.get('notes') || [];
+        const existingIds = new Set(existingNotes.map(n => n.id));
+        const mergedNotes = [...existingNotes];
+        for (const item of data.notes) {
+          if (!existingIds.has(item.id)) {
+            mergedNotes.push(item);
+          } else {
+            mergedNotes.push(Object.assign({}, item, {
+              id: 'note-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6)
+            }));
+          }
+        }
+        store.set('notes', mergedNotes);
+      }
+    }
+
+    // 6. Broadcast updates to windows
+    const petName = store.get('settings.general.petName') || 'Pixel';
+    app.setName(petName);
+    createTray();
+    relayToPet('pet:update-name', petName);
+
+    const appearance = store.get('settings.appearance') || {};
+    relayToPet('pet:apply-appearance', appearance);
+    relayToPet('pet:update-glasses', appearance.glassesEnabled !== undefined ? appearance.glassesEnabled : store.get('settings.appearance.glassesEnabled'));
+    if (appearance.accentColor) {
+      relayToPet('pet:update-accent', appearance.accentColor);
+    }
+
+    if (panelWindow && !panelWindow.isDestroyed()) {
+      panelWindow.webContents.send('panel:data-imported');
+      panelWindow.webContents.send('panel:update-name', petName);
+      if (appearance.accentColor) {
+        panelWindow.webContents.send('panel:update-accent', appearance.accentColor);
+      }
+      if (appearance.glassesEnabled !== undefined) {
+        panelWindow.webContents.send('panel:update-glasses', appearance.glassesEnabled);
+      }
+    }
+
+    return {
+      success: true,
+      backupFile: backupFileName
+    };
+  } catch (err) {
+    console.error('[Desktop Pet] Apply import failed:', err);
+    return { error: err.message };
+  }
 });
 
 // Behavior & Reactions IPC

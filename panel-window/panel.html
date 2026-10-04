@@ -1029,6 +1029,59 @@
             </div>
           </div>
 
+          <!-- SECTION 6.5: DATA MANAGEMENT (IMPORT / EXPORT - Item I1) -->
+          <div class="settings-group-card" id="section-data-management">
+            <div class="settings-group-title">
+              <div class="title-with-icon">
+                <i data-lucide="database"></i>
+                <span>Data Management</span>
+              </div>
+            </div>
+            <span class="setting-hint">Backup and restore your settings, to-dos, reminders, and notes. API keys and sensitive credentials are never exported.</span>
+
+            <div class="data-actions-row" style="display: flex; gap: 10px; margin-top: 12px;">
+              <button type="button" class="theme-btn-secondary" id="btn-export-data" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 12px;">
+                <i data-lucide="download"></i>
+                <span>Export Data</span>
+              </button>
+              <button type="button" class="theme-btn-secondary" id="btn-import-data" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 12px;">
+                <i data-lucide="upload"></i>
+                <span>Import Data</span>
+              </button>
+            </div>
+
+            <!-- Import Preview Box -->
+            <div id="import-preview-box" class="import-preview-card" style="display: none; margin-top: 14px; padding: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px;">
+              <div style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="file-check" style="width: 15px; height: 15px; color: #10B981;"></i>
+                <span>Backup Preview</span>
+              </div>
+              <div id="import-counts-summary" style="font-size: 12px; opacity: 0.85; margin-bottom: 10px; line-height: 1.5;"></div>
+
+              <div id="import-notes-strategy-wrap" style="margin-bottom: 10px; font-size: 12px;">
+                <div style="font-weight: 500; margin-bottom: 4px;">Notes Handling:</div>
+                <div style="display: flex; gap: 16px;">
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="notes-import-strategy" value="merge" checked>
+                    <span>Merge with existing</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="notes-import-strategy" value="replace">
+                    <span>Replace existing</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button type="button" class="theme-btn-secondary" id="btn-cancel-import" style="padding: 5px 12px; font-size: 12px;">Cancel</button>
+                <button type="button" class="theme-btn-primary" id="btn-confirm-import" style="padding: 5px 14px; font-size: 12px;">Confirm &amp; Apply</button>
+              </div>
+            </div>
+
+            <!-- Status Feedback Message -->
+            <div id="data-status-msg" style="display: none; margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 12px;"></div>
+          </div>
+
           <!-- SECTION 7: ABOUT DESKTOP PET (Item W1) -->
           <div class="settings-group-card" id="section-about">
             <div class="settings-group-title">

@@ -179,6 +179,17 @@ class SettingsTab {
     this.privacyScreenshots = document.getElementById('privacy-screenshots');
     this.privacyBlocklist = document.getElementById('privacy-blocklist');
 
+    // 6.5 Data Management (Item I1)
+    this.btnExportData = document.getElementById('btn-export-data');
+    this.btnImportData = document.getElementById('btn-import-data');
+    this.importPreviewBox = document.getElementById('import-preview-box');
+    this.importCountsSummary = document.getElementById('import-counts-summary');
+    this.importNotesStrategyWrap = document.getElementById('import-notes-strategy-wrap');
+    this.btnCancelImport = document.getElementById('btn-cancel-import');
+    this.btnConfirmImport = document.getElementById('btn-confirm-import');
+    this.dataStatusMsg = document.getElementById('data-status-msg');
+    this.pendingImportData = null;
+
     // 7. About (Item W1)
     this.aboutGithubBtn = document.getElementById('btn-about-github');
     this.aboutVersionDisplay = document.getElementById('about-version-display');
@@ -1082,6 +1093,97 @@ class SettingsTab {
       });
     }
 
+    // 6.5 Data Management Events (Item I1)
+    if (this.btnExportData) {
+      this.btnExportData.addEventListener('click', async () => {
+        this.showDataStatus('Preparing export...', 'info');
+        try {
+          const res = await window.panelController.ipcRenderer.invoke('data:export');
+          if (res.canceled) {
+            this.hideDataStatus();
+            return;
+          }
+          if (res.success) {
+            this.showDataStatus(`Exported ${res.counts.notes} notes, ${res.counts.todos} to-dos, ${res.counts.reminders} reminders successfully!`, 'success');
+            if (window.soundEffects) window.soundEffects.playHappy();
+          } else {
+            this.showDataStatus(res.error || 'Failed to export data.', 'error');
+          }
+        } catch (err) {
+          this.showDataStatus(err.message || 'Error exporting data.', 'error');
+        }
+      });
+    }
+
+    if (this.btnImportData) {
+      this.btnImportData.addEventListener('click', async () => {
+        this.hideDataStatus();
+        try {
+          const res = await window.panelController.ipcRenderer.invoke('data:select-import-file');
+          if (res.canceled) return;
+          if (res.error) {
+            this.showDataStatus(res.error, 'error');
+            if (window.soundEffects) window.soundEffects.playTap();
+            return;
+          }
+          if (res.success && res.data) {
+            this.pendingImportData = res.data;
+            const c = res.preview.counts;
+            const fileName = res.filePath ? res.filePath.split(/[\\/]/).pop() : 'backup.json';
+            this.importCountsSummary.innerHTML = `<strong>File:</strong> ${fileName}<br>` +
+              `<strong>Contents:</strong> ${c.settings} settings categories, ${c.notes} notes, ${c.todos} to-dos, ${c.reminders} reminders.`;
+            if (c.notes > 0) {
+              this.importNotesStrategyWrap.style.display = 'block';
+            } else {
+              this.importNotesStrategyWrap.style.display = 'none';
+            }
+            this.importPreviewBox.style.display = 'block';
+            if (window.panelController && typeof window.panelController.refreshIcons === 'function') {
+              window.panelController.refreshIcons();
+            }
+          }
+        } catch (err) {
+          this.showDataStatus(err.message || 'Error reading import file.', 'error');
+        }
+      });
+    }
+
+    if (this.btnCancelImport) {
+      this.btnCancelImport.addEventListener('click', () => {
+        this.pendingImportData = null;
+        this.importPreviewBox.style.display = 'none';
+      });
+    }
+
+    if (this.btnConfirmImport) {
+      this.btnConfirmImport.addEventListener('click', async () => {
+        if (!this.pendingImportData) return;
+        const selectedRadio = document.querySelector('input[name="notes-import-strategy"]:checked');
+        const notesStrategy = selectedRadio ? selectedRadio.value : 'merge';
+        this.btnConfirmImport.disabled = true;
+        this.btnConfirmImport.textContent = 'Importing...';
+        try {
+          const res = await window.panelController.ipcRenderer.invoke('data:apply-import', {
+            data: this.pendingImportData,
+            notesStrategy
+          });
+          if (res.success) {
+            this.importPreviewBox.style.display = 'none';
+            this.pendingImportData = null;
+            this.showDataStatus(`Import completed! Created safety backup in userData.`, 'success');
+            if (window.soundEffects) window.soundEffects.playHappy();
+          } else {
+            this.showDataStatus(res.error || 'Failed to apply import.', 'error');
+          }
+        } catch (err) {
+          this.showDataStatus(err.message || 'Error applying imported data.', 'error');
+        } finally {
+          this.btnConfirmImport.disabled = false;
+          this.btnConfirmImport.textContent = 'Confirm & Apply';
+        }
+      });
+    }
+
     // 7. About Section Buttons (Item W1)
     if (this.aboutGithubBtn) {
       this.aboutGithubBtn.addEventListener('click', (e) => {
@@ -1441,6 +1543,31 @@ class SettingsTab {
     });
     if (window.soundEffects) window.soundEffects.playChirp();
     this.updateAllResetButtons();
+  }
+
+  showDataStatus(msg, type = 'info') {
+    if (!this.dataStatusMsg) return;
+    this.dataStatusMsg.textContent = msg;
+    this.dataStatusMsg.style.display = 'block';
+    if (type === 'success') {
+      this.dataStatusMsg.style.background = 'rgba(16, 185, 129, 0.15)';
+      this.dataStatusMsg.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+      this.dataStatusMsg.style.color = '#10B981';
+    } else if (type === 'error') {
+      this.dataStatusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
+      this.dataStatusMsg.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+      this.dataStatusMsg.style.color = '#EF4444';
+    } else {
+      this.dataStatusMsg.style.background = 'rgba(56, 189, 248, 0.15)';
+      this.dataStatusMsg.style.border = '1px solid rgba(56, 189, 248, 0.35)';
+      this.dataStatusMsg.style.color = '#38BDF8';
+    }
+  }
+
+  hideDataStatus() {
+    if (this.dataStatusMsg) {
+      this.dataStatusMsg.style.display = 'none';
+    }
   }
 }
 
