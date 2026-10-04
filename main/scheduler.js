@@ -247,6 +247,16 @@ class Scheduler {
       duration: 3500
     });
   }
+
+  reschedule(reminderId) {
+    const reminders = store.get('reminders') || [];
+    const rem = reminders.find(r => r.id === reminderId);
+    if (!rem) return;
+
+    rem.enabled = true;
+    rem.lastTriggered = null;
+    store.set('reminders', reminders);
+  }
 }
 
 module.exports = new Scheduler();

@@ -1,6 +1,6 @@
 /**
  * Desktop Pet — Reminders Tab Controller
- * Sets reminders with repeat options (Once, Daily, Every Hour), snooze, editing,
+ * Sets reminders with repeat options (Once, Daily, Every Hour), snooze, inline editing,
  * persistent store, audio alerts, and natural user-name speech bubbles.
  */
 
@@ -13,6 +13,7 @@ class RemindersTab {
     this.saveBtn = document.getElementById('btn-save-reminder') || document.getElementById('btn-add-reminder');
 
     this.reminders = [];
+    this.editingId = null;
     this.checkInterval = null;
 
     this.init();
@@ -51,6 +52,69 @@ class RemindersTab {
         if (e.key === 'Enter') this.addReminder();
       });
     }
+
+    // Robust Event Delegation on listContainer — click events are never lost
+    if (this.listContainer) {
+      this.listContainer.addEventListener('click', (e) => {
+        // Edit button
+        const editBtn = e.target.closest('.reminder-edit-btn');
+        if (editBtn) {
+          const id = editBtn.dataset.id;
+          if (id) this.startEditing(id);
+          return;
+        }
+
+        // Save Edit button
+        const saveEditBtn = e.target.closest('.reminder-edit-save-btn');
+        if (saveEditBtn) {
+          const id = saveEditBtn.dataset.id;
+          if (id) this.saveEditing(id);
+          return;
+        }
+
+        // Cancel Edit button
+        const cancelEditBtn = e.target.closest('.reminder-edit-cancel-btn');
+        if (cancelEditBtn) {
+          this.cancelEditing();
+          return;
+        }
+
+        // Snooze button
+        const snoozeBtn = e.target.closest('.reminder-snooze-btn');
+        if (snoozeBtn) {
+          const id = snoozeBtn.dataset.id;
+          if (id) this.snoozeReminder(id, 5);
+          return;
+        }
+
+        // Delete button
+        const deleteBtn = e.target.closest('.reminder-delete-btn') || e.target.closest('.todo-delete-btn');
+        if (deleteBtn) {
+          const id = deleteBtn.dataset.id;
+          if (id) this.deleteReminder(id);
+          return;
+        }
+      });
+
+      this.listContainer.addEventListener('change', (e) => {
+        const checkbox = e.target.closest('.todo-checkbox') || e.target.closest('.reminder-checkbox');
+        if (checkbox && checkbox.dataset.id) {
+          this.toggleEnabled(checkbox.dataset.id);
+        }
+      });
+
+      this.listContainer.addEventListener('keydown', (e) => {
+        if (this.editingId) {
+          if (e.key === 'Enter' && (e.target.classList.contains('reminder-edit-title') || e.target.classList.contains('reminder-edit-time'))) {
+            e.preventDefault();
+            this.saveEditing(this.editingId);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            this.cancelEditing();
+          }
+        }
+      });
+    }
   }
 
   addReminder() {
@@ -61,17 +125,80 @@ class RemindersTab {
 
     if (!text || !time) return;
 
-    this.reminders.push({
+    const newReminder = {
       id: Date.now().toString(),
       title: text,
       time: time,
       repeat: repeat,
       enabled: true,
       lastTriggered: null
-    });
+    };
 
+    this.reminders.push(newReminder);
     this.textInput.value = '';
     this.saveReminders();
+    this.render();
+
+    if (window.soundEffects) window.soundEffects.playTap();
+    if (window.panelController?.ipcRenderer) {
+      window.panelController.ipcRenderer.send('reminders:updated');
+    }
+  }
+
+  startEditing(id) {
+    this.editingId = id;
+    this.render();
+
+    // Auto-focus and select the title input in the newly rendered inline edit form
+    setTimeout(() => {
+      const titleInput = this.listContainer.querySelector(`.reminder-edit-title[data-id="${id}"]`);
+      if (titleInput) {
+        titleInput.focus();
+        titleInput.select();
+      }
+    }, 50);
+
+    if (window.soundEffects) window.soundEffects.playTap();
+  }
+
+  saveEditing(id) {
+    const item = this.reminders.find(r => r.id === id);
+    if (!item) {
+      this.editingId = null;
+      this.render();
+      return;
+    }
+
+    const titleInput = this.listContainer.querySelector(`.reminder-edit-title[data-id="${id}"]`);
+    const timeInput = this.listContainer.querySelector(`.reminder-edit-time[data-id="${id}"]`);
+    const repeatSelect = this.listContainer.querySelector(`.reminder-edit-repeat[data-id="${id}"]`);
+
+    const newTitle = titleInput ? titleInput.value.trim() : '';
+    const newTime = timeInput ? timeInput.value.trim() : '';
+    const newRepeat = repeatSelect ? repeatSelect.value : 'once';
+
+    if (!newTitle || !newTime) return;
+
+    item.title = newTitle;
+    item.time = newTime;
+    item.repeat = newRepeat;
+    item.enabled = true; // Editing re-enables the reminder
+    item.lastTriggered = null; // Reschedule for next match
+
+    this.editingId = null;
+    this.saveReminders();
+    this.render();
+
+    if (window.soundEffects) window.soundEffects.playTap();
+
+    if (window.panelController?.ipcRenderer) {
+      window.panelController.ipcRenderer.send('reminders:reschedule', id);
+      window.panelController.ipcRenderer.send('reminders:updated');
+    }
+  }
+
+  cancelEditing() {
+    this.editingId = null;
     this.render();
     if (window.soundEffects) window.soundEffects.playTap();
   }
@@ -80,9 +207,16 @@ class RemindersTab {
     const item = this.reminders.find(r => r.id === id);
     if (item) {
       item.enabled = !item.enabled;
+      if (item.enabled) {
+        item.lastTriggered = null; // reset triggered flag if user re-enables
+      }
       this.saveReminders();
       this.render();
       if (window.soundEffects) window.soundEffects.playTap();
+
+      if (window.panelController?.ipcRenderer) {
+        window.panelController.ipcRenderer.send('reminders:updated');
+      }
     }
   }
 
@@ -99,6 +233,12 @@ class RemindersTab {
       this.saveReminders();
       this.render();
       if (window.soundEffects) window.soundEffects.playTap();
+
+      if (window.panelController?.ipcRenderer) {
+        window.panelController.ipcRenderer.send('reminders:reschedule', id);
+        window.panelController.ipcRenderer.send('reminders:updated');
+      }
+
       window.panelController.notifyPet('pet:show-bubble', {
         badge: 'SNOOZED',
         text: `Snoozed "${item.title}" for ${minutes} mins (${item.time})`,
@@ -108,34 +248,30 @@ class RemindersTab {
     }
   }
 
-  editReminder(id) {
-    const item = this.reminders.find(r => r.id === id);
-    if (!item) return;
-
-    const newTitle = prompt('Edit reminder title:', item.title);
-    if (newTitle !== null && newTitle.trim()) {
-      item.title = newTitle.trim();
-      const newTime = prompt('Edit reminder time (HH:MM):', item.time);
-      if (newTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(newTime.trim())) {
-        item.time = newTime.trim();
-      }
-      this.saveReminders();
-      this.render();
-    }
-  }
-
   deleteReminder(id) {
     this.reminders = this.reminders.filter(r => r.id !== id);
+    if (this.editingId === id) this.editingId = null;
     this.saveReminders();
     this.render();
     if (window.soundEffects) window.soundEffects.playTap();
+
+    if (window.panelController?.ipcRenderer) {
+      window.panelController.ipcRenderer.send('reminders:updated');
+    }
   }
 
   startChecker() {
     if (this.checkInterval) clearInterval(this.checkInterval);
     this.checkInterval = setInterval(() => {
-      this.loadReminders();
-    }, 5000); // Keep UI list synced with main process scheduler
+      // Do not interrupt user while actively editing inline!
+      if (this.editingId) return;
+
+      const latest = window.panelController?.store?.get('reminders') || [];
+      if (JSON.stringify(latest) !== JSON.stringify(this.reminders)) {
+        this.reminders = latest;
+        this.render();
+      }
+    }, 4000);
   }
 
   render() {
@@ -159,43 +295,58 @@ class RemindersTab {
 
     this.reminders.forEach(r => {
       const item = document.createElement('div');
-      item.className = `reminder-item ${r.enabled ? 'active' : 'disabled'}`;
-      item.innerHTML = `
-        <div class="reminder-info">
-          <div class="reminder-title">${r.title}</div>
-          <div class="reminder-meta">
-            <span class="reminder-time-badge mono"><i data-lucide="clock"></i> ${r.time}</span>
-            <span class="reminder-repeat-badge">${r.repeat}</span>
+      const isEditing = this.editingId === r.id;
+
+      if (isEditing) {
+        item.className = 'reminder-item editing';
+        item.dataset.id = r.id;
+        item.innerHTML = `
+          <div class="reminder-edit-form">
+            <input type="text" class="terminal-input reminder-edit-title" data-id="${r.id}" value="${r.title.replace(/"/g, '&quot;')}" placeholder="Reminder title">
+            <div class="reminder-edit-inputs-row">
+              <input type="time" class="terminal-input mono reminder-edit-time" data-id="${r.id}" value="${r.time}">
+              <select class="terminal-select reminder-edit-repeat" data-id="${r.id}">
+                <option value="once" ${r.repeat === 'once' ? 'selected' : ''}>Once</option>
+                <option value="daily" ${r.repeat === 'daily' ? 'selected' : ''}>Daily</option>
+                <option value="every-hour" ${r.repeat === 'every-hour' ? 'selected' : ''}>Every Hour</option>
+              </select>
+            </div>
+            <div class="reminder-edit-actions-row">
+              <button class="reminder-edit-cancel-btn" data-id="${r.id}" title="Cancel editing">
+                <i data-lucide="x"></i>
+                <span>Cancel</span>
+              </button>
+              <button class="reminder-edit-save-btn" data-id="${r.id}" title="Save reminder">
+                <i data-lucide="check"></i>
+                <span>Save</span>
+              </button>
+            </div>
           </div>
-        </div>
-        <div class="reminder-item-actions">
-          <button class="reminder-snooze-btn" title="Snooze 5 minutes">
-            <i data-lucide="alarm-clock"></i>
-            <span>+5m</span>
-          </button>
-          <button class="reminder-edit-btn" title="Edit reminder">
-            <i data-lucide="edit-3"></i>
-          </button>
-          <input type="checkbox" class="todo-checkbox" ${r.enabled ? 'checked' : ''} title="Toggle active">
-          <button class="todo-delete-btn" title="Delete reminder"><i data-lucide="trash-2"></i></button>
-        </div>
-      `;
-
-      item.querySelector('.todo-checkbox').addEventListener('change', () => {
-        this.toggleEnabled(r.id);
-      });
-
-      item.querySelector('.reminder-snooze-btn').addEventListener('click', () => {
-        this.snoozeReminder(r.id, 5);
-      });
-
-      item.querySelector('.reminder-edit-btn').addEventListener('click', () => {
-        this.editReminder(r.id);
-      });
-
-      item.querySelector('.todo-delete-btn').addEventListener('click', () => {
-        this.deleteReminder(r.id);
-      });
+        `;
+      } else {
+        item.className = `reminder-item ${r.enabled ? 'active' : 'disabled'}`;
+        item.dataset.id = r.id;
+        item.innerHTML = `
+          <div class="reminder-info">
+            <div class="reminder-title">${r.title}</div>
+            <div class="reminder-meta">
+              <span class="reminder-time-badge mono"><i data-lucide="clock"></i> ${r.time}</span>
+              <span class="reminder-repeat-badge">${r.repeat}</span>
+            </div>
+          </div>
+          <div class="reminder-item-actions">
+            <button class="reminder-snooze-btn" data-id="${r.id}" title="Snooze 5 minutes">
+              <i data-lucide="alarm-clock"></i>
+              <span>+5m</span>
+            </button>
+            <button class="reminder-edit-btn" data-id="${r.id}" title="Edit reminder">
+              <i data-lucide="edit-3"></i>
+            </button>
+            <input type="checkbox" class="todo-checkbox reminder-checkbox" data-id="${r.id}" ${r.enabled ? 'checked' : ''} title="Toggle active">
+            <button class="todo-delete-btn reminder-delete-btn" data-id="${r.id}" title="Delete reminder"><i data-lucide="trash-2"></i></button>
+          </div>
+        `;
+      }
 
       this.listContainer.appendChild(item);
     });

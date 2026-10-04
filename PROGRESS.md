@@ -162,9 +162,9 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Test event injection via hook: volume, brightness, battery, media, network, headphones, high CPU, etc.
 
 ## Item R2 — REMINDER "EDIT" BUTTON DOES NOTHING
-- [ ] Investigate cause (event listener loss, channel mismatch, CSS hidden form)
-- [ ] Implement inline edit form with custom pickers, reschedule in scheduler, persist across restarts
-- [ ] Real click e2e test: add, edit, snooze, mark done, delete, repeat; verify alert fires at new time with bubble & sound
+- [x] Investigate cause (event listener loss, channel mismatch, CSS hidden form)
+- [x] Implement inline edit form with custom pickers, reschedule in scheduler, persist across restarts
+- [x] Real click e2e test: add, edit, snooze, mark done, delete, repeat; verify alert fires at new time with bubble & sound
 
 ## Item PERM2 — SCREEN RECORDING STILL SHOWS "REQUEST" AFTER ALLOWING IT
 - [ ] Real status check via `systemPreferences.getMediaAccessStatus('screen')` + `desktopCapturer.getSources`

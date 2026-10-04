@@ -860,6 +860,17 @@ ipcMain.on('reminders:snooze', (e, { id, minutes }) => {
   scheduler.snoozeReminder(id, minutes);
 });
 
+ipcMain.on('reminders:reschedule', (e, id) => {
+  scheduler.reschedule(id);
+});
+
+ipcMain.on('reminders:updated', () => {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  scheduler.evaluateReminders(`${hours}:${minutes}`, now);
+});
+
 ipcMain.on('window:set-always-on-top', (e, val) => {
   if (petWindow) petWindow.setAlwaysOnTop(val);
   if (panelWindow) panelWindow.setAlwaysOnTop(val);
