@@ -90,9 +90,9 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Target: renderer under 1% CPU and under 10 wake-ups/s with cursor still (measured: before ~181 wake-ups/s & 3.4% CPU; after 1.33 wake-ups/s & ~0.8-1.2% CPU)
 
 ## Item H1 — HOVER/CLICK OUTSIDE THE PET
-- [ ] Shape-accurate hit-testing in main process (reusing existing cursor poll, no extra timers) based on pet size/width/height/roundness + bubble rect
-- [ ] setIgnoreMouseEvents(!inside) with 2px hysteresis, keep accepting events while dragging, transparent padding passes clicks through
-- [ ] Verify click 20px outside pet edge passes to background app without opening panel
+- [x] Shape-accurate hit-testing in main process (reusing existing cursor poll, no extra timers) based on pet size/width/height/roundness + bubble rect
+- [x] setIgnoreMouseEvents(!inside) with 2px hysteresis, keep accepting events while dragging, transparent padding passes clicks through
+- [x] Verify click 20px outside pet edge passes to background app without opening panel (verified on packaged app)
 
 ## Item W1 — FIRST-LAUNCH WELCOME SCREEN + ABOUT
 - [ ] First-launch centered solid welcome window (480x660), destroyed after closing; live pet reacts to changes

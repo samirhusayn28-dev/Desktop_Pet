@@ -129,8 +129,8 @@ function createTray() {
 
 function getPetWindowSize(scale = 1.0) {
   const s = Math.max(0.5, Math.min(3.0, scale));
-  const w = Math.round(250 * s);
-  const h = Math.round(250 * s);
+  const w = Math.round(230 * s);
+  const h = Math.round(230 * s);
   return [w, h];
 }
 
@@ -182,6 +182,10 @@ function createPetWindow() {
 
   petWindow.loadFile(path.join(__dirname, '..', 'pet-window', 'pet.html'));
 
+  // Default to ignoring mouse events so transparent padding lets clicks pass straight through
+  petWindow.setIgnoreMouseEvents(true, { forward: true });
+  isPetHoveredOrInside = false;
+
   petWindow.on('moved', () => {
     if (petWindow && store.get('settings.general.rememberPosition') !== false) {
       const [x, y] = petWindow.getPosition();
@@ -201,7 +205,112 @@ function createPetWindow() {
 }
 
 /**
+ * Shape-Accurate Hit Testing (Item H1)
+ * Tests whether cursor is inside the pet's real rounded-rectangle
+ * (from size/width/height/roundness settings) plus bubble rectangle when visible.
+ * Includes 2px hysteresis to prevent edge jitter.
+ */
+let isPetHoveredOrInside = false;
+
+function isCursorInPetHitArea(screenX, screenY) {
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible()) {
+    return false;
+  }
+
+  // Always keep accepting mouse events while user is dragging
+  if (dragStartPos) {
+    return true;
+  }
+
+  const [winX, winY] = petWindow.getPosition();
+  const [winW, winH] = petWindow.getSize();
+
+  // Quick bounds reject outside pet window
+  if (screenX < winX || screenX > winX + winW || screenY < winY || screenY > winY + winH) {
+    return false;
+  }
+
+  const relX = screenX - winX;
+  const relY = screenY - winY;
+
+  // 1. Check Speech Bubble (if visible)
+  if (bubble && bubble.isShowing) {
+    const bubbleMaxW = 270;
+    const bubbleW = Math.min(bubbleMaxW, winW - 20);
+    const bubbleX = (winW - bubbleW) / 2;
+    const bubbleY = 10;
+    const bubbleH = 75;
+    const bPad = isPetHoveredOrInside ? 2 : 0;
+    if (relX >= bubbleX - bPad && relX <= bubbleX + bubbleW + bPad &&
+        relY >= bubbleY - bPad && relY <= bubbleY + bubbleH + bPad) {
+      return true;
+    }
+  }
+
+  // 2. Check Pet's Real Rounded-Rectangle Shape
+  const appConfig = store.get('settings.appearance') || {};
+  const scale = appConfig.scale || 1.0;
+  const cfgW = Math.max(60, Math.min(200, appConfig.width !== undefined ? appConfig.width : 136));
+  const cfgH = Math.max(60, Math.min(200, appConfig.height !== undefined ? appConfig.height : 120));
+  const roundness = appConfig.roundness !== undefined ? appConfig.roundness : 36;
+
+  const size = Math.round(180 * scale);
+  const k = size / 220; // SVG viewBox to screen scale factor
+
+  const cx = 110;
+  const cy = 110;
+  const vx = cx - cfgW / 2;
+  const vy = cy - cfgH / 2;
+  const maxR = Math.min(cfgW, cfgH) / 2;
+  const vrx = Math.max(0, Math.min(maxR, maxR * (roundness / 50)));
+
+  // SVG position inside window:
+  // .pet-app-container: flex column, align-items: center, justify-content: flex-end, padding-bottom: 10px
+  const svgX = (winW - size) / 2;
+  const svgY = winH - 10 - size;
+
+  // Real pet body rounded rect in window coordinates:
+  const bodyX = svgX + vx * k;
+  const bodyY = svgY + vy * k;
+  const bodyW = cfgW * k;
+  const bodyH = cfgH * k;
+  const bodyR = vrx * k;
+
+  // 2px hysteresis: if already inside, expand test area by 2px to prevent flicker at boundary
+  const pad = isPetHoveredOrInside ? 2 : 0;
+
+  const minX = bodyX - pad;
+  const maxX = bodyX + bodyW + pad;
+  const minY = bodyY - pad;
+  const maxY = bodyY + bodyH + pad;
+  const r = bodyR + pad;
+
+  // Check outer bounding box
+  if (relX < minX || relX > maxX || relY < minY || relY > maxY) {
+    return false;
+  }
+
+  // Check 4 rounded corners
+  if (relX < minX + r && relY < minY + r) {
+    return Math.hypot(relX - (minX + r), relY - (minY + r)) <= r;
+  }
+  if (relX > maxX - r && relY < minY + r) {
+    return Math.hypot(relX - (maxX - r), relY - (minY + r)) <= r;
+  }
+  if (relX < minX + r && relY > maxY - r) {
+    return Math.hypot(relX - (minX + r), relY - (maxY - r)) <= r;
+  }
+  if (relX > maxX - r && relY > maxY - r) {
+    return Math.hypot(relX - (maxX - r), relY - (maxY - r)) <= r;
+  }
+
+  // Inside straight cross / body interior
+  return true;
+}
+
+/**
  * Adaptive Cursor Tracking (Max 30 Hz / 33ms only while moving)
+ * - Shape-accurate hit testing with 2px hysteresis for transparent mouse pass-through
  * - Checks delta: only sends IPC if cursor moved by > 1.5px
  * - Automatically throttles down to 300ms when cursor is still (0% idle CPU)
  * - Immediately stops completely when pet is sleeping
@@ -215,6 +324,16 @@ function pollCursorTick() {
 
   try {
     const cursor = screen.getCursorScreenPoint();
+
+    // 1. Shape-accurate hit testing with 2px hysteresis (Item H1)
+    if (!dragStartPos) {
+      const isInside = isCursorInPetHitArea(cursor.x, cursor.y);
+      if (isInside !== isPetHoveredOrInside) {
+        isPetHoveredOrInside = isInside;
+        petWindow.setIgnoreMouseEvents(!isInside, { forward: true });
+      }
+    }
+
     const dist = Math.hypot(cursor.x - lastCursorPos.x, cursor.y - lastCursorPos.y);
     if (dist < 1.5) {
       stillCount++;
@@ -555,10 +674,21 @@ ipcMain.on('pet:drag-end', () => {
     store.set('window.petY', y);
   }
   bubble.syncPosition();
+
+  // Re-evaluate mouse ignore state immediately after drag
+  if (petWindow && !petWindow.isDestroyed()) {
+    try {
+      const cursor = screen.getCursorScreenPoint();
+      isPetHoveredOrInside = isCursorInPetHitArea(cursor.x, cursor.y);
+      petWindow.setIgnoreMouseEvents(!isPetHoveredOrInside, { forward: true });
+    } catch (e) {}
+  }
 });
 
 ipcMain.on('pet:set-ignore-mouse-events', (e, ignore) => {
+  if (dragStartPos) return; // Keep accepting events while dragging
   if (petWindow && !petWindow.isDestroyed()) {
+    isPetHoveredOrInside = !ignore;
     petWindow.setIgnoreMouseEvents(ignore, { forward: true });
   }
 });
