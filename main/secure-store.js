@@ -83,7 +83,7 @@ class SecureStore {
         ai: {
           activeProvider: 'gemini',
           models: {
-            gemini: 'gemini-1.5-flash',
+            gemini: 'gemini-2.0-flash-lite',
             groq: 'llama-3.3-70b-versatile',
             openai: 'gpt-4o-mini',
             anthropic: 'claude-3-5-sonnet-20241022',

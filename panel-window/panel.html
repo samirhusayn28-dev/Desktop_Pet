@@ -125,7 +125,7 @@
               <div class="chat-header-meta">
                 <span class="chat-header-title" id="chat-assistant-name">Bolt Assistant</span>
                 <button type="button" class="chat-header-subtitle" id="chat-model-info" title="Click to change model in Settings">
-                  gemini • gemini-1.5-flash
+                  gemini • gemini-2.0-flash-lite
                 </button>
               </div>
               <button class="chat-broom-btn" id="btn-clear-chat" title="Clear Conversation">
@@ -193,16 +193,30 @@
           <div class="timer-card-glass">
             <!-- Mode Pills -->
             <div class="timer-mode-pills">
-              <button class="timer-mode-btn active" data-mode="pomodoro">Pomodoro (25m)</button>
-              <button class="timer-mode-btn" data-mode="short-break">Short Break (5m)</button>
-              <button class="timer-mode-btn" data-mode="long-break">Long Break (15m)</button>
+              <button class="timer-mode-btn active" data-mode="pomodoro">Pomodoro</button>
+              <button class="timer-mode-btn" data-mode="short-break">Short Break</button>
+              <button class="timer-mode-btn" data-mode="long-break">Long Break</button>
+              <button class="timer-mode-btn" data-mode="countdown">Countdown</button>
               <button class="timer-mode-btn" data-mode="stopwatch">Stopwatch</button>
             </div>
 
-            <!-- Clock Display -->
-            <div class="timer-clock-display">
-              <div class="time-large-text mono" id="timer-time-display">25:00</div>
-              <span class="timer-state-label" id="timer-sublabel">FOCUS SESSION</span>
+            <!-- Circular SVG Ring + Clock Display -->
+            <div class="timer-ring-wrap">
+              <svg class="timer-ring-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Track -->
+                <circle cx="100" cy="100" r="88" stroke-width="10" class="timer-ring-track"/>
+                <!-- Progress arc (stroke-dasharray=553 = 2π×88) -->
+                <circle cx="100" cy="100" r="88" stroke-width="10" class="timer-ring-progress"
+                  id="timer-ring-progress"
+                  stroke-dasharray="553"
+                  stroke-dashoffset="0"
+                  stroke-linecap="round"
+                  transform="rotate(-90 100 100)"/>
+              </svg>
+              <div class="timer-ring-inner">
+                <div class="time-large-text mono" id="timer-time-display">25:00</div>
+                <span class="timer-state-label" id="timer-sublabel">FOCUS SESSION</span>
+              </div>
             </div>
 
             <!-- Timer Controls -->

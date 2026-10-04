@@ -362,7 +362,7 @@ class SettingsTab {
                       models.find(m => !isExcluded(m.id));
             if (p) def = p.id;
           } else if (providerId === 'gemini') {
-            const flash = models.find(m => (m.id.includes('gemini-2.0-flash') || m.id.includes('gemini-1.5-flash')) && !isExcluded(m.id)) ||
+            const flash = models.find(m => (m.id.includes('gemini-2.0-flash') || m.id.includes('gemini-2.0-flash-lite')) && !isExcluded(m.id)) ||
                           models.find(m => m.id.includes('flash') && !isExcluded(m.id));
             if (flash) def = flash.id;
           } else if (providerId === 'openai') {

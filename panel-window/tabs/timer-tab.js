@@ -211,11 +211,25 @@ class TimerTab {
     }
   }
 
+
   updateDisplay() {
     if (!this.displayEl) return;
     const mins = Math.floor(Math.abs(this.remainingSeconds) / 60);
     const secs = Math.abs(this.remainingSeconds) % 60;
     this.displayEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+    // Drive circular SVG ring (stroke-dasharray=553 for r=88)
+    const ring = document.getElementById('timer-ring-progress');
+    if (ring) {
+      const CIRC = 553;
+      let frac = 0;
+      if (this.mode === 'stopwatch') {
+        frac = Math.min(1, this.remainingSeconds / (30 * 60));
+      } else if (this.totalSeconds > 0) {
+        frac = Math.max(0, this.remainingSeconds / this.totalSeconds);
+      }
+      ring.style.strokeDashoffset = (CIRC * (1 - frac)).toFixed(2);
+    }
   }
 }
 

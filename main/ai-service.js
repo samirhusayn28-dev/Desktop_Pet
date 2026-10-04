@@ -209,9 +209,8 @@ class AIService {
       ],
       gemini: [
         'gemini-2.0-flash',
-        'gemini-1.5-flash',
-        'gemini-1.5-flash-8b',
         'gemini-2.0-flash-lite',
+        'gemini-1.5-flash-8b',
         'gemini-1.5-pro'
       ],
       openai: [
@@ -581,7 +580,7 @@ class AIService {
         if (provider === 'gemini') {
           return await this.streamGemini(requestId, {
             apiKey,
-            model: (activeModel || 'gemini-1.5-flash').replace(/^models\//, ''),
+            model: (activeModel || 'gemini-2.0-flash-lite').replace(/^models\//, ''),
             baseUrl,
             messages,
             systemPrompt: fullSystemPrompt,
@@ -670,7 +669,7 @@ class AIService {
     if (!apiKey) throw new Error('Gemini API key is required');
 
     const root = (baseUrl || 'https://generativelanguage.googleapis.com').replace(/\/+$/, '');
-    const cleanModel = (model || 'gemini-1.5-flash').replace(/^models\//, '');
+    const cleanModel = (model || 'gemini-2.0-flash-lite').replace(/^models\//, '');
     const action = enableStreaming ? 'streamGenerateContent?alt=sse&' : 'generateContent?';
     const url = `${root}/v1beta/models/${encodeURIComponent(cleanModel)}:${action}key=${encodeURIComponent(apiKey)}`;
 
