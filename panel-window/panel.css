@@ -285,6 +285,7 @@ svg.lucide {
 .panel-tabs-bar {
   display: flex !important;
   flex-direction: row !important;
+  flex-wrap: nowrap !important;
   align-items: center !important;
   background: rgba(0, 0, 0, 0.32) !important;
   border-bottom: 1px solid #282830 !important;
@@ -1204,17 +1205,22 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   height: 100%;
 }
 
-.notes-toolbar {
+.notes-toolbar,
+.notes-top-bar {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
-.notes-toolbar input {
+.notes-toolbar input,
+.notes-top-bar .search-input-wrap {
   flex: 1;
 }
 
-.notes-new-btn {
+.notes-new-btn,
+.notes-top-bar #btn-new-note {
   padding: 9px 16px;
+  flex-shrink: 0;
 }
 
 .notes-grid-scroll {
@@ -1309,23 +1315,36 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   color: var(--theme-primary, #FF7A2F);
 }
 
-.reminder-form-grid {
+.reminder-form-grid,
+.reminder-fields-grid {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.reminder-inputs-subrow {
+.reminder-inputs-subrow,
+.reminder-time-row {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
+.reminder-time-row input[type="time"],
 .time-input {
-  width: 110px;
+  flex: 1;
+  min-width: 90px;
 }
 
-.reminder-save-btn {
+.reminder-time-row select,
+.repeat-select {
+  flex: 1;
+  min-width: 100px;
+}
+
+.reminder-save-btn,
+.reminder-time-row button {
   padding: 8px 18px;
+  flex-shrink: 0;
 }
 
 .reminders-list-container {

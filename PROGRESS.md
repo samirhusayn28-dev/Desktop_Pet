@@ -27,13 +27,13 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Reminder fires → speech bubble + sound
 
 ## Item 4 — UI: solid dark Material, fixed tabs
-- [ ] Tab bar always one horizontal row
-- [ ] To-Do: clean card list
-- [ ] Timer: big circular SVG ring, mode buttons in one row
-- [ ] Notes: search + New button aligned same row
-- [ ] Reminders: aligned grid form
-- [ ] Tools: real charts (start empty, fill with real samples)
-- [ ] Settings: no misaligned controls
+- [x] Tab bar always one horizontal row
+- [x] To-Do: clean card list
+- [x] Timer: big circular SVG ring, mode buttons in one row
+- [x] Notes: search + New button aligned same row
+- [x] Reminders: aligned grid form
+- [x] Tools: real charts (start empty, fill with real samples)
+- [x] Settings: no misaligned controls
 
 ## Item 5 — No fake data
 - [x] Remove `Math.random()` pet CPU in tools-tab (use real Electron process metrics)
