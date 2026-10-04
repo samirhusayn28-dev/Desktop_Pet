@@ -107,8 +107,8 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Never resets notes, to-dos, reminders, chat history, or API keys; values apply live and persist
 
 ## Item E1 — NEW EMOTIONS (SHAPE-ONLY, NO CPU COST)
-- [ ] 11 new emotions using eye/mouth vector morphs + static SVG overlays (transform/opacity only, max 3s): yawn, dizzy, blush, excited, scared, annoyed, bored, proud, worried, grateful, goodbye
-- [ ] Rate limits and individual toggles in Settings -> Reactions; test via triggers and hidden `--emotion=<name>` CLI flag
+- [x] 11 new emotions using eye/mouth vector morphs + static SVG overlays (transform/opacity only, max 3s): yawn, dizzy, blush, excited, scared, annoyed, bored, proud, worried, grateful, goodbye
+- [x] Rate limits and individual toggles in Settings -> Reactions; test via triggers and hidden `--emotion=<name>` CLI flag
 
 ## Item G1 — GLASSES FOR THE PET
 - [ ] Static black round-frame glasses SVG (#111111, transparent fill) centered on eyes, derived from pet size/eye size/eye spacing, clamped to body

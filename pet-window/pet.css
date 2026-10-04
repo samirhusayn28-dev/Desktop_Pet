@@ -256,3 +256,17 @@ html, body {
   background: var(--border);
   margin: 4px 0;
 }
+
+/* Waving Hand for Goodbye Emotion (Item E1 & B1) */
+@keyframes waveHand {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-18deg); }
+  50% { transform: rotate(14deg); }
+  75% { transform: rotate(-14deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.waving-hand {
+  transform-origin: 0px 6px;
+  animation: waveHand 0.8s ease-in-out 2;
+}

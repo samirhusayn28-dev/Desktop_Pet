@@ -1189,8 +1189,35 @@ app.whenReady().then(async () => {
     return;
   }
 
+  // CLI Test for Item E1: 11 New Emotions
+  if (process.argv.includes('--test-emotions')) {
+    const PetRenderer = require('../character/pet.js');
+    const renderer = new PetRenderer();
+    const emotionsToTest = ['yawn', 'dizzy', 'blush', 'excited', 'scared', 'annoyed', 'bored', 'proud', 'worried', 'grateful', 'goodbye'];
+    let allValid = true;
+    for (const em of emotionsToTest) {
+      const svg = renderer.render(em);
+      const isValid = svg && svg.includes(`emotion-${em}`) && svg.includes('</svg>');
+      console.log(`Emotion [${em}]: ${isValid ? 'PASS' : 'FAIL'} (svg length: ${svg.length})`);
+      if (!isValid) allValid = false;
+    }
+    console.log('ALL 11 EMOTIONS VALID:', allValid);
+    app.exit(allValid ? 0 : 1);
+    return;
+  }
+
   createTray();
   createPetWindow();
+
+  // Test emotion CLI flag (--emotion=<name>)
+  const emotionArg = process.argv.find(a => a.startsWith('--emotion='));
+  if (emotionArg && petWindow) {
+    const emotionName = emotionArg.split('=')[1];
+    petWindow.webContents.on('did-finish-load', () => {
+      petWindow.webContents.send('pet:set-state', { state: emotionName, duration: 3000 });
+      console.log(`[Item E1] Sent CLI test emotion: ${emotionName}`);
+    });
+  }
 
   // On first launch only, show centered welcome window (Item W1)
   const isFirstRun = store.get('isFirstRun');

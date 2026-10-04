@@ -541,6 +541,10 @@ class FaceBotController {
       }
     });
 
+    ipcRenderer.on('pet:set-emotion', (event, emotion, duration = 3000) => {
+      this.setEmotion(emotion, duration);
+    });
+
     // 3. Embedded Speech Bubble
     ipcRenderer.on('pet:show-bubble', (event, data) => {
       if (data) this.showBubble(data);
