@@ -512,7 +512,9 @@ class FaceBotController {
     const handleCursorUpdate = ({ normX, normY }) => {
       if (this.isSleeping) return;
 
-      const eyeMax = 5.5 * (this.pet.config.eyeSize || 1.0);
+      const hasGlasses = Boolean(this.pet.config && this.pet.config.glassesEnabled);
+      const limit = hasGlasses ? 3.0 : 5.5;
+      const eyeMax = limit * (this.pet.config.eyeSize || 1.0);
       this.targetEyeOffset = {
         x: normX * eyeMax,
         y: normY * eyeMax
@@ -565,6 +567,11 @@ class FaceBotController {
       document.documentElement.style.setProperty('--accent-glow', `color-mix(in srgb, ${color} 75%, transparent)`);
       document.documentElement.style.setProperty('--accent-border', `color-mix(in srgb, ${color} 32%, transparent)`);
       this.pet.updateConfig({ primaryColor: color, primaryGlow: color });
+      this.render();
+    });
+
+    ipcRenderer.on('pet:update-glasses', (event, enabled) => {
+      this.pet.updateConfig({ glassesEnabled: !!enabled });
       this.render();
     });
   }

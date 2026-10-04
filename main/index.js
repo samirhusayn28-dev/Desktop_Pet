@@ -811,9 +811,22 @@ ipcMain.on('pet:get-appearance', (e) => {
     eyeSpacing: 44,
     mouthWidth: 14,
     depth: 80,
-    bodyColor: '#FFFFFF'
+    bodyColor: '#FFFFFF',
+    glassesEnabled: false
   };
-  e.returnValue = Object.assign(defaults, store.get('settings.appearance') || {});
+  const currentAppearance = Object.assign({}, defaults, store.get('settings.appearance') || {});
+  if (store.get('settings.appearance.glassesEnabled') !== undefined) {
+    currentAppearance.glassesEnabled = !!store.get('settings.appearance.glassesEnabled');
+  }
+  e.returnValue = currentAppearance;
+});
+
+ipcMain.on('pet:update-glasses', (e, enabled) => {
+  store.set('settings.appearance.glassesEnabled', !!enabled);
+  relayToPet('pet:update-glasses', !!enabled);
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    panelWindow.webContents.send('panel:update-glasses', !!enabled);
+  }
 });
 
 ipcMain.on('reminders:snooze', (e, { id, minutes }) => {

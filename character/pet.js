@@ -83,6 +83,7 @@
 
       const defs = this.getDefs(idPrefix, cfg, d, { x, y, w, h, rx, ry });
       const faceContent = this.getEmotionFace(emotion, idPrefix, cfg, { eyeX, eyeY, isBlinking, cx, cy, d });
+      const glassesContent = cfg.glassesEnabled ? this.getGlassesOverlay(cfg, { cx, cy, x, y, w, h }) : '';
 
       return `
         <svg class="facebot-svg emotion-${emotion} ${isBlinking ? 'blinking' : ''}" 
@@ -148,9 +149,46 @@
               <g class="facebot-face" transform="translate(${eyeX}, ${eyeY})">
                 ${faceContent}
               </g>
+
+              <!-- 4. Glasses Layer (Item G1: Tilts & breathes with face, doesn't follow cursor) -->
+              ${glassesContent}
             </g>
           </g>
         </svg>
+      `;
+    }
+
+    getGlassesOverlay(cfg, { cx, cy, x, y, w, h }) {
+      const spacing = Math.max(20, Math.min(70, cfg.eyeSpacing));
+      const eyeScale = Math.max(0.5, Math.min(2.0, cfg.eyeSize));
+      const lx = cx - spacing / 2;
+      const rx = cx + spacing / 2;
+      const ey = cy - 6;
+
+      // Lens radius derived from eyeScale & spacing, clamped to body
+      let r = Math.round(11 * eyeScale + 3);
+      const maxAllowedR = Math.min((spacing / 2 - 2), (w / 2 - 6), (h / 2 - 8));
+      r = Math.max(8, Math.min(r, maxAllowedR));
+
+      const leftArmX = Math.max(x + 2, lx - r - 8);
+      const rightArmX = Math.min(x + w - 2, rx + r + 8);
+
+      return `
+        <g class="facebot-glasses" id="facebot-glasses">
+          <!-- Left Lens Frame -->
+          <circle cx="${lx}" cy="${ey}" r="${r}" fill="none" stroke="#111111" stroke-width="2.6" />
+          <!-- Right Lens Frame -->
+          <circle cx="${rx}" cy="${ey}" r="${r}" fill="none" stroke="#111111" stroke-width="2.6" />
+          <!-- Center Bridge Arch -->
+          <path d="M ${(lx + r).toFixed(1)} ${ey} Q ${cx} ${(ey - 3.5).toFixed(1)}, ${(rx - r).toFixed(1)} ${ey}" stroke="#111111" stroke-width="2.4" stroke-linecap="round" fill="none" />
+          <!-- Left Temple Arm -->
+          <line x1="${(lx - r).toFixed(1)}" y1="${ey}" x2="${leftArmX.toFixed(1)}" y2="${(ey - 1.5).toFixed(1)}" stroke="#111111" stroke-width="2.2" stroke-linecap="round" />
+          <!-- Right Temple Arm -->
+          <line x1="${(rx + r).toFixed(1)}" y1="${ey}" x2="${rightArmX.toFixed(1)}" y2="${(ey - 1.5).toFixed(1)}" stroke="#111111" stroke-width="2.2" stroke-linecap="round" />
+          <!-- Subtle specular reflection glint on upper lenses -->
+          <line x1="${(lx - r*0.5).toFixed(1)}" y1="${(ey - r*0.5).toFixed(1)}" x2="${(lx - r*0.1).toFixed(1)}" y2="${(ey - r*0.8).toFixed(1)}" stroke="rgba(255,255,255,0.45)" stroke-width="1.2" stroke-linecap="round" />
+          <line x1="${(rx - r*0.5).toFixed(1)}" y1="${(ey - r*0.5).toFixed(1)}" x2="${(rx - r*0.1).toFixed(1)}" y2="${(ey - r*0.8).toFixed(1)}" stroke="rgba(255,255,255,0.45)" stroke-width="1.2" stroke-linecap="round" />
+        </g>
       `;
     }
 

@@ -111,11 +111,11 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Rate limits and individual toggles in Settings -> Reactions; test via triggers and hidden `--emotion=<name>` CLI flag
 
 ## Item G1 — GLASSES FOR THE PET
-- [ ] Static black round-frame glasses SVG (#111111, transparent fill) centered on eyes, derived from pet size/eye size/eye spacing, clamped to body
-- [ ] Part of face layer (tilts & breathes with face, doesn't follow cursor); eye-follow clamped inside lenses
-- [ ] Layer order: body -> blush -> eyes/mouth -> glasses frame -> overlays/bubbles; all emotions & blink clearly visible
-- [ ] Setting `glassesEnabled` (default OFF), toggle in Welcome screen, Settings -> Appearance, reset, export/import
-- [ ] Re-measure idle with glasses ON (GPU helper < 3% & < 10 wake-ups/s, renderer < 1%, main < 1%)
+- [x] Static black round-frame glasses SVG (#111111, transparent fill) centered on eyes, derived from pet size/eye size/eye spacing, clamped to body
+- [x] Part of face layer (tilts & breathes with face, doesn't follow cursor); eye-follow clamped inside lenses
+- [x] Layer order: body -> blush -> eyes/mouth -> glasses frame -> overlays/bubbles; all emotions & blink clearly visible
+- [x] Setting `glassesEnabled` (default OFF), toggle in Welcome screen, Settings -> Appearance, reset, export/import
+- [x] Re-measure idle with glasses ON (GPU helper < 3% & < 10 wake-ups/s, renderer < 1%, main < 1%)
 
 ## Item I1 — IMPORT / EXPORT SETTINGS AND NOTES
 - [ ] Settings -> Data: Export JSON with version via native save dialog (API keys excluded)

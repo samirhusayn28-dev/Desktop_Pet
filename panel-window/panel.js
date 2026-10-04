@@ -133,6 +133,16 @@ class PanelController {
       this.ipcRenderer.on('panel:update-name', (event, name) => {
         this.applyPetName(name);
       });
+
+      this.ipcRenderer.on('panel:update-glasses', (event, enabled) => {
+        if (this.settingsTab) {
+          this.settingsTab.appearance.glassesEnabled = !!enabled;
+          if (this.settingsTab.glassesToggle) {
+            this.settingsTab.glassesToggle.checked = !!enabled;
+          }
+          this.settingsTab.renderLivePreview();
+        }
+      });
     }
   }
 
