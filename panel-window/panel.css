@@ -283,6 +283,8 @@ svg.lucide {
    ========================================================================== */
 .panel-tabs,
 .panel-tabs-bar {
+  container-type: inline-size;
+  container-name: panel-tabs-container;
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
@@ -293,7 +295,7 @@ svg.lucide {
   border-left: none !important;
   border-right: none !important;
   margin: 0 !important;
-  padding: 8px 12px !important;
+  padding: 8px 10px !important;
   gap: 6px !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
@@ -310,8 +312,8 @@ svg.lucide {
 }
 
 .tab-btn {
-  flex: 1 1 0 !important;
-  min-width: 0 !important;
+  flex: 0 1 auto !important;
+  min-width: fit-content !important;
   height: 32px !important;
   background: #141418;
   border: 1px solid transparent !important;
@@ -319,7 +321,7 @@ svg.lucide {
   font-family: var(--font-sans) !important;
   font-size: 11.5px !important;
   font-weight: 600 !important;
-  padding: 0 10px !important;
+  padding: 0 12px !important;
   border-radius: 999px !important;
   cursor: pointer !important;
   display: inline-flex !important;
@@ -327,13 +329,42 @@ svg.lucide {
   justify-content: center !important;
   gap: 6px !important;
   white-space: nowrap !important;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: background 0.15s ease, color 0.15s ease, padding 0.15s ease !important;
   -webkit-app-region: no-drag !important;
+}
+
+.tab-btn .tab-label {
+  display: inline;
 }
 
 .tab-btn:hover {
   color: #FFFFFF !important;
   background: #282830 !important;
+}
+
+/* Container Query & Media Query: When narrow (<440px), inactive tabs show only icon, active tab shows icon + label */
+@container panel-tabs-container (max-width: 440px) {
+  .tab-btn:not(.active) .tab-label {
+    display: none !important;
+  }
+  .tab-btn:not(.active) {
+    padding: 0 10px !important;
+  }
+  .tab-btn.active {
+    padding: 0 14px !important;
+  }
+}
+
+@media (max-width: 440px) {
+  .tab-btn:not(.active) .tab-label {
+    display: none !important;
+  }
+  .tab-btn:not(.active) {
+    padding: 0 10px !important;
+  }
+  .tab-btn.active {
+    padding: 0 14px !important;
+  }
 }
 
 /* Active tab = solid white rounded pill with black text/icon */
