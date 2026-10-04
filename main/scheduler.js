@@ -134,7 +134,7 @@ class Scheduler {
       badge: isMissed ? 'MISSED REMINDER' : 'REMINDER',
       text,
       sound: 'alarm',
-      emotion: 'surprised',
+      emotion: isMissed ? 'worried' : 'surprised',
       bounce: true,
       duration: 7000,
       critical: true

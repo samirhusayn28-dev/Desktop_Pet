@@ -11,11 +11,56 @@
 
 const { ipcRenderer } = typeof require !== 'undefined' ? require('electron') : { ipcRenderer: null };
 
+const EMOTION_PRIORITIES = {
+  // Level 5: ERROR_AI
+  confused: 5,
+  error: 5,
+  // Level 4: USER_INTERACTION
+  dizzy: 4,
+  scared: 4,
+  blush: 4,
+  grateful: 4,
+  proud: 4,
+  celebrating: 4,
+  laugh: 4,
+  wink: 4,
+  love: 4,
+  excited: 4,
+  happy: 4,
+  // Level 3: REMINDER
+  worried: 3,
+  surprised: 3,
+  // Level 2: SYSTEM_REACTION
+  irritated: 2,
+  sad: 2,
+  squint: 2,
+  'low-battery': 2,
+  charging: 2,
+  energized: 2,
+  vibing: 2,
+  music: 2,
+  stressed: 2,
+  relieved: 2,
+  focus: 2,
+  annoyed: 2,
+  yawn: 2,
+  bored: 2,
+  goodbye: 2,
+  dim: 2,
+  dull: 2,
+  thinking: 2,
+  // Level 1: IDLE_BASELINE
+  neutral: 1,
+  sleepy: 1,
+  sleeping: 1
+};
+
 class FaceBotController {
   constructor() {
     this.pet = new PetRenderer();
     this.currentEmotion = 'neutral';
     this.baseEmotion = 'neutral';
+    this.currentPriority = 1;
 
     // 2D Eye Offset & Easing
     this.eyeOffset = { x: 0, y: 0 };
@@ -31,6 +76,13 @@ class FaceBotController {
     this.isRafActive = false;
     this.rafId = null;
     this.emotionTimeout = null;
+
+    // Interaction triggers
+    this.recentClicks = [];
+    this.hoverTimer = null;
+    this.isFastDrag = false;
+    this.lastCursorTime = 0;
+    this.lastNormDist = 0;
 
     // Item H2: Driven strictly by insidePet state from Main Process hit testing
     this.isInsidePet = false;
@@ -81,8 +133,32 @@ class FaceBotController {
     });
   }
 
-  setEmotion(newEmotion, durationMs = 0) {
+  canTransitionTo(newEmotion, priority = null) {
+    const reqPriority = priority !== null ? priority : (EMOTION_PRIORITIES[newEmotion] || 2);
+    // If no active temporary emotion is running, allow
+    if (!this.emotionTimeout) {
+      return true;
+    }
+    // If active temporary emotion is running with a higher priority, lower priority cannot overwrite
+    if (this.currentPriority && this.currentPriority > reqPriority) {
+      return false;
+    }
+    return true;
+  }
+
+  getBaselineEmotion() {
+    return this.baseEmotion || 'neutral';
+  }
+
+  setEmotion(newEmotion, durationMs = 0, priority = null, force = false) {
+    const reqPriority = priority !== null ? priority : (EMOTION_PRIORITIES[newEmotion] || 2);
+
+    if (!force && !this.canTransitionTo(newEmotion, reqPriority)) {
+      return false;
+    }
+
     this.currentEmotion = newEmotion;
+    this.currentPriority = reqPriority;
     this.isSleeping = (newEmotion === 'sleeping');
 
     if (this.container) {
@@ -112,17 +188,42 @@ class FaceBotController {
 
     if (durationMs > 0) {
       this.emotionTimeout = setTimeout(() => {
-        if (this.currentEmotion === newEmotion) {
-          this.currentEmotion = this.baseEmotion;
-          this.render();
+        this.currentEmotion = this.getBaselineEmotion();
+        this.currentPriority = EMOTION_PRIORITIES[this.currentEmotion] || 1;
+        this.isSleeping = (this.currentEmotion === 'sleeping');
+        if (this.container) {
+          if (this.isSleeping) {
+            this.container.classList.add('sleeping');
+          } else {
+            this.container.classList.remove('sleeping');
+          }
         }
+        this.render();
+        this.emotionTimeout = null;
       }, durationMs);
+    } else {
+      if (newEmotion === 'sleeping' || newEmotion === 'sleepy' || newEmotion === 'neutral') {
+        this.baseEmotion = newEmotion;
+      }
     }
+    return true;
   }
 
   setBaseEmotion(emotion) {
     this.baseEmotion = emotion;
-    this.setEmotion(emotion);
+    if (!this.emotionTimeout) {
+      this.currentEmotion = emotion;
+      this.currentPriority = EMOTION_PRIORITIES[emotion] || 1;
+      this.isSleeping = (emotion === 'sleeping');
+      if (this.container) {
+        if (this.isSleeping) {
+          this.container.classList.add('sleeping');
+        } else {
+          this.container.classList.remove('sleeping');
+        }
+      }
+      this.render();
+    }
   }
 
   // --- Solid Cute Material Speech Bubble ---
@@ -173,7 +274,7 @@ class FaceBotController {
     }
 
     if (emotion) {
-      this.setEmotion(emotion, duration);
+      this.setEmotion(emotion, duration, EMOTION_PRIORITIES[emotion] || 3);
     }
 
     this.bubbleTimer = setTimeout(() => {
@@ -332,14 +433,26 @@ class FaceBotController {
           if (this.currentEmotion === 'sleeping' || this.currentEmotion === 'sleepy') {
             this.wakeUp();
           } else if (this.currentEmotion === 'neutral') {
-            this.setEmotion('happy', 2000);
+            this.setEmotion('happy', 2000, 4);
             if (window.soundEffects) window.soundEffects.playTap();
           }
+
+          // 4s continuous hover inside pet -> blush (Item E1 & E2)
+          if (this.hoverTimer) clearTimeout(this.hoverTimer);
+          this.hoverTimer = setTimeout(() => {
+            if (this.isInsidePet && !this.isDragging && !this.isSleeping) {
+              this.setEmotion('blush', 3000, 4);
+            }
+          }, 4000);
         } else {
+          if (this.hoverTimer) {
+            clearTimeout(this.hoverTimer);
+            this.hoverTimer = null;
+          }
           if (!this.isDragging) {
             // Mouse exited pet body shape
             if (this.currentEmotion === 'happy' && !this.emotionTimeout) {
-              this.setEmotion('neutral');
+              this.setEmotion(this.getBaselineEmotion());
             }
           }
         }
@@ -351,6 +464,9 @@ class FaceBotController {
     let isMouseDown = false;
     let startX = 0;
     let startY = 0;
+    let lastMoveTime = 0;
+    let lastMoveX = 0;
+    let lastMoveY = 0;
     let hasMoved = false;
 
     window.addEventListener('mousedown', (e) => {
@@ -358,23 +474,42 @@ class FaceBotController {
       // Only proceed if mouse is inside the pet shape
       if (!this.isInsidePet) return;
 
+      if (this.hoverTimer) {
+        clearTimeout(this.hoverTimer);
+        this.hoverTimer = null;
+      }
+
       this.mouseDownInside = true;
       isMouseDown = true;
       hasMoved = false;
+      this.isFastDrag = false;
       startX = e.screenX;
       startY = e.screenY;
+      lastMoveTime = Date.now();
+      lastMoveX = e.screenX;
+      lastMoveY = e.screenY;
     });
 
     window.addEventListener('mousemove', (moveEvent) => {
       if (!isMouseDown || !this.mouseDownInside) return;
       const dist = Math.hypot(moveEvent.screenX - startX, moveEvent.screenY - startY);
 
+      const now = Date.now();
+      const dt = Math.max(1, now - (lastMoveTime || now));
+      const stepDist = Math.hypot(moveEvent.screenX - (lastMoveX || moveEvent.screenX), moveEvent.screenY - (lastMoveY || moveEvent.screenY));
+      if (stepDist / dt > 2.0) {
+        this.isFastDrag = true;
+      }
+      lastMoveTime = now;
+      lastMoveX = moveEvent.screenX;
+      lastMoveY = moveEvent.screenY;
+
       if (dist >= 4) {
         hasMoved = true;
         if (!this.isDragging) {
           this.isDragging = true;
           this.container.classList.add('dangling');
-          this.setEmotion('surprised');
+          this.setEmotion('surprised', 0, 4);
           if (ipcRenderer) ipcRenderer.send('pet:set-ignore-mouse-events', false);
         }
 
@@ -399,7 +534,12 @@ class FaceBotController {
         this.container.classList.add('bounce-drop');
         setTimeout(() => this.container.classList.remove('bounce-drop'), 450);
 
-        this.setEmotion('happy', 2000);
+        if (this.isFastDrag) {
+          this.isFastDrag = false;
+          this.setEmotion('dizzy', 3000, 4);
+        } else {
+          this.setEmotion('happy', 2000, 4);
+        }
         if (window.soundEffects) window.soundEffects.playTap();
 
         if (ipcRenderer) {
@@ -418,7 +558,7 @@ class FaceBotController {
     window.addEventListener('dblclick', (e) => {
       if (this.isInsidePet && e.button === 0) {
         const doubleEmo = Math.random() < 0.5 ? 'laugh' : 'wink';
-        this.setEmotion(doubleEmo, 2800);
+        this.setEmotion(doubleEmo, 2800, 4);
         if (window.soundEffects) window.soundEffects.playHappy();
       }
     });
@@ -458,10 +598,27 @@ class FaceBotController {
       return;
     }
 
-    this.setEmotion('surprised', 300);
-    setTimeout(() => {
-      this.setEmotion('happy', 2000);
-    }, 300);
+    if (this.clickTimeout) {
+      clearTimeout(this.clickTimeout);
+      this.clickTimeout = null;
+    }
+
+    // 5 rapid clicks (within 1.5s) -> dizzy
+    const now = Date.now();
+    this.recentClicks.push(now);
+    this.recentClicks = this.recentClicks.filter(t => now - t <= 1500);
+    if (this.recentClicks.length >= 5) {
+      this.recentClicks = [];
+      this.setEmotion('dizzy', 3000, 4);
+      if (window.soundEffects) window.soundEffects.playTap();
+      return;
+    }
+
+    this.setEmotion('surprised', 250, 4);
+    this.clickTimeout = setTimeout(() => {
+      this.setEmotion('happy', 2000, 4);
+      this.clickTimeout = null;
+    }, 250);
 
     if (window.soundEffects) window.soundEffects.playChirp();
     if (ipcRenderer) {
@@ -471,11 +628,14 @@ class FaceBotController {
 
   wakeUp() {
     this.setBaseEmotion('neutral');
-    this.setEmotion('surprised', 400);
+    this.setEmotion('surprised', 400, 4);
     setTimeout(() => {
-      this.setEmotion('happy', 2200);
+      this.setEmotion('happy', 2200, 4);
     }, 380);
     if (window.soundEffects) window.soundEffects.playChirp();
+    if (ipcRenderer) {
+      ipcRenderer.send('pet:reset-idle');
+    }
   }
 
   handleMenuAction(action) {
@@ -510,6 +670,24 @@ class FaceBotController {
     const handleCursorUpdate = ({ normX, normY }) => {
       if (this.isSleeping) return;
 
+      // Fast cursor approach towards pet -> scared (Item E1 & E2)
+      const now = Date.now();
+      if (this.lastCursorTime && this.lastNormDist !== undefined) {
+        const dt = (now - this.lastCursorTime) / 1000;
+        const normDist = Math.hypot(normX, normY);
+        if (dt > 0.01 && dt < 0.25) {
+          const deltaDist = this.lastNormDist - normDist;
+          const approachRate = deltaDist / dt;
+          if (approachRate > 4.5 && normDist < 0.7 && normDist > 0.1 && !this.isInsidePet) {
+            this.setEmotion('scared', 2000, 4);
+          }
+        }
+        this.lastNormDist = normDist;
+      } else {
+        this.lastNormDist = Math.hypot(normX, normY);
+      }
+      this.lastCursorTime = now;
+
       const hasGlasses = Boolean(this.pet.config && this.pet.config.glassesEnabled);
       const limit = hasGlasses ? 3.0 : 5.5;
       const eyeMax = limit * (this.pet.config.eyeSize || 1.0);
@@ -529,20 +707,31 @@ class FaceBotController {
     ipcRenderer.on('pet:global-cursor', (event, data) => handleCursorUpdate(data));
     ipcRenderer.on('pet:cursor-pos', (event, data) => handleCursorUpdate(data));
 
-    // 2. Emotion and state triggers (handles both string and { state, duration })
+    // 2. Emotion and state triggers (handles both string and { state, duration, priority, force })
     ipcRenderer.on('pet:set-state', (event, data) => {
       const state = typeof data === 'string' ? data : (data?.state || 'neutral');
-      const duration = (typeof data === 'object' && data?.duration) ? data.duration : 0;
+      const duration = (typeof data === 'object' && data?.duration !== undefined) ? data.duration : 0;
+      const priority = (typeof data === 'object' && data?.priority !== undefined) ? data.priority : null;
+      const force = (typeof data === 'object' && data?.force) ? true : false;
 
-      if (state === 'sleeping' || state === 'sleepy') {
+      if (force) {
+        if (this.emotionTimeout) {
+          clearTimeout(this.emotionTimeout);
+          this.emotionTimeout = null;
+        }
+        if (state === 'sleeping' || state === 'sleepy' || state === 'neutral') {
+          this.baseEmotion = state;
+        }
+        this.setEmotion(state, duration, priority || 5, true);
+      } else if (state === 'sleeping' || state === 'sleepy' || state === 'neutral') {
         this.setBaseEmotion(state);
       } else {
-        this.setEmotion(state, duration);
+        this.setEmotion(state, duration, priority);
       }
     });
 
-    ipcRenderer.on('pet:set-emotion', (event, emotion, duration = 3000) => {
-      this.setEmotion(emotion, duration);
+    ipcRenderer.on('pet:set-emotion', (event, emotion, duration = 3000, priority = null) => {
+      this.setEmotion(emotion, duration, priority);
     });
 
     // 3. Embedded Speech Bubble

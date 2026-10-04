@@ -134,7 +134,29 @@ class SystemSense {
     console.log('[SystemSense] Active with adaptive energy-efficient scheduler and dedicated volume watcher');
   }
 
+  pauseBackgroundPolling(durationMs = 8000) {
+    this.isPaused = true;
+    if (this.unpauseTimer) clearTimeout(this.unpauseTimer);
+    this.unpauseTimer = setTimeout(() => {
+      this.isPaused = false;
+      this.unpauseTimer = null;
+    }, durationMs);
+  }
+
+  resumeBackgroundPolling() {
+    this.isPaused = false;
+    if (this.unpauseTimer) {
+      clearTimeout(this.unpauseTimer);
+      this.unpauseTimer = null;
+    }
+  }
+
   async runAdaptiveCheck() {
+    if (this.isPaused) {
+      this.pollTimer = setTimeout(() => this.runAdaptiveCheck(), 4000);
+      return;
+    }
+
     if (this.isScreenLocked || this.isSuspended) {
       // Screen is locked or system is suspended - sleep interval (20s)
       this.pollTimer = setTimeout(() => this.runAdaptiveCheck(), 20000);
@@ -254,7 +276,7 @@ class SystemSense {
 
   checkVolume() {
     return new Promise((resolve) => {
-      if (process.platform !== 'darwin') return resolve();
+      if (process.platform !== 'darwin' || this.isPaused) return resolve();
 
       // Combined osascript: fetches volume and mute in a single string
       exec(`osascript -e 'set o to (get volume settings)' -e '(output volume of o as string) & "," & (output muted of o as string)' 2>/dev/null`, (err, stdout) => {
@@ -843,6 +865,183 @@ class SystemSense {
     });
 
     return status;
+  }
+
+  // --- SYNTHETIC SENSOR INJECTION FOR AUTOMATED TESTING ---
+  injectSensorReading(type, value) {
+    bubble.hide();
+    this.pauseBackgroundPolling(8000);
+    switch (type) {
+      case 'volume': {
+        const vol = typeof value === 'object' ? value.level : Number(value);
+        const muted = typeof value === 'object' ? Boolean(value.muted) : false;
+        this.state.volumeLevel = vol;
+        this.state.isMuted = muted;
+
+        const isMuteOrZero = muted || vol === 0;
+        let newBand = 'NORMAL';
+        if (isMuteOrZero) newBand = 'MUTED';
+        else if (vol >= 98) newBand = 'MAX';
+        else if (vol <= 15) newBand = 'LOW';
+        else newBand = 'NORMAL';
+
+        this.currentVolumeBand = newBand;
+
+        if (newBand === 'MAX') {
+          this.sendPetEmotion('irritated', 4000);
+          bubble.show({ badge: 'MAX VOLUME', text: 'Whoa, too loud! Protecting my little ears!', sound: 'tap', emotion: 'irritated', duration: 3000 });
+        } else if (newBand === 'MUTED') {
+          this.sendPetEmotion('dim', 3500);
+          bubble.show({ badge: 'SHH...', text: 'Whisper quiet mode.', sound: 'tap', emotion: 'dim', duration: 3000 });
+        } else if (newBand === 'LOW') {
+          this.sendPetEmotion('sad', 3500);
+          bubble.show({ badge: 'LOW VOLUME', text: 'Can barely hear anything down here...', sound: 'tap', emotion: 'sad', duration: 3000 });
+        } else if (newBand === 'NORMAL') {
+          this.sendPetEmotion('relieved', 3000);
+          bubble.show({ badge: 'VOLUME OK', text: 'Ah, that is much better.', sound: 'happy', emotion: 'relieved', duration: 2500 });
+        }
+        return { success: true, band: newBand, emotion: newBand === 'MAX' ? 'irritated' : (newBand === 'MUTED' ? 'dim' : (newBand === 'LOW' ? 'sad' : 'relieved')) };
+      }
+
+      case 'brightness': {
+        const pct = Number(value);
+        this.state.brightnessLevel = pct;
+        let emotion = 'neutral';
+        if (pct >= 95) {
+          emotion = 'squint';
+          this.sendPetEmotion('squint', 3500);
+          bubble.show({ badge: 'MAX BRIGHTNESS', text: 'So bright! Sunglasses recommended!', emotion: 'squint' });
+        } else if (pct <= 15) {
+          emotion = 'sleepy';
+          this.sendPetEmotion('sleepy', 3500);
+          bubble.show({ badge: 'DIM SCREEN', text: 'Getting cozy in the dark...', emotion: 'sleepy' });
+        } else {
+          this.sendPetEmotion('neutral', 0);
+        }
+        return { success: true, brightness: pct, emotion };
+      }
+
+      case 'battery': {
+        const pct = typeof value === 'object' ? value.percent : Number(value);
+        const isCharging = typeof value === 'object' ? Boolean(value.charging) : (pct === 100);
+        this.lastReactions['battery'] = 0;
+        this.state.batteryPercent = pct;
+        this.state.batteryCharging = isCharging;
+        let emotion = 'happy';
+        if (pct === 100 && isCharging) {
+          emotion = 'happy';
+          this.sendPetEmotion('happy', 3500);
+          bubble.show({ badge: 'BATTERY FULL', text: 'Battery fully charged! 100% ready!', sound: 'happy', emotion: 'happy' });
+        } else if (isCharging) {
+          emotion = 'charging';
+          this.sendPetEmotion('charging', 4000);
+          bubble.show({ badge: 'CHARGER CONNECTED', text: 'Plugged in! Energized and charging up!', sound: 'happy', emotion: 'charging' });
+        } else if (pct <= 20) {
+          emotion = 'low-battery';
+          this.sendPetEmotion('low-battery', 4500);
+          bubble.show({ badge: 'LOW BATTERY', text: `Battery at ${pct}%. Grab your charger when you can!`, sound: 'tap', emotion: 'low-battery' });
+        } else {
+          emotion = 'surprised';
+          this.sendPetEmotion('surprised', 2500);
+          bubble.show({ badge: 'ON BATTERY', text: `Running on battery power (${pct}%).`, sound: 'tap', emotion: 'surprised' });
+        }
+        return { success: true, percent: pct, charging: isCharging, emotion };
+      }
+
+      case 'media': {
+        const isPlaying = typeof value === 'object' ? Boolean(value.isPlaying) : Boolean(value);
+        const title = (typeof value === 'object' && value.title) ? value.title : 'Vibing Music';
+        let emotion = 'relieved';
+        if (isPlaying) {
+          this.state.isMusicPlaying = true;
+          this.state.currentTrack = title;
+          emotion = 'vibing';
+          this.sendPetEmotion('vibing', 6000);
+          bubble.show({ badge: 'VIBING TO MUSIC ♪', text: `Grooving to ${title}!`, sound: 'happy', emotion: 'vibing' });
+        } else {
+          if (this.state.isMusicPlaying) {
+            emotion = 'relieved';
+            this.sendPetEmotion('relieved', 3000);
+          }
+          this.state.isMusicPlaying = false;
+          this.state.currentTrack = '';
+        }
+        return { success: true, isPlaying, emotion };
+      }
+
+      case 'network': {
+        const online = Boolean(value);
+        this.state.hasCheckedOnline = true;
+        let emotion = online ? 'happy' : 'irritated';
+        if (!online) {
+          this.state.isOnline = false;
+          this.sendPetEmotion('irritated', 4000);
+          bubble.show({ badge: 'OFFLINE', text: 'Internet disconnected. Working in offline mode.', sound: 'tap', emotion: 'irritated' });
+        } else {
+          this.state.isOnline = true;
+          this.sendPetEmotion('happy', 3500);
+          bubble.show({ badge: 'CONNECTED', text: 'Internet reconnected! Back online.', sound: 'happy', emotion: 'happy' });
+        }
+        return { success: true, online, emotion };
+      }
+
+      case 'headphones': {
+        const connected = Boolean(value);
+        this.state.headphonesConnected = connected;
+        let emotion = connected ? 'focus' : 'relieved';
+        if (connected) {
+          this.sendPetEmotion('focus', 4000);
+          bubble.show({ badge: 'HEADPHONES DETECTED', text: 'Headphones on. Focus mode engaged!', sound: 'chirp', emotion: 'focus' });
+        } else {
+          this.sendPetEmotion('relieved', 3000);
+        }
+        return { success: true, connected, emotion };
+      }
+
+      case 'cpu': {
+        const cpu = Number(value);
+        let emotion = 'relieved';
+        if (cpu >= 90) {
+          this.state.isHighLoad = true;
+          emotion = 'stressed';
+          this.sendPetEmotion('stressed', 5000);
+          bubble.show({ badge: 'HEAVY LOAD', text: `Sustained high load detected (${cpu}%)!`, sound: 'tap', emotion: 'stressed' });
+        } else {
+          if (this.state.isHighLoad) {
+            this.state.isHighLoad = false;
+            emotion = 'relieved';
+            this.sendPetEmotion('relieved', 3000);
+          }
+        }
+        return { success: true, cpu, emotion };
+      }
+
+      case 'idle': {
+        const seconds = Number(value);
+        let emotion = 'neutral';
+        if (this.petWindowRef && !this.petWindowRef.isDestroyed()) {
+          if (seconds >= 300) {
+            emotion = 'sleeping';
+            this.setSleeping(true);
+            this.petWindowRef.webContents.send('pet:set-state', { state: 'sleeping' });
+          } else if (seconds >= 120) {
+            emotion = 'sleepy';
+            this.petWindowRef.webContents.send('pet:set-state', { state: 'sleepy' });
+          } else if (seconds >= 60) {
+            emotion = 'bored';
+            this.petWindowRef.webContents.send('pet:set-state', { state: 'bored', duration: 3000, priority: 2 });
+          } else {
+            emotion = 'neutral';
+            this.setSleeping(false);
+            this.petWindowRef.webContents.send('pet:set-state', { state: 'neutral' });
+          }
+        }
+        return { success: true, idleSec: seconds, emotion };
+      }
+
+      default:
+        return { success: false, error: 'Unknown sensor type: ' + type };
+    }
   }
 }
 

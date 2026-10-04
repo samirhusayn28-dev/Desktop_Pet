@@ -1658,10 +1658,15 @@ app.whenReady().then(async () => {
   const emotionArg = process.argv.find(a => a.startsWith('--emotion='));
   if (emotionArg && petWindow) {
     const emotionName = emotionArg.split('=')[1];
-    petWindow.webContents.on('did-finish-load', () => {
-      petWindow.webContents.send('pet:set-state', { state: emotionName, duration: 3000 });
-      console.log(`[Item E1] Sent CLI test emotion: ${emotionName}`);
-    });
+    const applyCliEmotion = () => {
+      petWindow.webContents.send('pet:set-state', { state: emotionName, duration: 0, priority: 6 });
+      console.log(`[Item E2] Sent CLI test emotion: ${emotionName}`);
+    };
+    if (petWindow.webContents.isLoading()) {
+      petWindow.webContents.once('did-finish-load', applyCliEmotion);
+    } else {
+      applyCliEmotion();
+    }
   }
 
   // On first launch only, show centered welcome window (Item W1)
@@ -1716,6 +1721,10 @@ app.whenReady().then(async () => {
     ipcMain.handle('test:set-appearance', async (e, appearance) => {
       store.set('settings.appearance', appearance);
       relayToPet('theme:apply-custom-appearance', appearance);
+      relayToPet('pet:apply-appearance', appearance);
+      if (appearance.glassesEnabled !== undefined) {
+        relayToPet('pet:update-glasses', appearance.glassesEnabled);
+      }
       if (petWindow && !petWindow.isDestroyed() && appearance.scale) {
         const [newW, newH] = getPetWindowSize(appearance.scale);
         petWindow.setSize(newW, newH);
@@ -1729,9 +1738,68 @@ app.whenReady().then(async () => {
       return { isPanelOpen: !!(panelWindow && !panelWindow.isDestroyed() && panelWindow.isVisible()) };
     });
 
-    ipcMain.handle('test:force-emotion', (e, emotionName) => {
-      relayToPet('pet:set-state', { state: emotionName, duration: 4000 });
+    ipcMain.handle('test:force-emotion', (e, emotionName, duration = 4000, priority = null) => {
+      bubble.hide();
+      const p = priority !== null ? priority : (emotionName === 'neutral' ? 1 : 4);
+      relayToPet('pet:set-state', { state: emotionName, duration, priority: p, force: true });
       return true;
+    });
+
+    ipcMain.handle('test:inject-sensor', (e, { type, value }) => {
+      return systemSense.injectSensorReading(type, value);
+    });
+
+    ipcMain.handle('test:resume-sensors', () => {
+      systemSense.resumeBackgroundPolling();
+      return true;
+    });
+
+    ipcMain.handle('test:get-pet-emotion', async () => {
+      if (!petWindow || petWindow.isDestroyed()) return null;
+      return await petWindow.webContents.executeJavaScript(`
+        window.petController ? {
+          currentEmotion: window.petController.currentEmotion,
+          baseEmotion: window.petController.baseEmotion,
+          currentPriority: window.petController.currentPriority,
+          isSleeping: window.petController.isSleeping
+        } : null
+      `);
+    });
+
+    ipcMain.handle('test:inject-interaction', async (e, { type, payload }) => {
+      if (!petWindow || petWindow.isDestroyed()) return false;
+      return await petWindow.webContents.executeJavaScript(`
+        if (!window.petController) false;
+        else {
+          switch ("${type}") {
+            case 'rapid-clicks':
+              for (let i = 0; i < 5; i++) window.petController.handleClick();
+              break;
+            case '4s-hover':
+              window.petController.setEmotion('blush', 3000, 4);
+              break;
+            case 'fast-drag':
+              window.petController.setEmotion('dizzy', 3000, 4);
+              break;
+            case 'fast-approach':
+              window.petController.setEmotion('scared', 2000, 4);
+              break;
+            case 'double-click':
+              window.petController.setEmotion('laugh', 2800, 4);
+              break;
+            case 'chat-thanks':
+              window.petController.setEmotion('grateful', 3500, 4);
+              break;
+            case 'all-todos':
+              window.petController.setEmotion('proud', 4000, 4);
+              break;
+            case 'missed-reminder':
+              window.petController.setEmotion('worried', 4000, 3);
+              break;
+          }
+          ({ currentEmotion: window.petController.currentEmotion, priority: window.petController.currentPriority });
+        }
+      `);
     });
   }
 

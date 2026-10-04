@@ -156,10 +156,10 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Test via hook: 1px inside, 1px/5px/20px outside across sizes, pill/square roundness, glasses on, bubbles visible
 
 ## Item E2 — EMOTIONS DO NOT WORK
-- [ ] Add `--emotion=<name>` hook; test each of 25 emotions via e2e screenshot inspection (glasses OFF and ON)
-- [ ] Fix triggers and define strict priority order: error/AI > user interaction > reminder > system reactions > idle
-- [ ] Ensure all temporary emotions return to correct baseline (neutral / sleepy / sleeping)
-- [ ] Test event injection via hook: volume, brightness, battery, media, network, headphones, high CPU, etc.
+- [x] Add `--emotion=<name>` hook; test each of 25 emotions via e2e screenshot inspection (glasses OFF and ON)
+- [x] Fix triggers and define strict priority order: error/AI > user interaction > reminder > system reactions > idle
+- [x] Ensure all temporary emotions return to correct baseline (neutral / sleepy / sleeping)
+- [x] Test event injection via hook: volume, brightness, battery, media, network, headphones, high CPU, etc.
 
 ## Item R2 — REMINDER "EDIT" BUTTON DOES NOTHING
 - [ ] Investigate cause (event listener loss, channel mismatch, CSS hidden form)

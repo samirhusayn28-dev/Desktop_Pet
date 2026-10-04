@@ -173,10 +173,16 @@ class ChatTab {
     this.renderMessages();
     this.scrollToBottom();
 
-    // Pet reaction: thinking
-    this.renderMiniAvatar('thinking');
-    if (this.miniAvatarEl) this.miniAvatarEl.classList.add('animating');
-    window.panelController.notifyPet('pet:set-state', { state: 'thinking', duration: 15000 });
+    // Pet reaction: grateful on thanks, otherwise thinking
+    const isThanks = /\b(thanks|thank you|thx|ty|shukriya|dhanyawad|arigato)\b/i.test(text);
+    if (isThanks) {
+      this.renderMiniAvatar('grateful');
+      window.panelController.notifyPet('pet:set-state', { state: 'grateful', duration: 4000, priority: 4 });
+    } else {
+      this.renderMiniAvatar('thinking');
+      if (this.miniAvatarEl) this.miniAvatarEl.classList.add('animating');
+      window.panelController.notifyPet('pet:set-state', { state: 'thinking', duration: 15000, priority: 2 });
+    }
 
     const assistantMsgEl = this.messagesContainer.querySelector(`.chat-msg[data-index="${assistantIndex}"]`);
     const assistantBodyEl = assistantMsgEl ? assistantMsgEl.querySelector('.chat-bubble-content') : null;
@@ -268,6 +274,7 @@ class ChatTab {
 
         this.renderMiniAvatar('confused');
         if (this.miniAvatarEl) this.miniAvatarEl.classList.remove('animating');
+        window.panelController.notifyPet('pet:set-state', { state: 'confused', duration: 4500, priority: 5 });
         this.isGenerating = false;
       });
 
@@ -308,6 +315,7 @@ class ChatTab {
       }
       this.renderMiniAvatar('confused');
       if (this.miniAvatarEl) this.miniAvatarEl.classList.remove('animating');
+      window.panelController.notifyPet('pet:set-state', { state: 'confused', duration: 4500, priority: 5 });
       this.isGenerating = false;
     }
   }

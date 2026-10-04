@@ -79,10 +79,10 @@ class TodoTab {
 
       // Check if all completed -> celebrate!
       if (this.todos.length > 0 && this.todos.every(t => t.done)) {
-        window.panelController.notifyPet('pet:set-state', { state: 'celebrating', duration: 4000 });
+        window.panelController.notifyPet('pet:set-state', { state: 'proud', duration: 4500, priority: 4 });
         const name = (window.panelController.store.get('settings.general.userName') || '').trim();
         const msg = name ? `All tasks done, ${name}! You crushed it today!` : 'All tasks completed! Amazing work!';
-        window.panelController.notifyPet('pet:show-bubble', { text: msg, duration: 4500, emotion: 'happy', badge: 'SPRINT COMPLETE' });
+        window.panelController.notifyPet('pet:show-bubble', { text: msg, duration: 4500, emotion: 'proud', badge: 'SPRINT COMPLETE' });
         if (window.soundEffects) window.soundEffects.playHappy();
       }
     }

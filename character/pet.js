@@ -727,7 +727,8 @@
         }
 
         // 29. PROUD (Item E1)
-        case 'proud': {
+        case 'proud':
+        case 'celebrating': {
           const arcW = (baseRx * 1.35).toFixed(1);
           return `
             <g ${filterAttr}>
