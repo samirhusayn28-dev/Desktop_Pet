@@ -103,14 +103,19 @@
 
             <!-- 2. The 3D Rounded Rectangle Body -->
             <g class="facebot-body-wrap">
-              <!-- Base 3D Body Surface with Drop Shadow -->
+              ${d > 0.05 ? `
+                <rect x="${x.toFixed(1)}" y="${(y + 3.5 * d).toFixed(1)}" 
+                      width="${w.toFixed(1)}" height="${h.toFixed(1)}" 
+                      rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" 
+                      fill="rgba(0, 0, 0, ${(0.16 * d).toFixed(2)})" />
+              ` : ''}
+              <!-- Base 3D Body Surface -->
               <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" 
                     width="${w.toFixed(1)}" height="${h.toFixed(1)}" 
                     rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" 
                     fill="url(#${idPrefix}-body-grad)" 
                     stroke="rgba(255, 255, 255, ${(0.85 * d).toFixed(2)})" 
-                    stroke-width="${(1.5 * d).toFixed(1)}" 
-                    ${d > 0.05 ? `filter="url(#${idPrefix}-soft-shadow)"` : ''} />
+                    stroke-width="${(1.5 * d).toFixed(1)}" />
 
               ${d > 0.1 ? `
                 <!-- Inner Bottom-Right Shading Rim (simulates puffy edge curve) -->
@@ -161,10 +166,9 @@
 
       return `
         <defs>
-          <!-- Soft Drop Shadow Filter for Body -->
-          <filter id="${p}-soft-shadow" x="-35%" y="-35%" width="170%" height="170%">
-            <feDropShadow dx="0" dy="${(12 * d).toFixed(1)}" stdDeviation="${(14 * d + 1).toFixed(1)}" flood-color="rgba(0,0,0,${(0.32 * d).toFixed(2)})" />
-            <feDropShadow dx="0" dy="${(2 * d).toFixed(1)}" stdDeviation="${(3 * d).toFixed(1)}" flood-color="rgba(0,0,0,${(0.12 * d).toFixed(2)})" />
+          <!-- Soft Drop Shadow Filter for Body (Lightweight single-pass for low CPU) -->
+          <filter id="${p}-soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="${(4 * d).toFixed(1)}" stdDeviation="${(4 * d + 0.5).toFixed(1)}" flood-color="rgba(0,0,0,${(0.25 * d).toFixed(2)})" />
           </filter>
 
           <!-- Floor Contact Shadow Radial Gradient (Zero GPU filter cost) -->
@@ -240,7 +244,7 @@
 
       const baseRx = (6.5 * eyeScale).toFixed(1);
       const baseRy = (7.5 * eyeScale).toFixed(1);
-      const filterAttr = d > 0.1 ? `filter="url(#${p}-socket-shadow)"` : '';
+      const filterAttr = '';
 
       // Bottom rim highlight helper (gives eyes engraved bezel feel)
       const rim = (cxVal, cyVal, rxVal, ryVal) => {

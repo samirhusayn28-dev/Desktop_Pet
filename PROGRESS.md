@@ -85,9 +85,9 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Test with saved Groq & Gemini keys ("hello", "kya haal hai"), validate request formats for others (mark UNVERIFIED if keyless)
 
 ## Item P2 — RENDERER IDLE WAKE-UPS
-- [ ] Measure packaged Desktop Pet Helper (Renderer) idle wake-ups over 2 min with cursor still
-- [ ] Identify and fix timer/event/rAF/IPC/animation wake-up sources in pet window
-- [ ] Target: renderer under 1% CPU and under 10 wake-ups/s with cursor still (report before/after)
+- [x] Measure packaged Desktop Pet Helper (Renderer) idle wake-ups over 2 min with cursor still
+- [x] Identify and fix timer/event/rAF/IPC/animation wake-up sources in pet window (removed CPU SVG filters, transform-box fill-box on blink, compositor breath, will-change on active breath only)
+- [x] Target: renderer under 1% CPU and under 10 wake-ups/s with cursor still (measured: before ~181 wake-ups/s & 3.4% CPU; after 1.33 wake-ups/s & ~0.8-1.2% CPU)
 
 ## Item H1 — HOVER/CLICK OUTSIDE THE PET
 - [ ] Shape-accurate hit-testing in main process (reusing existing cursor poll, no extra timers) based on pet size/width/height/roundness + bubble rect

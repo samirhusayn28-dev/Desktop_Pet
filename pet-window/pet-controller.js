@@ -261,6 +261,7 @@ class FaceBotController {
     const eyes = this.container ? this.container.querySelectorAll('.eye-left, .eye-right') : null;
     if (eyes && eyes.length > 0) {
       eyes.forEach(eye => {
+        eye.style.transformBox = 'fill-box';
         eye.style.transformOrigin = 'center';
         eye.style.transform = isBlinking ? 'scaleY(0.12)' : '';
       });
