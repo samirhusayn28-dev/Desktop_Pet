@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to Desktop Pet</title>
+  <link rel="stylesheet" href="../themes/themes.css">
+  <link rel="stylesheet" href="welcome.css">
+</head>
+<body>
+  <div class="welcome-shell">
+    <!-- Header with Samir Husayn Credit & GitHub -->
+    <header class="welcome-header">
+      <div class="header-badge">WELCOME</div>
+      <h1 class="welcome-title">Designed &amp; Developed by Samir Husayn</h1>
+      <a class="github-pill" id="link-github" href="#" title="View GitHub profile">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+        <span>samirhusayn28-dev</span>
+      </a>
+    </header>
+
+    <!-- Scrollable Form Body -->
+    <main class="welcome-content">
+      <!-- 1. What should I call you? -->
+      <div class="welcome-field">
+        <label class="field-label" for="input-user-name">What should I call you?</label>
+        <input type="text" id="input-user-name" class="solid-input" placeholder="Your name (e.g. Sameer)" maxlength="30">
+      </div>
+
+      <!-- 2. Name your pet -->
+      <div class="welcome-field">
+        <label class="field-label" for="input-pet-name">Name your pet</label>
+        <input type="text" id="input-pet-name" class="solid-input" placeholder="Pet name (default: Bolt)" value="Bolt" maxlength="24">
+      </div>
+
+      <!-- 3. Glasses Toggle (G1 add-on: visible row right under pet name) -->
+      <div class="welcome-toggle-row">
+        <div class="toggle-text-wrap">
+          <label class="toggle-title" for="toggle-glasses">Do you wear glasses? Give your pet some</label>
+          <div class="toggle-hint">Adds round black glasses that scale and fit your pet</div>
+        </div>
+        <input type="checkbox" id="toggle-glasses" class="solid-checkbox">
+      </div>
+
+      <!-- 4. Customize your pet (Expandable Section with live preview) -->
+      <details class="welcome-expandable" id="details-customize">
+        <summary class="expandable-summary">
+          <span>Customize your pet</span>
+          <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </summary>
+        
+        <div class="expandable-body">
+          <div class="field-row-slider">
+            <div class="slider-header">
+              <span class="slider-label">Size</span>
+              <span class="slider-val" id="val-scale">100%</span>
+            </div>
+            <input type="range" id="input-scale" min="0.6" max="1.5" step="0.05" value="1.0" class="solid-slider">
+          </div>
+
+          <div class="field-row-slider">
+            <div class="slider-header">
+              <span class="slider-label">Width</span>
+              <span class="slider-val" id="val-width">136</span>
+            </div>
+            <input type="range" id="input-width" min="70" max="190" step="2" value="136" class="solid-slider">
+          </div>
+
+          <div class="field-row-slider">
+            <div class="slider-header">
+              <span class="slider-label">Height</span>
+              <span class="slider-val" id="val-height">120</span>
+            </div>
+            <input type="range" id="input-height" min="70" max="180" step="2" value="120" class="solid-slider">
+          </div>
+
+          <div class="field-row-slider">
+            <div class="slider-header">
+              <span class="slider-label">Roundness</span>
+              <span class="slider-val" id="val-roundness">36%</span>
+            </div>
+            <input type="range" id="input-roundness" min="0" max="50" step="1" value="36" class="solid-slider">
+          </div>
+
+          <div class="field-row-slider">
+            <div class="slider-header">
+              <span class="slider-label">3D Depth</span>
+              <span class="slider-val" id="val-depth">80%</span>
+            </div>
+            <input type="range" id="input-depth" min="0" max="100" step="5" value="80" class="solid-slider">
+          </div>
+
+          <div class="field-row-slider">
+            <div class="slider-header">
+              <span class="slider-label">Eye Size</span>
+              <span class="slider-val" id="val-eyesize">1.0x</span>
+            </div>
+            <input type="range" id="input-eyesize" min="0.6" max="1.5" step="0.05" value="1.0" class="solid-slider">
+          </div>
+
+          <div class="field-row-slider">
+            <div class="slider-header">
+              <span class="slider-label">Eye Spacing</span>
+              <span class="slider-val" id="val-eyespacing">44</span>
+            </div>
+            <input type="range" id="input-eyespacing" min="32" max="64" step="1" value="44" class="solid-slider">
+          </div>
+
+          <div class="field-row-slider">
+            <div class="slider-header">
+              <span class="slider-label">Mouth Width</span>
+              <span class="slider-val" id="val-mouthwidth">14</span>
+            </div>
+            <input type="range" id="input-mouthwidth" min="8" max="24" step="1" value="14" class="solid-slider">
+          </div>
+
+          <div class="field-color-group">
+            <label class="slider-label">Pet Color</label>
+            <div class="color-picker-wrap">
+              <input type="color" id="input-body-color" value="#FFFFFF">
+              <input type="text" id="disp-body-color" class="solid-input mono-input" value="#FFFFFF" readonly>
+              <button type="button" class="swatch-mini" id="btn-body-white" title="Pure White">White</button>
+            </div>
+          </div>
+
+          <div class="field-color-group">
+            <label class="slider-label">Accent Color</label>
+            <div class="color-picker-wrap">
+              <input type="color" id="input-accent-color" value="#FF7A2F">
+              <input type="text" id="disp-accent-color" class="solid-input mono-input" value="#FF7A2F" readonly>
+            </div>
+            <div class="swatches-row">
+              <button type="button" class="accent-dot active" data-color="#FF7A2F" style="background:#FF7A2F;" title="Classic Amber"></button>
+              <button type="button" class="accent-dot" data-color="#38BDF8" style="background:#38BDF8;" title="Sky Blue"></button>
+              <button type="button" class="accent-dot" data-color="#10B981" style="background:#10B981;" title="Emerald"></button>
+              <button type="button" class="accent-dot" data-color="#A855F7" style="background:#A855F7;" title="Purple"></button>
+              <button type="button" class="accent-dot" data-color="#F43F5E" style="background:#F43F5E;" title="Rose"></button>
+              <button type="button" class="accent-dot" data-color="#EAB308" style="background:#EAB308;" title="Yellow"></button>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- 5. Chat Section -->
+      <div class="welcome-chat-card">
+        <div class="chat-card-title">Chat Assistant Setup</div>
+
+        <div class="welcome-field">
+          <label class="field-label" for="select-ai-provider">AI Provider</label>
+          <select id="select-ai-provider" class="solid-select">
+            <option value="gemini" selected>Google Gemini (Free Flash Tier)</option>
+            <option value="groq">Groq Cloud (Fast Llama 3.3)</option>
+            <option value="openai">OpenAI (GPT-4o Mini)</option>
+            <option value="anthropic">Claude (Anthropic Messages API)</option>
+            <option value="qwen">Qwen AI (DashScope)</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="ollama">Ollama (Local Private NDJSON)</option>
+            <option value="custom">Custom (OpenAI-Compatible)</option>
+          </select>
+        </div>
+
+        <div class="welcome-field" id="wrap-api-key">
+          <label class="field-label" for="input-api-key">API Key</label>
+          <div class="password-wrap">
+            <input type="password" id="input-api-key" class="solid-input password-input" placeholder="Paste your API key (stored in OS keychain)">
+            <button type="button" id="btn-toggle-key" class="icon-toggle-btn" title="Show / Hide Key">
+              <svg id="icon-eye" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="welcome-field">
+          <label class="field-label" for="select-ai-model">Model</label>
+          <select id="select-ai-model" class="solid-select">
+            <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite (chat)</option>
+          </select>
+        </div>
+
+        <div class="test-row">
+          <button type="button" id="btn-test-conn" class="btn-secondary">Test connection</button>
+          <div id="test-result-badge" class="test-badge hidden"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer Action Buttons -->
+    <footer class="welcome-footer">
+      <div class="actions-row">
+        <button type="button" id="btn-save-start" class="btn-primary">Save &amp; Start</button>
+        <button type="button" id="btn-skip" class="btn-ghost">Skip</button>
+      </div>
+      <div class="footer-hint">You can change everything later in Settings</div>
+    </footer>
+  </div>
+
+  <script src="welcome.js"></script>
+</body>
+</html>

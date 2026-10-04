@@ -1,11 +1,12 @@
 /**
  * Desktop Pet — Face-Bot Controller
+ * 
  * Features:
- * - High-precision mouse drag vs click (<4px = click to toggle panel; >4px = drag)
- * - Low-CPU cursor eye tracking & 3D parallax tilt (paused while sleeping)
- * - Automatic blinking (every 3-6s)
- * - Event-driven emotions from main process SystemSense & IdleMonitor (zero random changes)
- * - Pure transform & opacity animations (sub-2% idle CPU, sub-5% GPU helper)
+ * - Event-driven emotions and animations with zero CPU when idle/sleeping
+ * - Global cursor eye-tracking with smooth easing and 3D body tilt
+ * - Random blinking (every 2-6s, 20% double-blink chance) and breathing
+ * - Full interactions: hover (happy), click (<4px = panel toggle), drag (>=4px = dangling/bounce), double click (laugh/wink), right-click quick menu
+ * - Solid Cute Material speech bubble (notifies main to expand/shrink pet window)
  */
 
 const { ipcRenderer } = typeof require !== 'undefined' ? require('electron') : { ipcRenderer: null };
@@ -26,10 +27,17 @@ class FaceBotController {
 
     this.isBlinking = false;
     this.isDragging = false;
-    this.trackingRaf = null;
+    this.isSleeping = false;
+    this.isRafActive = false;
+    this.rafId = null;
+    this.emotionTimeout = null;
 
     this.container = document.getElementById('pet-viewport');
     this.menuEl = document.getElementById('quick-menu');
+    this.bubbleEl = document.getElementById('pet-speech-bubble');
+    this.bubbleBadge = document.getElementById('bubble-badge');
+    this.bubbleText = document.getElementById('bubble-text');
+    this.bubbleTimer = null;
 
     this.init();
   }
@@ -40,15 +48,11 @@ class FaceBotController {
     this.setupEvents();
     this.setupIPC();
     this.startBlinkLoop();
-    this.startParallaxLoop();
+    this.startBreathingLoop();
 
     // Default window mouse ignore state
     if (ipcRenderer) {
       ipcRenderer.send('pet:set-ignore-mouse-events', true);
-    }
-
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons({ attrs: { 'stroke-width': 1.75 } });
     }
   }
 
@@ -64,7 +68,7 @@ class FaceBotController {
   }
 
   render() {
-    const size = Math.round(220 * (this.pet.config.scale || 1.0));
+    const size = Math.round(180 * (this.pet.config.scale || 1.0));
     this.container.innerHTML = this.pet.render(this.currentEmotion, {
       size: size,
       eyeOffset: this.eyeOffset,
@@ -75,16 +79,35 @@ class FaceBotController {
 
   setEmotion(newEmotion, durationMs = 0) {
     this.currentEmotion = newEmotion;
-    this.render();
+    this.isSleeping = (newEmotion === 'sleeping');
 
-    // If pet entered sleeping state, gently return tilt to 0 and pause heavy rendering
-    if (newEmotion === 'sleeping') {
+    if (this.container) {
+      if (this.isSleeping) {
+        this.container.classList.add('sleeping');
+      } else {
+        this.container.classList.remove('sleeping');
+      }
+    }
+
+    if (this.isSleeping) {
       this.targetTilt = { x: 0, y: 0 };
       this.targetEyeOffset = { x: 0, y: 0 };
+      this.isRafActive = false;
+      if (this.rafId) {
+        cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+      }
+    }
+
+    this.render();
+
+    if (this.emotionTimeout) {
+      clearTimeout(this.emotionTimeout);
+      this.emotionTimeout = null;
     }
 
     if (durationMs > 0) {
-      setTimeout(() => {
+      this.emotionTimeout = setTimeout(() => {
         if (this.currentEmotion === newEmotion) {
           this.currentEmotion = this.baseEmotion;
           this.render();
@@ -98,84 +121,181 @@ class FaceBotController {
     this.setEmotion(emotion);
   }
 
-  // Optimized 30FPS Parallax Tilt & Eye Tracking Loop
-  // Pauses updates completely while sleeping to conserve CPU and GPU power
-  startParallaxLoop() {
-    let lastFrameTime = 0;
-    const targetInterval = 1000 / 30; // 30 FPS cap
+  // --- Solid Cute Material Speech Bubble ---
+  showBubble({ text, badge = '', duration = 5000, sound = '', emotion = '', bounce = false }) {
+    if (!this.bubbleEl || !text) return;
 
-    const step = (now) => {
-      this.trackingRaf = requestAnimationFrame(step);
+    if (bounce && this.container) {
+      this.container.classList.remove('bounce-drop');
+      void this.container.offsetWidth;
+      this.container.classList.add('bounce-drop');
+      setTimeout(() => {
+        if (this.container) this.container.classList.remove('bounce-drop');
+      }, 500);
+    }
 
-      if (now - lastFrameTime < targetInterval) return;
-      lastFrameTime = now;
+    if (this.bubbleTimer) {
+      clearTimeout(this.bubbleTimer);
+      this.bubbleTimer = null;
+    }
 
-      if (this.currentEmotion === 'sleeping') {
-        // Flat tilt when sleeping
-        if (Math.abs(this.tilt.x) > 0.05 || Math.abs(this.tilt.y) > 0.05) {
-          this.tilt.x *= 0.85;
-          this.tilt.y *= 0.85;
-          this.container.style.transform = `perspective(700px) rotateX(${this.tilt.x.toFixed(2)}deg) rotateY(${this.tilt.y.toFixed(2)}deg)`;
-        }
-        return;
-      }
+    if (badge && this.bubbleBadge) {
+      this.bubbleBadge.textContent = badge;
+      this.bubbleBadge.style.display = 'inline-block';
+    } else if (this.bubbleBadge) {
+      this.bubbleBadge.style.display = 'none';
+      this.bubbleBadge.textContent = '';
+    }
 
-      const ease = 0.22;
+    if (this.bubbleText) {
+      this.bubbleText.textContent = text;
+    }
 
-      // Ease Eye 2D coordinates (transform only)
-      const dEyeX = (this.targetEyeOffset.x - this.eyeOffset.x) * ease;
-      const dEyeY = (this.targetEyeOffset.y - this.eyeOffset.y) * ease;
-      if (Math.abs(dEyeX) > 0.04 || Math.abs(dEyeY) > 0.04) {
-        this.eyeOffset.x += dEyeX;
-        this.eyeOffset.y += dEyeY;
+    this.bubbleEl.classList.remove('fade-out');
+    this.bubbleEl.classList.add('fade-in');
+    this.bubbleEl.style.display = 'block';
 
-        const face = document.querySelector('.facebot-face');
-        if (face) {
-          face.setAttribute('transform', `translate(${this.eyeOffset.x.toFixed(2)}, ${this.eyeOffset.y.toFixed(2)})`);
-        }
-      }
+    // Tell main process to expand pet window height so bubble fits without clipping
+    if (ipcRenderer) {
+      ipcRenderer.send('pet:bubble-shown');
+    }
 
-      // Ease 3D Body Tilt (transform only)
-      const dTiltX = (this.targetTilt.x - this.tilt.x) * ease;
-      const dTiltY = (this.targetTilt.y - this.tilt.y) * ease;
-      if (Math.abs(dTiltX) > 0.04 || Math.abs(dTiltY) > 0.04) {
-        this.tilt.x += dTiltX;
-        this.tilt.y += dTiltY;
+    if (sound && window.soundEffects) {
+      if (sound === 'chirp') window.soundEffects.playChirp();
+      else if (sound === 'happy') window.soundEffects.playHappy();
+      else if (sound === 'alarm') window.soundEffects.playAlarm();
+      else if (sound === 'tap') window.soundEffects.playTap();
+      else window.soundEffects.playChirp();
+    }
 
-        if (this.container && !this.isDragging) {
-          this.container.style.transform = `perspective(700px) rotateX(${this.tilt.x.toFixed(2)}deg) rotateY(${this.tilt.y.toFixed(2)}deg)`;
-        }
-      }
-    };
+    if (emotion) {
+      this.setEmotion(emotion, duration);
+    }
 
-    this.trackingRaf = requestAnimationFrame(step);
+    this.bubbleTimer = setTimeout(() => {
+      this.hideBubble();
+    }, duration);
   }
 
-  // Automatic random blinking (every 3-6 seconds)
+  hideBubble() {
+    if (!this.bubbleEl) return;
+    this.bubbleEl.classList.remove('fade-in');
+    this.bubbleEl.classList.add('fade-out');
+
+    setTimeout(() => {
+      this.bubbleEl.style.display = 'none';
+      if (this.bubbleText) this.bubbleText.textContent = '';
+      if (this.bubbleBadge) this.bubbleBadge.textContent = '';
+      this.bubbleEl.classList.remove('fade-out');
+
+      // Tell main process to reset pet window bounds to compact pet size
+      if (ipcRenderer) {
+        ipcRenderer.send('pet:bubble-hidden');
+      }
+    }, 200);
+
+    if (this.bubbleTimer) {
+      clearTimeout(this.bubbleTimer);
+      this.bubbleTimer = null;
+    }
+  }
+
+  // --- Event-Driven Cursor & Motion Easing ---
+  requestMotionUpdate() {
+    if (this.isRafActive || this.isSleeping) return;
+    this.isRafActive = true;
+    this.stepMotion();
+  }
+
+  stepMotion() {
+    if (this.isSleeping) {
+      this.isRafActive = false;
+      return;
+    }
+
+    const ease = 0.22;
+    let needsContinue = false;
+
+    // 1. Ease Eye Coordinates (within small natural range)
+    const dEyeX = (this.targetEyeOffset.x - this.eyeOffset.x) * ease;
+    const dEyeY = (this.targetEyeOffset.y - this.eyeOffset.y) * ease;
+    if (Math.abs(dEyeX) > 0.03 || Math.abs(dEyeY) > 0.03) {
+      this.eyeOffset.x += dEyeX;
+      this.eyeOffset.y += dEyeY;
+      const face = document.querySelector('.facebot-face');
+      if (face) {
+        face.setAttribute('transform', `translate(${this.eyeOffset.x.toFixed(2)}, ${this.eyeOffset.y.toFixed(2)})`);
+      }
+      needsContinue = true;
+    } else {
+      this.eyeOffset.x = this.targetEyeOffset.x;
+      this.eyeOffset.y = this.targetEyeOffset.y;
+    }
+
+    // 2. Ease 3D Body Tilt
+    const dTiltX = (this.targetTilt.x - this.tilt.x) * ease;
+    const dTiltY = (this.targetTilt.y - this.tilt.y) * ease;
+    if (Math.abs(dTiltX) > 0.03 || Math.abs(dTiltY) > 0.03) {
+      this.tilt.x += dTiltX;
+      this.tilt.y += dTiltY;
+      if (this.container && !this.isDragging) {
+        this.container.style.transform = `perspective(700px) rotateX(${this.tilt.x.toFixed(2)}deg) rotateY(${this.tilt.y.toFixed(2)}deg)`;
+      }
+      needsContinue = true;
+    } else {
+      this.tilt.x = this.targetTilt.x;
+      this.tilt.y = this.targetTilt.y;
+    }
+
+    if (needsContinue) {
+      this.rafId = requestAnimationFrame(() => this.stepMotion());
+    } else {
+      this.isRafActive = false;
+      this.rafId = null;
+    }
+  }
+
+  // Lightweight Eye Blinking (uses direct scaleY transform without innerHTML re-render)
+  setBlink(isBlinking) {
+    this.isBlinking = isBlinking;
+    const eyes = this.container ? this.container.querySelectorAll('.eye-left, .eye-right') : null;
+    if (eyes && eyes.length > 0) {
+      eyes.forEach(eye => {
+        eye.style.transformBox = 'fill-box';
+        eye.style.transformOrigin = 'center';
+        eye.style.transform = isBlinking ? 'scaleY(0.12)' : '';
+      });
+    } else {
+      this.render();
+    }
+  }
+
+  // Automatic random blinking (every 2-6 seconds, 20% double-blink)
   startBlinkLoop() {
     const scheduleNext = () => {
-      const delay = 3000 + Math.random() * 3000;
+      const delay = 2200 + Math.random() * 3800;
       setTimeout(() => {
-        if (this.currentEmotion !== 'sleeping' && this.currentEmotion !== 'happy' && this.currentEmotion !== 'laugh' && this.currentEmotion !== 'love' && this.currentEmotion !== 'vibing') {
-          this.isBlinking = true;
-          this.render();
+        if (!this.isSleeping &&
+            this.currentEmotion !== 'happy' &&
+            this.currentEmotion !== 'laugh' &&
+            this.currentEmotion !== 'love' &&
+            this.currentEmotion !== 'vibing' &&
+            this.currentEmotion !== 'squint') {
+          this.setBlink(true);
 
           setTimeout(() => {
-            this.isBlinking = false;
-            this.render();
+            this.setBlink(false);
 
             // 20% chance of double-blink
             if (Math.random() < 0.20) {
               setTimeout(() => {
-                this.isBlinking = true;
-                this.render();
+                this.setBlink(true);
                 setTimeout(() => {
-                  this.isBlinking = false;
-                  this.render();
-                }, 120);
-              }, 150);
+                  this.setBlink(false);
+                }, 90);
+              }, 130);
             }
-          }, 130);
+          }, 110);
         }
         scheduleNext();
       }, delay);
@@ -183,50 +303,82 @@ class FaceBotController {
     scheduleNext();
   }
 
-  setupEvents() {
-    // Mouse enter / leave for click-through pass
-    this.container.addEventListener('mouseenter', () => {
-      if (ipcRenderer) ipcRenderer.send('pet:set-ignore-mouse-events', false);
+  // Periodic burst breathing (1.8s breath every 8-10s; 0 animation layers when idle)
+  startBreathingLoop() {
+    const triggerBreath = () => {
+      if (this.isSleeping || this.isDragging || !this.container) {
+        this.breathTimer = setTimeout(triggerBreath, 4000);
+        return;
+      }
+      this.container.classList.add('breath-burst');
+      setTimeout(() => {
+        if (this.container) this.container.classList.remove('breath-burst');
+        this.breathTimer = setTimeout(triggerBreath, 6500 + Math.random() * 2000);
+      }, 1850);
+    };
+    this.breathTimer = setTimeout(triggerBreath, 3500);
+  }
 
-      // If pet was sleeping or sleepy, wake it up!
+  setupEvents() {
+    // Mouse hover management (allows interaction with pet, bubbles, and menus)
+    const onEnterInteractive = () => {
+      if (ipcRenderer) ipcRenderer.send('pet:set-ignore-mouse-events', false);
       if (this.currentEmotion === 'sleeping' || this.currentEmotion === 'sleepy') {
         this.wakeUp();
       } else if (this.currentEmotion === 'neutral') {
         this.setEmotion('happy', 2000);
         if (window.soundEffects) window.soundEffects.playTap();
       }
-    });
+    };
 
-    this.container.addEventListener('mouseleave', () => {
-      if (this.menuEl.classList.contains('hidden') && !this.isDragging) {
-        if (ipcRenderer) ipcRenderer.send('pet:set-ignore-mouse-events', true);
+    const onLeaveInteractive = () => {
+      if (!this.isDragging && (!this.menuEl || this.menuEl.classList.contains('hidden')) && ipcRenderer) {
+        ipcRenderer.send('pet:set-ignore-mouse-events', true);
       }
-    });
+    };
 
-    // --- MANUAL DRAGGING VS CLICK DETECTION ---
-    // <4px movement = CLICK (toggle panel)
-    // >4px movement = DRAG (reposition pet & follow panel)
+    if (this.container) {
+      this.container.addEventListener('mouseenter', onEnterInteractive);
+      this.container.addEventListener('mouseleave', onLeaveInteractive);
+    }
+
+    if (this.bubbleEl) {
+      this.bubbleEl.addEventListener('mouseenter', () => {
+        if (ipcRenderer) ipcRenderer.send('pet:set-ignore-mouse-events', false);
+        // Pause auto-dismiss timer on hover
+        if (this.bubbleTimer) {
+          clearTimeout(this.bubbleTimer);
+          this.bubbleTimer = null;
+        }
+      });
+      this.bubbleEl.addEventListener('mouseleave', () => {
+        if (!this.isDragging && ipcRenderer) {
+          ipcRenderer.send('pet:set-ignore-mouse-events', true);
+        }
+        this.bubbleTimer = setTimeout(() => this.hideBubble(), 2000);
+      });
+    }
+
+    // High-Precision Drag vs Click (<4px = click, >=4px = drag)
     let isMouseDown = false;
-    let startScreenX = 0;
-    let startScreenY = 0;
-    let hasMovedOverThreshold = false;
+    let startX = 0;
+    let startY = 0;
+    let hasMoved = false;
 
     this.container.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return; // Left click only
       isMouseDown = true;
-      hasMovedOverThreshold = false;
-      startScreenX = e.screenX;
-      startScreenY = e.screenY;
+      hasMoved = false;
+      startX = e.screenX;
+      startY = e.screenY;
     });
 
-    window.addEventListener('mousemove', (e) => {
+    window.addEventListener('mousemove', (moveEvent) => {
       if (!isMouseDown) return;
+      const dist = Math.hypot(moveEvent.screenX - startX, moveEvent.screenY - startY);
 
-      const deltaX = Math.abs(e.screenX - startScreenX);
-      const deltaY = Math.abs(e.screenY - startScreenY);
-
-      if (deltaX > 4 || deltaY > 4) {
-        hasMovedOverThreshold = true;
+      if (dist >= 4) {
+        hasMoved = true;
         if (!this.isDragging) {
           this.isDragging = true;
           this.container.classList.add('dangling');
@@ -235,12 +387,15 @@ class FaceBotController {
         }
 
         if (ipcRenderer) {
-          ipcRenderer.send('pet:drag-move', { screenX: e.screenX, screenY: e.screenY });
+          ipcRenderer.send('pet:drag-move', {
+            screenX: moveEvent.screenX,
+            screenY: moveEvent.screenY
+          });
         }
       }
     });
 
-    window.addEventListener('mouseup', (e) => {
+    window.addEventListener('mouseup', (upEvent) => {
       if (!isMouseDown) return;
       isMouseDown = false;
 
@@ -251,17 +406,19 @@ class FaceBotController {
         setTimeout(() => this.container.classList.remove('bounce-drop'), 450);
 
         this.setEmotion('happy', 2000);
+        if (window.soundEffects) window.soundEffects.playTap();
+
         if (ipcRenderer) {
           ipcRenderer.send('pet:drag-end');
           ipcRenderer.send('pet:set-ignore-mouse-events', false);
         }
-      } else if (!hasMovedOverThreshold && e.button === 0) {
-        // --- CLICK DETECTED! TOGGLE PANEL ---
+      } else if (!hasMoved && upEvent.button === 0) {
+        // Pure Click (<4px movement): Toggle assistant panel!
         this.handleClick();
       }
     });
 
-    // Double click reaction
+    // Double click for playful reaction
     this.container.addEventListener('dblclick', () => {
       const doubleEmo = Math.random() < 0.5 ? 'laugh' : 'wink';
       this.setEmotion(doubleEmo, 2800);
@@ -271,23 +428,30 @@ class FaceBotController {
     // Right Click Context Menu
     window.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      if (ipcRenderer) ipcRenderer.send('pet:set-ignore-mouse-events', false);
-      this.menuEl.classList.remove('hidden');
-    });
-
-    window.addEventListener('mousedown', (e) => {
-      if (!this.menuEl.contains(e.target) && !this.menuEl.classList.contains('hidden')) {
-        this.menuEl.classList.add('hidden');
+      if (this.menuEl) {
+        if (ipcRenderer) ipcRenderer.send('pet:set-ignore-mouse-events', false);
+        this.menuEl.classList.remove('hidden');
       }
     });
 
-    this.menuEl.querySelectorAll('.menu-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const action = item.dataset.action;
+    window.addEventListener('mousedown', (e) => {
+      if (this.menuEl && !this.menuEl.contains(e.target) && !this.menuEl.classList.contains('hidden')) {
         this.menuEl.classList.add('hidden');
-        this.handleMenuAction(action);
-      });
+        if (!this.isDragging && ipcRenderer) {
+          ipcRenderer.send('pet:set-ignore-mouse-events', true);
+        }
+      }
     });
+
+    if (this.menuEl) {
+      this.menuEl.querySelectorAll('.menu-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const action = item.dataset.action;
+          this.menuEl.classList.add('hidden');
+          this.handleMenuAction(action);
+        });
+      });
+    }
   }
 
   handleClick() {
@@ -296,14 +460,14 @@ class FaceBotController {
       return;
     }
 
-    this.setEmotion('surprised');
+    this.setEmotion('surprised', 300);
     setTimeout(() => {
       this.setEmotion('happy', 2000);
     }, 300);
 
     if (window.soundEffects) window.soundEffects.playChirp();
     if (ipcRenderer) {
-      ipcRenderer.send('panel:toggle');
+      ipcRenderer.send('pet:clicked');
     }
   }
 
@@ -318,7 +482,6 @@ class FaceBotController {
 
   handleMenuAction(action) {
     if (!ipcRenderer) return;
-
     switch (action) {
       case 'panel':
         ipcRenderer.send('panel:open', { tab: 'chat' });
@@ -345,27 +508,33 @@ class FaceBotController {
   setupIPC() {
     if (!ipcRenderer) return;
 
-    // Cursor tracking
-    ipcRenderer.on('pet:global-cursor', (e, { normX, normY }) => {
-      if (this.currentEmotion === 'sleeping') return;
+    // 1. Global Cursor Coordinate Updates (handles both channel names)
+    const handleCursorUpdate = ({ normX, normY }) => {
+      if (this.isSleeping) return;
 
-      const maxEyeRange = 6.5;
+      const hasGlasses = Boolean(this.pet.config && this.pet.config.glassesEnabled);
+      const limit = hasGlasses ? 3.0 : 5.5;
+      const eyeMax = limit * (this.pet.config.eyeSize || 1.0);
       this.targetEyeOffset = {
-        x: normX * maxEyeRange,
-        y: normY * maxEyeRange
+        x: normX * eyeMax,
+        y: normY * eyeMax
       };
 
-      const maxTilt = 10;
       this.targetTilt = {
-        x: -normY * maxTilt,
-        y: normX * maxTilt
+        x: -normY * 9,
+        y: normX * 11
       };
-    });
 
-    // Emotion and state triggers
-    ipcRenderer.on('pet:set-state', (e, data) => {
-      const state = typeof data === 'string' ? data : data.state;
-      const duration = (typeof data === 'object' && data.duration) ? data.duration : 0;
+      this.requestMotionUpdate();
+    };
+
+    ipcRenderer.on('pet:global-cursor', (event, data) => handleCursorUpdate(data));
+    ipcRenderer.on('pet:cursor-pos', (event, data) => handleCursorUpdate(data));
+
+    // 2. Emotion and state triggers (handles both string and { state, duration })
+    ipcRenderer.on('pet:set-state', (event, data) => {
+      const state = typeof data === 'string' ? data : (data?.state || 'neutral');
+      const duration = (typeof data === 'object' && data?.duration) ? data.duration : 0;
 
       if (state === 'sleeping' || state === 'sleepy') {
         this.setBaseEmotion(state);
@@ -374,26 +543,40 @@ class FaceBotController {
       }
     });
 
-    ipcRenderer.on('pet:play-sound', (e, soundName) => {
-      if (!window.soundEffects) return;
-      if (soundName === 'happy') window.soundEffects.playHappy();
-      else if (soundName === 'tap') window.soundEffects.playTap();
-      else window.soundEffects.playChirp();
+    ipcRenderer.on('pet:set-emotion', (event, emotion, duration = 3000) => {
+      this.setEmotion(emotion, duration);
     });
 
-    ipcRenderer.on('pet:apply-appearance', (e, appearance) => {
-      this.pet.updateConfig(appearance);
+    // 3. Embedded Speech Bubble
+    ipcRenderer.on('pet:show-bubble', (event, data) => {
+      if (data) this.showBubble(data);
+    });
+
+    ipcRenderer.on('pet:hide-bubble', () => {
+      this.hideBubble();
+    });
+
+    // 4. Real-time Appearance Updates
+    ipcRenderer.on('pet:apply-appearance', (event, config) => {
+      this.pet.updateConfig(config);
       this.render();
     });
 
-    ipcRenderer.on('pet:update-accent', (e, color) => {
-      if (window.ThemeManager) {
-        window.ThemeManager.applyAccentColor(document, color);
-      }
+    ipcRenderer.on('pet:update-accent', (event, color) => {
+      document.documentElement.style.setProperty('--accent', color);
+      document.documentElement.style.setProperty('--accent-glow', `color-mix(in srgb, ${color} 75%, transparent)`);
+      document.documentElement.style.setProperty('--accent-border', `color-mix(in srgb, ${color} 32%, transparent)`);
+      this.pet.updateConfig({ primaryColor: color, primaryGlow: color });
+      this.render();
+    });
+
+    ipcRenderer.on('pet:update-glasses', (event, enabled) => {
+      this.pet.updateConfig({ glassesEnabled: !!enabled });
+      this.render();
     });
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  window.faceBotController = new FaceBotController();
+window.addEventListener('DOMContentLoaded', () => {
+  window.petController = new FaceBotController();
 });

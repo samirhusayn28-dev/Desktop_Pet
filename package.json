@@ -1,11 +1,13 @@
 {
   "name": "desktop-pet",
   "productName": "Desktop Pet",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Desktop Pet – Minimal 3D Face-Bot Companion",
   "main": "main/index.js",
   "scripts": {
     "start": "electron .",
+    "selftest": "electron . --selftest",
+    "test:selftest": "electron . --selftest",
     "preview": "electron scripts/capture_preview.js",
     "preview:emotions": "electron facebot_preview.html",
     "verify": "electron scripts/verify_real_desktop_pet.js",
@@ -19,6 +21,18 @@
     "productName": "Desktop Pet",
     "mac": {
       "icon": "assets/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "Desktop-Pet-${version}-mac-x64.${ext}",
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "Desktop Pet needs Automation permissions to detect current browser tabs, media playback, and active applications for context awareness.",
+        "NSScreenCaptureUsageDescription": "Desktop Pet needs Screen Recording permissions to sense display brightness, full-screen apps, and active windows.",
+        "NSAccessibilityUsageDescription": "Desktop Pet needs Accessibility permissions to detect active window titles and system interactions."
+      },
       "target": [
         {
           "target": "dmg",
@@ -32,12 +46,11 @@
             "x64"
           ]
         }
-      ],
-      "category": "public.app-category.developer-tools",
-      "identity": null
+      ]
     },
     "dmg": {
       "title": "Desktop Pet",
+      "artifactName": "Desktop-Pet-${version}-mac-x64.dmg",
       "contents": [
         {
           "x": 130,
@@ -53,6 +66,7 @@
     },
     "win": {
       "icon": "assets/icon.png",
+      "artifactName": "Desktop-Pet-${version}-win-x64.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -64,10 +78,15 @@
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "Desktop-Pet-${version}-win-x64.exe"
     },
+    "asarUnpack": [
+      "audio/**/*"
+    ],
     "files": [
       "assets/**/*",
       "audio/**/*",
@@ -76,6 +95,7 @@
       "main/**/*",
       "panel-window/**/*",
       "pet-window/**/*",
+      "welcome-window/**/*",
       "themes/**/*",
       "node_modules/lucide/**/*",
       "node_modules/systeminformation/**/*",

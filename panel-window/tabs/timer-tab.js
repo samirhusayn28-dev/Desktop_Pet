@@ -1,28 +1,26 @@
 /**
  * Desktop Pet — Timer & Pomodoro Tab Controller
- * Pomodoro focus session syncs with pet's 'working' state
+ * Pomodoro focus session syncs with pet's 'focus' state
+ * Supports: Pomodoro (25m), Short Break (5m), Long Break (15m), Countdown, Stopwatch
+ * Natural user-name speech bubbles and pet emotional reactions
  */
 
 class TimerTab {
   constructor() {
-    this.displayEl = document.getElementById('timer-time-display');
-    this.sublabelEl = document.getElementById('timer-sublabel');
-    this.progressRingEl = document.getElementById('timer-progress-ring');
-    this.toggleBtn = document.getElementById('btn-timer-toggle');
+    this.displayEl = document.getElementById('timer-time-display') || document.getElementById('timer-display-digits');
+    this.sublabelEl = document.getElementById('timer-sublabel') || document.getElementById('timer-state-label');
+    this.toggleBtn = document.getElementById('btn-timer-toggle') || document.getElementById('btn-timer-start');
     this.resetBtn = document.getElementById('btn-timer-reset');
     this.pomodoroCountEl = document.getElementById('pomodoro-count');
     this.petStatusEl = document.getElementById('timer-pet-status');
 
-    this.mode = 'pomodoro'; // 'pomodoro' | 'countdown' | 'stopwatch'
+    this.mode = 'pomodoro'; // 'pomodoro' | 'short-break' | 'long-break' | 'countdown' | 'stopwatch'
     this.isBreak = false;
     this.isRunning = false;
     this.totalSeconds = 25 * 60;
     this.remainingSeconds = 25 * 60;
     this.timerInterval = null;
     this.completedSessions = 0;
-
-    // Circumference of r=72 circle is 2 * PI * 72 ~= 452.39
-    this.ringCircumference = 452.39;
 
     this.init();
   }
@@ -38,11 +36,16 @@ class TimerTab {
         document.querySelectorAll('.timer-mode-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         this.switchMode(btn.dataset.mode);
+        if (window.soundEffects) window.soundEffects.playTap();
       });
     });
 
-    this.toggleBtn.addEventListener('click', () => this.toggle());
-    this.resetBtn.addEventListener('click', () => this.reset());
+    if (this.toggleBtn) {
+      this.toggleBtn.addEventListener('click', () => this.toggle());
+    }
+    if (this.resetBtn) {
+      this.resetBtn.addEventListener('click', () => this.reset());
+    }
   }
 
   switchMode(mode) {
@@ -52,19 +55,45 @@ class TimerTab {
       this.isBreak = false;
       this.totalSeconds = 25 * 60;
       this.remainingSeconds = 25 * 60;
-      this.sublabelEl.textContent = 'Focus Session';
-      this.toggleBtn.textContent = 'Start Focus';
+      if (this.sublabelEl) this.sublabelEl.textContent = 'FOCUS SESSION';
+      this.setToggleText('Start Focus');
+    } else if (mode === 'short-break') {
+      this.isBreak = true;
+      this.totalSeconds = 5 * 60;
+      this.remainingSeconds = 5 * 60;
+      if (this.sublabelEl) this.sublabelEl.textContent = 'SHORT BREAK';
+      this.setToggleText('Start Break');
+    } else if (mode === 'long-break') {
+      this.isBreak = true;
+      this.totalSeconds = 15 * 60;
+      this.remainingSeconds = 15 * 60;
+      if (this.sublabelEl) this.sublabelEl.textContent = 'LONG BREAK';
+      this.setToggleText('Start Break');
     } else if (mode === 'countdown') {
       this.totalSeconds = 10 * 60;
       this.remainingSeconds = 10 * 60;
-      this.sublabelEl.textContent = 'Countdown';
-      this.toggleBtn.textContent = 'Start Timer';
+      if (this.sublabelEl) this.sublabelEl.textContent = 'COUNTDOWN';
+      this.setToggleText('Start Timer');
     } else if (mode === 'stopwatch') {
       this.remainingSeconds = 0;
-      this.sublabelEl.textContent = 'Stopwatch';
-      this.toggleBtn.textContent = 'Start';
+      this.totalSeconds = 0;
+      if (this.sublabelEl) this.sublabelEl.textContent = 'STOPWATCH';
+      this.setToggleText('Start');
     }
     this.updateDisplay();
+  }
+
+  setToggleText(text) {
+    if (!this.toggleBtn) return;
+    const span = this.toggleBtn.querySelector('span') || this.toggleBtn;
+    span.textContent = text;
+    const icon = this.toggleBtn.querySelector('i');
+    if (icon) {
+      icon.setAttribute('data-lucide', this.isRunning ? 'pause' : 'play');
+      if (window.panelController && typeof window.panelController.refreshIcons === 'function') {
+        window.panelController.refreshIcons();
+      }
+    }
   }
 
   toggle() {
@@ -73,18 +102,20 @@ class TimerTab {
     } else {
       this.start();
     }
+    if (window.soundEffects) window.soundEffects.playTap();
   }
 
   start() {
     if (this.isRunning) return;
     this.isRunning = true;
-    this.toggleBtn.textContent = 'Pause';
+    this.setToggleText('Pause');
+
+    const name = (window.panelController && window.panelController.store ? window.panelController.store.get('settings.general.userName') : '') || '';
 
     if (this.mode === 'pomodoro' && !this.isBreak) {
-      // Put pet into 'focus' state with determined eyes
       window.panelController.notifyPet('pet:set-state', { state: 'focus' });
-      window.panelController.notifyPet('pet:show-bubble', { text: "Focus mode ON! Happy coding!", duration: 3500 });
-      this.petStatusEl.textContent = 'Focused';
+      const focusMsg = name ? `Focus mode ON, ${name}! Happy coding!` : 'Focus mode ON! Happy coding!';
+      window.panelController.notifyPet('pet:show-bubble', { text: focusMsg, duration: 3500, emotion: 'focus', badge: 'FOCUS' });
     }
 
     this.timerInterval = setInterval(() => {
@@ -102,11 +133,11 @@ class TimerTab {
 
   pause() {
     this.isRunning = false;
-    this.toggleBtn.textContent = this.mode === 'pomodoro' ? (this.isBreak ? 'Resume Break' : 'Resume Focus') : 'Resume';
+    const resumeLabel = this.mode === 'pomodoro' ? (this.isBreak ? 'Resume Break' : 'Resume Focus') : 'Resume';
+    this.setToggleText(resumeLabel);
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.mode === 'pomodoro' && !this.isBreak) {
       window.panelController.notifyPet('pet:set-state', { state: 'neutral' });
-      this.petStatusEl.textContent = 'Normal';
     }
   }
 
@@ -116,64 +147,88 @@ class TimerTab {
       this.isBreak = false;
       this.totalSeconds = 25 * 60;
       this.remainingSeconds = 25 * 60;
-      this.sublabelEl.textContent = 'Focus Session';
-      this.toggleBtn.textContent = 'Start Focus';
+      this.setToggleText('Start Focus');
+      if (this.sublabelEl) this.sublabelEl.textContent = 'FOCUS SESSION';
+    } else if (this.mode === 'short-break') {
+      this.totalSeconds = 5 * 60;
+      this.remainingSeconds = 5 * 60;
+      this.setToggleText('Start Break');
+      if (this.sublabelEl) this.sublabelEl.textContent = 'SHORT BREAK';
+    } else if (this.mode === 'long-break') {
+      this.totalSeconds = 15 * 60;
+      this.remainingSeconds = 15 * 60;
+      this.setToggleText('Start Break');
+      if (this.sublabelEl) this.sublabelEl.textContent = 'LONG BREAK';
     } else if (this.mode === 'countdown') {
       this.totalSeconds = 10 * 60;
       this.remainingSeconds = 10 * 60;
-      this.toggleBtn.textContent = 'Start Timer';
+      this.setToggleText('Start Timer');
+      if (this.sublabelEl) this.sublabelEl.textContent = 'COUNTDOWN';
     } else if (this.mode === 'stopwatch') {
       this.remainingSeconds = 0;
-      this.toggleBtn.textContent = 'Start';
+      this.setToggleText('Start');
+      if (this.sublabelEl) this.sublabelEl.textContent = 'STOPWATCH';
     }
     this.updateDisplay();
+    if (window.soundEffects) window.soundEffects.playTap();
   }
 
   handleFinish() {
     this.pause();
     if (window.soundEffects) window.soundEffects.playAlarm();
 
+    const name = (window.panelController && window.panelController.store ? window.panelController.store.get('settings.general.userName') : '') || '';
+
     if (this.mode === 'pomodoro') {
       if (!this.isBreak) {
         this.completedSessions++;
-        this.pomodoroCountEl.textContent = this.completedSessions;
+        if (this.pomodoroCountEl) this.pomodoroCountEl.textContent = this.completedSessions;
         this.isBreak = true;
         this.totalSeconds = 5 * 60;
         this.remainingSeconds = 5 * 60;
-        this.sublabelEl.textContent = 'Break Time';
-        this.toggleBtn.textContent = 'Start Break';
+        if (this.sublabelEl) this.sublabelEl.textContent = 'SHORT BREAK';
+        this.setToggleText('Start Break');
 
         // Pet celebrates with laugh!
         window.panelController.notifyPet('pet:set-state', { state: 'laugh', duration: 5000 });
-        window.panelController.notifyPet('pet:show-bubble', { text: "Focus block done! Take a 5 min break", duration: 5000 });
+        const breakMsg = name ? `Great focus session, ${name}! Time for a 5-min break.` : 'Focus block done! Take a 5-min break.';
+        window.panelController.notifyPet('pet:show-bubble', { badge: 'POMODORO COMPLETE', text: breakMsg, duration: 6000, sound: 'alarm', emotion: 'laugh' });
       } else {
         this.isBreak = false;
         this.totalSeconds = 25 * 60;
         this.remainingSeconds = 25 * 60;
-        this.sublabelEl.textContent = 'Focus Session';
-        this.toggleBtn.textContent = 'Start Focus';
+        if (this.sublabelEl) this.sublabelEl.textContent = 'FOCUS SESSION';
+        this.setToggleText('Start Focus');
 
         window.panelController.notifyPet('pet:set-state', { state: 'happy', duration: 3500 });
-        window.panelController.notifyPet('pet:show-bubble', { text: "Break is over! Ready for the next sprint?", duration: 4000 });
+        const resumeMsg = name ? `Break is over, ${name}! Ready for the next sprint?` : 'Break is over! Ready for the next sprint?';
+        window.panelController.notifyPet('pet:show-bubble', { badge: 'BREAK FINISHED', text: resumeMsg, duration: 5000, sound: 'chirp', emotion: 'happy' });
       }
     } else {
       window.panelController.notifyPet('pet:set-state', { state: 'laugh', duration: 4000 });
-      window.panelController.notifyPet('pet:show-bubble', { text: "Timer finished!", duration: 4000 });
+      const finishMsg = name ? `Timer finished, ${name}!` : 'Timer finished!';
+      window.panelController.notifyPet('pet:show-bubble', { badge: 'TIMER DONE', text: finishMsg, duration: 5000, sound: 'alarm', emotion: 'laugh' });
     }
   }
 
+
   updateDisplay() {
+    if (!this.displayEl) return;
     const mins = Math.floor(Math.abs(this.remainingSeconds) / 60);
     const secs = Math.abs(this.remainingSeconds) % 60;
     this.displayEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
-    // Ring progress calculation
-    if (this.mode === 'stopwatch') {
-      this.progressRingEl.style.strokeDashoffset = 0;
-    } else {
-      const fraction = this.remainingSeconds / this.totalSeconds;
-      const offset = this.ringCircumference * (1 - fraction);
-      this.progressRingEl.style.strokeDashoffset = offset;
+    // Drive circular SVG ring (stroke-dasharray=553 for r=88)
+    const ring = document.getElementById('timer-ring-progress');
+    if (ring) {
+      const CIRC = 553;
+      let frac = 0;
+      if (this.mode === 'stopwatch') {
+        frac = Math.min(1, this.remainingSeconds / (30 * 60));
+      } else if (this.totalSeconds > 0) {
+        frac = Math.max(0, this.remainingSeconds / this.totalSeconds);
+      }
+      ring.style.strokeDashoffset = (CIRC * (1 - frac)).toFixed(2);
     }
   }
 }

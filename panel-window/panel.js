@@ -87,10 +87,10 @@ class PanelController {
   }
 
   applyPetName(name) {
-    const finalName = name || this.store.get('settings.general.petName') || 'Pet';
-    const brandTitle = document.getElementById('header-brand-title');
+    const finalName = name || this.store.get('settings.general.petName') || 'Bolt';
+    const brandTitle = document.getElementById('panel-title-text') || document.getElementById('header-brand-title');
     if (brandTitle) brandTitle.textContent = finalName;
-    const chatTitle = document.getElementById('chat-header-title');
+    const chatTitle = document.getElementById('chat-assistant-name') || document.getElementById('chat-header-title');
     if (chatTitle) chatTitle.textContent = `${finalName} Assistant`;
   }
 
@@ -133,6 +133,16 @@ class PanelController {
       this.ipcRenderer.on('panel:update-name', (event, name) => {
         this.applyPetName(name);
       });
+
+      this.ipcRenderer.on('panel:update-glasses', (event, enabled) => {
+        if (this.settingsTab) {
+          this.settingsTab.appearance.glassesEnabled = !!enabled;
+          if (this.settingsTab.glassesToggle) {
+            this.settingsTab.glassesToggle.checked = !!enabled;
+          }
+          this.settingsTab.renderLivePreview();
+        }
+      });
     }
   }
 
@@ -142,8 +152,8 @@ class PanelController {
   }
 
   setupWindowButtons() {
-    const minBtn = document.getElementById('btn-minimize-panel');
-    const closeBtn = document.getElementById('btn-close-panel');
+    const minBtn = document.getElementById('btn-win-min') || document.getElementById('btn-minimize-panel');
+    const closeBtn = document.getElementById('btn-win-close') || document.getElementById('btn-close-panel');
     const settingsBtn = document.getElementById('btn-header-settings');
 
     if (minBtn) {
@@ -268,6 +278,26 @@ class PanelController {
     this.ipcRenderer.on('panel:update-accent', (event, color) => {
       if (window.ThemeManager && window.ThemeManager.applyAccentColor) {
         window.ThemeManager.applyAccentColor(document, color);
+      }
+    });
+
+    this.ipcRenderer.on('panel:data-imported', () => {
+      if (this.settingsTab && typeof this.settingsTab.loadSettings === 'function') {
+        this.settingsTab.loadSettings();
+        this.settingsTab.updateAppearanceUI();
+        this.settingsTab.renderLivePreview();
+      }
+      if (this.notesTab && typeof this.notesTab.loadNotes === 'function') {
+        this.notesTab.loadNotes();
+      }
+      if (this.todoTab && typeof this.todoTab.loadTodos === 'function') {
+        this.todoTab.loadTodos();
+      }
+      if (this.remindersTab && typeof this.remindersTab.loadReminders === 'function') {
+        this.remindersTab.loadReminders();
+      }
+      if (this.chatTab && typeof this.chatTab.updateModelBadge === 'function') {
+        this.chatTab.updateModelBadge();
       }
     });
   }

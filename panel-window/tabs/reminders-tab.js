@@ -1,15 +1,16 @@
 /**
  * Desktop Pet — Reminders Tab Controller
- * Sets reminders with repeat options, triggers pet speech bubbles & audio alerts
+ * Sets reminders with repeat options (Once, Daily, Every Hour), snooze, editing,
+ * persistent store, audio alerts, and natural user-name speech bubbles.
  */
 
 class RemindersTab {
   constructor() {
-    this.listContainer = document.getElementById('reminders-list');
-    this.textInput = document.getElementById('reminder-text-input');
+    this.listContainer = document.getElementById('reminders-list') || document.getElementById('reminders-items-list');
+    this.textInput = document.getElementById('reminder-text-input') || document.getElementById('reminder-title-input');
     this.timeInput = document.getElementById('reminder-time-input');
     this.repeatSelect = document.getElementById('reminder-repeat-select');
-    this.saveBtn = document.getElementById('btn-save-reminder');
+    this.saveBtn = document.getElementById('btn-save-reminder') || document.getElementById('btn-add-reminder');
 
     this.reminders = [];
     this.checkInterval = null;
@@ -21,7 +22,9 @@ class RemindersTab {
     // Set default time to next hour
     const now = new Date();
     now.setHours(now.getHours() + 1);
-    this.timeInput.value = `${now.getHours().toString().padStart(2, '0')}:00`;
+    if (this.timeInput) {
+      this.timeInput.value = `${now.getHours().toString().padStart(2, '0')}:00`;
+    }
 
     this.loadReminders();
     this.setupEvents();
@@ -30,10 +33,7 @@ class RemindersTab {
 
   loadReminders() {
     if (!window.panelController) return;
-    this.reminders = window.panelController.store.get('reminders') || [
-      { id: '1', title: 'Drink water', time: '15:00', repeat: 'every-hour', enabled: true },
-      { id: '2', title: 'Stand up & stretch', time: '16:00', repeat: 'daily', enabled: true }
-    ];
+    this.reminders = window.panelController.store.get('reminders') || [];
     this.render();
   }
 
@@ -43,13 +43,21 @@ class RemindersTab {
   }
 
   setupEvents() {
-    this.saveBtn.addEventListener('click', () => this.addReminder());
+    if (this.saveBtn) {
+      this.saveBtn.addEventListener('click', () => this.addReminder());
+    }
+    if (this.textInput) {
+      this.textInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') this.addReminder();
+      });
+    }
   }
 
   addReminder() {
+    if (!this.textInput || !this.timeInput) return;
     const text = this.textInput.value.trim();
     const time = this.timeInput.value;
-    const repeat = this.repeatSelect.value;
+    const repeat = this.repeatSelect ? this.repeatSelect.value : 'once';
 
     if (!text || !time) return;
 
@@ -74,6 +82,45 @@ class RemindersTab {
       item.enabled = !item.enabled;
       this.saveReminders();
       this.render();
+      if (window.soundEffects) window.soundEffects.playTap();
+    }
+  }
+
+  snoozeReminder(id, minutes = 5) {
+    const item = this.reminders.find(r => r.id === id);
+    if (item) {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + minutes);
+      const hours = now.getHours().toString().padStart(2, '0');
+      const mins = now.getMinutes().toString().padStart(2, '0');
+      item.time = `${hours}:${mins}`;
+      item.enabled = true;
+      item.lastTriggered = null;
+      this.saveReminders();
+      this.render();
+      if (window.soundEffects) window.soundEffects.playTap();
+      window.panelController.notifyPet('pet:show-bubble', {
+        badge: 'SNOOZED',
+        text: `Snoozed "${item.title}" for ${minutes} mins (${item.time})`,
+        duration: 3500,
+        emotion: 'wink'
+      });
+    }
+  }
+
+  editReminder(id) {
+    const item = this.reminders.find(r => r.id === id);
+    if (!item) return;
+
+    const newTitle = prompt('Edit reminder title:', item.title);
+    if (newTitle !== null && newTitle.trim()) {
+      item.title = newTitle.trim();
+      const newTime = prompt('Edit reminder time (HH:MM):', item.time);
+      if (newTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(newTime.trim())) {
+        item.time = newTime.trim();
+      }
+      this.saveReminders();
+      this.render();
     }
   }
 
@@ -81,77 +128,69 @@ class RemindersTab {
     this.reminders = this.reminders.filter(r => r.id !== id);
     this.saveReminders();
     this.render();
+    if (window.soundEffects) window.soundEffects.playTap();
   }
 
   startChecker() {
+    if (this.checkInterval) clearInterval(this.checkInterval);
     this.checkInterval = setInterval(() => {
-      this.checkDueReminders();
-    }, 20000); // Check every 20 seconds
-  }
-
-  checkDueReminders() {
-    const now = new Date();
-    const currentHours = now.getHours().toString().padStart(2, '0');
-    const currentMins = now.getMinutes().toString().padStart(2, '0');
-    const currentTimeStr = `${currentHours}:${currentMins}`;
-    const todayDateStr = now.toDateString();
-
-    this.reminders.forEach(r => {
-      if (!r.enabled) return;
-
-      let isDue = false;
-      if (r.repeat === 'every-hour') {
-        const targetMin = r.time.split(':')[1];
-        if (currentMins === targetMin && r.lastTriggered !== `${todayDateStr}-${currentHours}`) {
-          isDue = true;
-          r.lastTriggered = `${todayDateStr}-${currentHours}`;
-        }
-      } else {
-        if (r.time === currentTimeStr && r.lastTriggered !== todayDateStr) {
-          isDue = true;
-          r.lastTriggered = todayDateStr;
-          if (r.repeat === 'once') {
-            r.enabled = false;
-          }
-        }
-      }
-
-      if (isDue) {
-        this.triggerAlert(r);
-      }
-    });
-
-    this.saveReminders();
-  }
-
-  triggerAlert(reminder) {
-    if (window.soundEffects) window.soundEffects.playAlarm();
-    // Pet pops out with speech bubble
-    window.panelController.notifyPet('pet:set-state', { state: 'happy', duration: 6000 });
-    window.panelController.notifyPet('pet:show-bubble', { 
-      text: `Reminder: ${reminder.title}!`, 
-      duration: 7000 
-    });
+      this.loadReminders();
+    }, 5000); // Keep UI list synced with main process scheduler
   }
 
   render() {
+    if (!this.listContainer) return;
     this.listContainer.innerHTML = '';
+
+    if (this.reminders.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'tab-empty-state';
+      empty.innerHTML = `
+        <i data-lucide="bell-off"></i>
+        <span class="empty-title">No reminders set</span>
+        <span class="empty-subtitle">Create a reminder above to stay on track!</span>
+      `;
+      this.listContainer.appendChild(empty);
+      if (window.panelController && typeof window.panelController.refreshIcons === 'function') {
+        window.panelController.refreshIcons();
+      }
+      return;
+    }
+
     this.reminders.forEach(r => {
       const item = document.createElement('div');
-      item.className = 'reminder-item';
+      item.className = `reminder-item ${r.enabled ? 'active' : 'disabled'}`;
       item.innerHTML = `
         <div class="reminder-info">
           <div class="reminder-title">${r.title}</div>
-          <div class="reminder-meta">${r.time} • ${r.repeat}</div>
+          <div class="reminder-meta">
+            <span class="reminder-time-badge mono"><i data-lucide="clock"></i> ${r.time}</span>
+            <span class="reminder-repeat-badge">${r.repeat}</span>
+          </div>
         </div>
         <div class="reminder-item-actions">
+          <button class="reminder-snooze-btn" title="Snooze 5 minutes">
+            <i data-lucide="alarm-clock"></i>
+            <span>+5m</span>
+          </button>
+          <button class="reminder-edit-btn" title="Edit reminder">
+            <i data-lucide="edit-3"></i>
+          </button>
           <input type="checkbox" class="todo-checkbox" ${r.enabled ? 'checked' : ''} title="Toggle active">
-          <button class="todo-delete-btn" title="Delete"><i data-lucide="trash-2"></i></button>
+          <button class="todo-delete-btn" title="Delete reminder"><i data-lucide="trash-2"></i></button>
         </div>
       `;
 
       item.querySelector('.todo-checkbox').addEventListener('change', () => {
         this.toggleEnabled(r.id);
+      });
+
+      item.querySelector('.reminder-snooze-btn').addEventListener('click', () => {
+        this.snoozeReminder(r.id, 5);
+      });
+
+      item.querySelector('.reminder-edit-btn').addEventListener('click', () => {
+        this.editReminder(r.id);
       });
 
       item.querySelector('.todo-delete-btn').addEventListener('click', () => {

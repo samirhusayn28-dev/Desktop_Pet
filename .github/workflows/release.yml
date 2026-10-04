@@ -9,8 +9,47 @@ permissions:
   contents: write
 
 jobs:
+  smoke-test-mac:
+    name: Smoke Test (macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Self-Test
+        run: npx electron . --selftest
+
+  smoke-test-windows:
+    name: Smoke Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Self-Test
+        run: npx electron . --selftest
+
   build-mac:
     name: Build macOS Intel DMG (x64)
+    needs: [smoke-test-mac, smoke-test-windows]
     runs-on: macos-latest
     steps:
       - name: Checkout repository
@@ -37,6 +76,7 @@ jobs:
 
   build-windows:
     name: Build Windows x64 NSIS EXE
+    needs: [smoke-test-mac, smoke-test-windows]
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -84,8 +124,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release-files/*
+          body_path: CHANGELOG.md
           draft: false
           prerelease: false
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -21,6 +21,9 @@ class ThemeManager {
     root.style.setProperty('--accent-strong', `color-mix(in srgb, ${cleanHex} 32%, transparent)`);
     root.style.setProperty('--accent-light', `color-mix(in srgb, ${cleanHex} 70%, white)`);
     root.style.setProperty('--accent-border', `color-mix(in srgb, ${cleanHex} 32%, transparent)`);
+    root.style.setProperty('--accent-focus', `color-mix(in srgb, ${cleanHex} 40%, transparent)`);
+    root.style.setProperty('--accent-scrollbar', `color-mix(in srgb, ${cleanHex} 45%, transparent)`);
+    root.style.setProperty('--accent-scrollbar-hover', `color-mix(in srgb, ${cleanHex} 80%, transparent)`);
 
     // Backwards-compatible mappings to cover every existing selector
     root.style.setProperty('--theme-primary', cleanHex);

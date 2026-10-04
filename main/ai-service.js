@@ -9,13 +9,117 @@ const http = require('http');
 const { URL } = require('url');
 const store = require('./secure-store');
 
+/**
+ * Stateful stream filter that strips <think>...</think> blocks across chunk boundaries,
+ * ensuring raw internal reasoning is never exposed to the user.
+ */
+class ThinkingFilter {
+  constructor() {
+    this.inThink = false;
+    this.buffer = '';
+  }
+
+  process(chunk) {
+    if (!chunk) return '';
+    this.buffer += chunk;
+    let output = '';
+
+    while (this.buffer.length > 0) {
+      if (!this.inThink) {
+        const lower = this.buffer.toLowerCase();
+        const startIdx = lower.indexOf('<think>');
+        if (startIdx !== -1) {
+          output += this.buffer.slice(0, startIdx);
+          this.buffer = this.buffer.slice(startIdx + 7);
+          this.inThink = true;
+          continue;
+        }
+
+        // Check if buffer ends with a partial "<think>" prefix
+        let prefixFound = false;
+        const target = '<think>';
+        for (let len = Math.min(lower.length, target.length - 1); len >= 1; len--) {
+          const tail = lower.slice(-len);
+          if (target.startsWith(tail)) {
+            output += this.buffer.slice(0, -len);
+            this.buffer = this.buffer.slice(-len);
+            prefixFound = true;
+            break;
+          }
+        }
+
+        if (!prefixFound) {
+          output += this.buffer;
+          this.buffer = '';
+        }
+        break;
+      } else {
+        // Discard reasoning until </think>
+        const lower = this.buffer.toLowerCase();
+        const endIdx = lower.indexOf('</think>');
+        if (endIdx !== -1) {
+          this.buffer = this.buffer.slice(endIdx + 8);
+          this.inThink = false;
+          continue;
+        }
+
+        // Check if buffer ends with a partial "</think>" prefix
+        let prefixFound = false;
+        const target = '</think>';
+        for (let len = Math.min(lower.length, target.length - 1); len >= 1; len--) {
+          const tail = lower.slice(-len);
+          if (target.startsWith(tail)) {
+            this.buffer = this.buffer.slice(-len);
+            prefixFound = true;
+            break;
+          }
+        }
+
+        if (!prefixFound) {
+          this.buffer = '';
+        }
+        break;
+      }
+    }
+
+    return output;
+  }
+
+  flush() {
+    let output = '';
+    if (!this.inThink) {
+      output += this.buffer;
+    }
+    this.buffer = '';
+    this.inThink = false;
+    return output;
+  }
+}
+
 class AIService {
   constructor() {
     this.activeStreams = new Map(); // id -> AbortController
   }
 
   /**
-   * Universal error mapper converting HTTP / API errors into human-friendly explanations
+   * Identifies specialized, regional, embedding, audio, speech, vision-only, or moderation models
+   * that MUST be excluded from auto-selection/defaults and placed in non-chat group.
+   */
+  isNonChatModel(id) {
+    if (!id) return true;
+    const s = String(id).toLowerCase();
+    const excludePatterns = [
+      'tts', 'orpheus', 'whisper', 'speech', 'audio', 'transcribe',
+      'realtime', 'guard', 'safeguard', 'moderation', 'embed', 'rerank',
+      'allam', 'arabic', 'saudi', 'image', 'dall-e', 'imagen', 'veo',
+      'bilingual', 'clip', 'vision-preview', 'vl-', 'embedding', 'distil-whisper',
+      'text-embedding', 'deepseek-vl', 'qwen-vl', 'ocr'
+    ];
+    return excludePatterns.some(pattern => s.includes(pattern));
+  }
+
+  /**
+   * Universal error mapper converting HTTP / API errors into truthful, human-friendly explanations
    */
   mapFriendlyError(err, status = 0) {
     let rawText = '';
@@ -44,13 +148,21 @@ class AIService {
     let friendly = '';
 
     if (
+      lower.includes('model_terms_required') ||
+      lower.includes('requires terms acceptance') ||
+      lower.includes('terms of service') ||
+      lower.includes('accept the terms')
+    ) {
+      friendly = 'Requires terms acceptance. Please accept the terms in your provider console.';
+    } else if (
       code === 401 ||
       code === 403 ||
       lower.includes('invalid api key') ||
       lower.includes('api_key_invalid') ||
       lower.includes('unauthorized') ||
       lower.includes('authentication') ||
-      lower.includes('permission_denied')
+      lower.includes('permission_denied') ||
+      lower.includes('forbidden')
     ) {
       friendly = 'Invalid API key. Please check your credentials in Settings -> AI Provider.';
     } else if (
@@ -73,9 +185,10 @@ class AIService {
       code === 404 ||
       lower.includes('not found') ||
       lower.includes('does not exist') ||
-      lower.includes('model_not_found')
+      lower.includes('model_not_found') ||
+      lower.includes('not supported')
     ) {
-      friendly = 'Model not found. Please refresh the model list in Settings -> AI Provider.';
+      friendly = 'Model not found or not supported. Please refresh the model list in Settings -> AI Provider.';
     } else if (code === 503 || lower.includes('overloaded') || lower.includes('service unavailable')) {
       friendly = 'Provider servers are temporarily busy. Please wait a moment.';
     } else if (
@@ -83,7 +196,8 @@ class AIService {
       lower.includes('enotfound') ||
       lower.includes('offline') ||
       lower.includes('no internet') ||
-      lower.includes('fetch failed')
+      lower.includes('fetch failed') ||
+      lower.includes('network')
     ) {
       friendly = 'No internet connection or provider endpoint unreachable.';
     } else if (lower.includes('abort') || lower.includes('cancelled')) {
@@ -174,7 +288,113 @@ class AIService {
   }
 
   /**
-   * Fetch dynamic model list per provider
+   * Chooses the highest priority general-purpose chat model from an available list
+   * Groq: llama versatile/instant, gpt-oss, qwen, kimi;
+   * OpenAI: newest gpt mini;
+   * Gemini: newest flash;
+   * DeepSeek: chat;
+   * Qwen: plus/turbo/max;
+   * OpenRouter: first sensible chat model;
+   * else first remaining chat model.
+   */
+  getPriorityDefaultModel(provider, availableModels = []) {
+    const modelIds = availableModels.map(m => (typeof m === 'string' ? m : m.id));
+    const eligible = modelIds.filter(id => !this.isNonChatModel(id));
+
+    if (provider === 'groq') {
+      const match =
+        eligible.find(id => /llama-3\.[1-9]-.*versatile/i.test(id)) ||
+        eligible.find(id => /llama-3\.[1-9]-.*instant/i.test(id)) ||
+        eligible.find(id => /llama-3.*versatile/i.test(id)) ||
+        eligible.find(id => /llama-3.*instant/i.test(id)) ||
+        eligible.find(id => /gpt-oss/i.test(id)) ||
+        eligible.find(id => /qwen/i.test(id)) ||
+        eligible.find(id => /kimi/i.test(id)) ||
+        eligible.find(id => /llama/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'llama-3.3-70b-versatile';
+    }
+
+    if (provider === 'openai') {
+      const match =
+        eligible.find(id => /^gpt-4o-mini/i.test(id)) ||
+        eligible.find(id => /mini/i.test(id)) ||
+        eligible.find(id => /^gpt-4o/i.test(id)) ||
+        eligible.find(id => /^gpt-4/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'gpt-4o-mini';
+    }
+
+    if (provider === 'gemini') {
+      const match =
+        eligible.find(id => /gemini-2\.5-flash/i.test(id)) ||
+        eligible.find(id => /gemini-2\.0-flash/i.test(id)) ||
+        eligible.find(id => /gemini-2\.0-flash-lite/i.test(id)) ||
+        eligible.find(id => /gemini-1\.5-flash/i.test(id)) ||
+        eligible.find(id => /flash/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'gemini-2.0-flash-lite';
+    }
+
+    if (provider === 'deepseek') {
+      const match =
+        eligible.find(id => /deepseek-chat/i.test(id)) ||
+        eligible.find(id => /chat/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'deepseek-chat';
+    }
+
+    if (provider === 'qwen') {
+      const match =
+        eligible.find(id => /qwen-plus/i.test(id)) ||
+        eligible.find(id => /qwen-turbo/i.test(id)) ||
+        eligible.find(id => /qwen-max/i.test(id)) ||
+        eligible.find(id => /qwen/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'qwen-plus';
+    }
+
+    if (provider === 'openrouter') {
+      const match =
+        eligible.find(id => /llama-3\.[1-9]/i.test(id)) ||
+        eligible.find(id => /claude-3-5/i.test(id)) ||
+        eligible.find(id => /gpt-4o/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'meta-llama/llama-3.3-70b-instruct';
+    }
+
+    if (provider === 'anthropic') {
+      const match =
+        eligible.find(id => /claude-3-5-sonnet/i.test(id)) ||
+        eligible.find(id => /claude-3-5-haiku/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'claude-3-5-sonnet-20241022';
+    }
+
+    if (provider === 'ollama') {
+      const match =
+        eligible.find(id => /llama3\.[1-9]/i.test(id)) ||
+        eligible.find(id => /llama3/i.test(id)) ||
+        eligible.find(id => /mistral/i.test(id)) ||
+        eligible.find(id => /qwen/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'llama3:latest';
+    }
+
+    if (eligible.length > 0) return eligible[0];
+    return modelIds[0] || 'default';
+  }
+
+  /**
+   * Fetch dynamic model list per provider with chat/non-chat classification
    */
   async fetchModels(provider, apiKey, baseUrl) {
     apiKey = (apiKey || store.getApiKey(provider) || '').trim();
@@ -196,14 +416,19 @@ class AIService {
           .map(m => {
             const rawName = m.name || '';
             const cleanId = rawName.replace(/^models\//, '');
+            const isChat = !this.isNonChatModel(cleanId);
             return {
               id: cleanId,
               name: m.displayName || cleanId,
+              isChat,
               isFlash: cleanId.toLowerCase().includes('flash')
             };
           });
 
-        list.sort((a, b) => (b.isFlash ? 1 : 0) - (a.isFlash ? 1 : 0));
+        list.sort((a, b) => {
+          if (a.isChat !== b.isChat) return a.isChat ? -1 : 1;
+          return (b.isFlash ? 1 : 0) - (a.isFlash ? 1 : 0);
+        });
         return list;
       }
 
@@ -217,16 +442,28 @@ class AIService {
           }
         });
         const data = JSON.parse(res.body);
-        return (data.data || [])
-          .filter(m => !m.id.includes('whisper'))
-          .map(m => ({ id: m.id, name: m.id }));
+        const list = (data.data || []).map(m => ({
+          id: m.id,
+          name: m.id,
+          isChat: !this.isNonChatModel(m.id)
+        }));
+
+        list.sort((a, b) => {
+          if (a.isChat !== b.isChat) return a.isChat ? -1 : 1;
+          const aLlama = a.id.includes('llama-3.3') || a.id.includes('llama-3.1');
+          const bLlama = b.id.includes('llama-3.3') || b.id.includes('llama-3.1');
+          if (aLlama !== bLlama) return bLlama ? 1 : -1;
+          return a.id.localeCompare(b.id);
+        });
+
+        return list;
       }
 
       if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'qwen' || provider === 'custom') {
         let defaultBase = 'https://api.openai.com/v1';
         if (provider === 'deepseek') defaultBase = 'https://api.deepseek.com/v1';
         if (provider === 'openrouter') defaultBase = 'https://openrouter.ai/api/v1';
-        if (provider === 'qwen') defaultBase = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+        if (provider === 'qwen') defaultBase = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
 
         const root = (baseUrl || defaultBase).replace(/\/+$/, '');
         const headers = { 'User-Agent': 'Desktop-Pet/1.0' };
@@ -234,25 +471,40 @@ class AIService {
 
         const res = await this.makeRequest(`${root}/models`, { method: 'GET', headers });
         const data = JSON.parse(res.body);
-        return (data.data || []).map(m => ({ id: m.id, name: m.id }));
+        const list = (data.data || []).map(m => ({
+          id: m.id,
+          name: m.id,
+          isChat: !this.isNonChatModel(m.id)
+        }));
+
+        list.sort((a, b) => {
+          if (a.isChat !== b.isChat) return a.isChat ? -1 : 1;
+          return a.id.localeCompare(b.id);
+        });
+
+        return list;
       }
 
       if (provider === 'ollama') {
         const root = (baseUrl || 'http://localhost:11434').replace(/\/+$/, '');
         const res = await this.makeRequest(`${root}/api/tags`, { method: 'GET' });
         const data = JSON.parse(res.body);
-        return (data.models || []).map(m => ({ id: m.name, name: m.name }));
+        return (data.models || []).map(m => ({
+          id: m.name,
+          name: m.name,
+          isChat: !this.isNonChatModel(m.name)
+        }));
       }
 
       if (provider === 'anthropic') {
         return [
-          { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Recommended)' },
-          { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' },
-          { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' }
+          { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Recommended)', isChat: true },
+          { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', isChat: true },
+          { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', isChat: true }
         ];
       }
 
-      return [{ id: 'default', name: 'Default Model' }];
+      return [{ id: 'default', name: 'Default Model', isChat: true }];
     } catch (err) {
       console.warn(`[AIService] Failed to fetch dynamic models for ${provider}:`, err.message);
       throw err;
@@ -261,7 +513,7 @@ class AIService {
 
   /**
    * "Test connection" button per provider:
-   * Sends tiny 3-token prompt and returns clear PASS/FAIL with short human-readable message.
+   * Uses the selected model and returns true result (PASS/FAIL with truthful message).
    */
   async testConnection(provider, apiKey, model, baseUrl) {
     apiKey = (apiKey || store.getApiKey(provider) || '').trim();
@@ -275,12 +527,18 @@ class AIService {
         };
       }
 
+      // Use selected model, or fallback to priority default chat model
+      let activeModel = model || store.get(`settings.ai.models.${provider}`);
+      if (!activeModel || this.isNonChatModel(activeModel)) {
+        activeModel = this.getPriorityDefaultModel(provider);
+      }
+
       // 1. Google Gemini Test
       if (provider === 'gemini') {
         const root = (baseUrl || 'https://generativelanguage.googleapis.com').replace(/\/+$/, '');
-        let activeModel = (model || 'gemini-1.5-flash').replace(/^models\//, '');
+        let cleanModel = activeModel.replace(/^models\//, '');
 
-        const url = `${root}/v1beta/models/${encodeURIComponent(activeModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const url = `${root}/v1beta/models/${encodeURIComponent(cleanModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
         const payload = JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
           generationConfig: { maxOutputTokens: 3 }
@@ -293,7 +551,7 @@ class AIService {
 
         return {
           success: true,
-          friendly: `Connection successful! ${activeModel} is active and ready.`,
+          friendly: `Connection successful! ${cleanModel} is active and ready.`,
           details: 'OK 200'
         };
       }
@@ -301,7 +559,6 @@ class AIService {
       // 2. Groq Test
       if (provider === 'groq') {
         const root = (baseUrl || 'https://api.groq.com/openai/v1').replace(/\/+$/, '');
-        const activeModel = model || 'llama-3.3-70b-versatile';
 
         const payload = JSON.stringify({
           model: activeModel,
@@ -325,15 +582,14 @@ class AIService {
         };
       }
 
-      // 3. OpenAI / Compatible Test
+      // 3. OpenAI / Compatible Test (OpenAI, DeepSeek, Qwen, OpenRouter, Custom)
       if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'qwen' || provider === 'custom') {
         let defaultBase = 'https://api.openai.com/v1';
         if (provider === 'deepseek') defaultBase = 'https://api.deepseek.com/v1';
         if (provider === 'openrouter') defaultBase = 'https://openrouter.ai/api/v1';
-        if (provider === 'qwen') defaultBase = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+        if (provider === 'qwen') defaultBase = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
 
         const root = (baseUrl || defaultBase).replace(/\/+$/, '');
-        const activeModel = model || (provider === 'openai' ? 'gpt-4o-mini' : 'default');
 
         const payload = JSON.stringify({
           model: activeModel,
@@ -360,7 +616,6 @@ class AIService {
       // 4. Anthropic Test
       if (provider === 'anthropic') {
         const root = (baseUrl || 'https://api.anthropic.com/v1').replace(/\/+$/, '');
-        const activeModel = model || 'claude-3-5-sonnet-20241022';
 
         const payload = JSON.stringify({
           model: activeModel,
@@ -387,7 +642,6 @@ class AIService {
       // 5. Ollama Test
       if (provider === 'ollama') {
         const root = (baseUrl || 'http://localhost:11434').replace(/\/+$/, '');
-        const activeModel = model || 'llama3:latest';
 
         const payload = JSON.stringify({
           model: activeModel,
@@ -424,8 +678,11 @@ class AIService {
 
   /**
    * Main streaming chat method executed in main process
-   * If streaming fails, automatically retries once without streaming.
-   * Handles 503 backoff retry and 404 auto-refresh.
+   * - System prompt delivered in provider's exact required field
+   * - Strips <think> blocks and ignores reasoning_content/thinking
+   * - Retries 503 with backoff 1s/3s/7s
+   * - Retries once without streaming on streaming failure
+   * - Auto-falls back to next chat model (max 2) on terms/404/not-supported/access-denied
    */
   async streamChat(requestId, params, onChunk, onDone, onError) {
     const {
@@ -434,87 +691,203 @@ class AIService {
       model,
       baseUrl,
       apiKey: passedKey,
-      systemPrompt,
       contextInfo,
       screenshotBase64
     } = params;
 
     const apiKey = (passedKey || store.getApiKey(provider) || '').trim();
 
-    // Prepare system prompt with pet personality and desktop context
-    let fullSystemPrompt = systemPrompt || `You are Bolt, a minimal, friendly desktop pet companion. Keep answers clear, helpful, and concise. Format code in markdown with language tags.`;
-    if (contextInfo) {
+    // Required System Prompt:
+    // "You are <pet name>, a friendly desktop pet assistant. The user's name is <user name>; use it occasionally. Always reply in the same language and script as the user's last message (English by default; if the user writes Roman Urdu/Hinglish reply in Roman Urdu/Hinglish). Be concise."
+    const petName = store.get('settings.general.petName') || 'Desktop Pet';
+    const userName = (store.get('settings.general.userName') || '').trim();
+    let fullSystemPrompt = `You are ${petName}, a friendly desktop pet assistant.`;
+    if (userName) {
+      fullSystemPrompt += ` The user's name is ${userName}; use it occasionally.`;
+    }
+    fullSystemPrompt += ` Always reply in the same language and script as the user's last message (English by default; if the user writes Roman Urdu/Hinglish reply in Roman Urdu/Hinglish). Be concise.`;
+
+    if (contextInfo && store.get('settings.privacy.contextAwareness') !== false) {
       fullSystemPrompt += `\n\n[Current Desktop Context: User is in "${contextInfo.appName || 'an application'}" - Window: "${contextInfo.windowTitle || ''}"${contextInfo.url ? ` - URL: ${contextInfo.url}` : ''}]`;
     }
 
-    // Attempt streaming with retry fallback
-    const executeAttempt = async (enableStreaming, attemptNum = 1) => {
+    // Clean and validate messages list: keep roles correct, trim history to fit
+    const cleanedMessages = [];
+    const rawMessages = Array.isArray(messages) ? messages : [];
+    for (const m of rawMessages) {
+      if (!m || m.isError || !m.content) continue;
+      const role = m.role === 'assistant' ? 'assistant' : 'user';
+      const cleanContent = String(m.content)
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/<\/?think>/gi, '')
+        .trim();
+      if (!cleanContent) continue;
+
+      if (cleanedMessages.length > 0 && cleanedMessages[cleanedMessages.length - 1].role === role) {
+        cleanedMessages[cleanedMessages.length - 1].content += '\n\n' + cleanContent;
+      } else {
+        cleanedMessages.push({ role, content: cleanContent });
+      }
+    }
+
+    // Trim to last 10 messages, ensuring first is 'user'
+    while (cleanedMessages.length > 10) {
+      cleanedMessages.shift();
+    }
+    while (cleanedMessages.length > 0 && cleanedMessages[0].role !== 'user') {
+      cleanedMessages.shift();
+    }
+    if (cleanedMessages.length === 0) {
+      cleanedMessages.push({ role: 'user', content: 'Hello' });
+    }
+
+    // Check if saved/selected model is non-chat; migrate if needed
+    let activeModel = model || store.get(`settings.ai.models.${provider}`);
+    if (!activeModel || this.isNonChatModel(activeModel)) {
+      activeModel = this.getPriorityDefaultModel(provider);
+      store.set(`settings.ai.models.${provider}`, activeModel);
+    }
+
+    let switchNotice = '';
+    let modelSwitchCount = 0;
+    const triedModels = new Set([String(activeModel).toLowerCase()]);
+
+    const executeAttempt = async (modelToUse, enableStreaming, attemptNum = 1) => {
       try {
+        const chunkFilter = new ThinkingFilter();
+        const filteredOnChunk = (rawChunk) => {
+          const cleanChunk = chunkFilter.process(rawChunk);
+          if (cleanChunk && typeof onChunk === 'function') {
+            onChunk(cleanChunk);
+          }
+        };
+
+        let result = '';
         if (provider === 'gemini') {
-          return await this.streamGemini(requestId, {
+          result = await this.streamGemini(requestId, {
             apiKey,
-            model: (model || 'gemini-1.5-flash').replace(/^models\//, ''),
+            model: (modelToUse || 'gemini-2.0-flash-lite').replace(/^models\//, ''),
             baseUrl,
-            messages,
+            messages: cleanedMessages,
             systemPrompt: fullSystemPrompt,
             enableStreaming,
             screenshotBase64
-          }, onChunk);
-        }
-
-        if (provider === 'groq' || provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'qwen' || provider === 'custom') {
-          return await this.streamOpenAICompatible(requestId, {
+          }, filteredOnChunk);
+        } else if (provider === 'groq' || provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'qwen' || provider === 'custom') {
+          result = await this.streamOpenAICompatible(requestId, {
             provider,
             apiKey,
-            model,
+            model: modelToUse,
             baseUrl,
-            messages,
+            messages: cleanedMessages,
             systemPrompt: fullSystemPrompt,
             enableStreaming,
             screenshotBase64
-          }, onChunk);
-        }
-
-        if (provider === 'anthropic') {
-          return await this.streamAnthropic(requestId, {
+          }, filteredOnChunk);
+        } else if (provider === 'anthropic') {
+          result = await this.streamAnthropic(requestId, {
             apiKey,
-            model: model || 'claude-3-5-sonnet-20241022',
+            model: modelToUse || 'claude-3-5-sonnet-20241022',
             baseUrl,
-            messages,
+            messages: cleanedMessages,
             systemPrompt: fullSystemPrompt,
             enableStreaming,
             screenshotBase64
-          }, onChunk);
-        }
-
-        if (provider === 'ollama') {
-          return await this.streamOllama(requestId, {
-            model: model || 'llama3:latest',
+          }, filteredOnChunk);
+        } else if (provider === 'ollama') {
+          result = await this.streamOllama(requestId, {
+            model: modelToUse || 'llama3:latest',
             baseUrl,
-            messages,
+            messages: cleanedMessages,
             systemPrompt: fullSystemPrompt,
             enableStreaming
-          }, onChunk);
+          }, filteredOnChunk);
+        } else {
+          result = `I'm your desktop pet companion! Configure an active AI provider in Settings -> AI Provider.`;
+          filteredOnChunk(result);
         }
 
-        // Built-in fallback companion
-        const lastMsg = messages[messages.length - 1]?.content || 'Hello';
-        const reply = `I'm your desktop pet companion! Configure an active AI provider in Settings -> AI Provider (Gemini, Groq, or OpenAI) to get live coding intelligence! You asked: "${lastMsg}"`;
-        onChunk(reply);
-        return reply;
+        const remaining = chunkFilter.flush();
+        if (remaining && typeof onChunk === 'function') {
+          onChunk(remaining);
+        }
+
+        let finalResponse = (result + remaining)
+          .replace(/<think>[\s\S]*?<\/think>/gi, '')
+          .replace(/<\/?think>/gi, '')
+          .trim();
+
+        if (switchNotice) {
+          finalResponse = `${switchNotice}${finalResponse}`;
+        }
+        return finalResponse;
+
       } catch (err) {
-        // If 503 Service Unavailable, retry with backoff 1s/3s/7s (up to attempt 3)
-        if (err.status === 503 && attemptNum < 3) {
+        const errMsg = String(err.message || err.body || err).toLowerCase();
+        const status = err.status || 0;
+
+        // 503 busy: backoff retry 1s/3s/7s
+        const is503 = status === 503 || errMsg.includes('503') || errMsg.includes('overloaded') || errMsg.includes('service unavailable');
+        if (is503 && attemptNum < 3) {
           const delays = [1000, 3000, 7000];
           const delay = delays[attemptNum - 1] || 2000;
           await new Promise(r => setTimeout(r, delay));
-          return executeAttempt(enableStreaming, attemptNum + 1);
+          return executeAttempt(modelToUse, enableStreaming, attemptNum + 1);
         }
 
-        // If streaming failed on attempt 1, automatically retry once without streaming!
-        if (enableStreaming && attemptNum === 1) {
+        // Check if model failed with terms acceptance, 404, not-supported, access-denied
+        const isModelIssue =
+          status === 404 ||
+          errMsg.includes('terms') ||
+          errMsg.includes('model_terms_required') ||
+          errMsg.includes('not found') ||
+          errMsg.includes('model_not_found') ||
+          errMsg.includes('not supported') ||
+          errMsg.includes('unsupported') ||
+          errMsg.includes('access denied') ||
+          errMsg.includes('permission_denied') ||
+          errMsg.includes('does not exist');
+
+        if (isModelIssue && modelSwitchCount < 2) {
+          modelSwitchCount++;
+          console.warn(`[AIService] Model ${modelToUse} failed. Auto-trying next chat model (attempt ${modelSwitchCount}/2)...`);
+
+          let available = [];
+          try {
+            available = await this.fetchModels(provider, apiKey, baseUrl);
+          } catch (e) {
+            available = [];
+          }
+
+          const chatCandidates = available
+            .map(m => (typeof m === 'string' ? m : m.id))
+            .filter(id => !this.isNonChatModel(id) && !triedModels.has(id.toLowerCase()));
+
+          let nextModel = '';
+          if (chatCandidates.length > 0) {
+            nextModel = this.getPriorityDefaultModel(provider, chatCandidates);
+          } else {
+            const fb = this.getPriorityDefaultModel(provider);
+            if (!triedModels.has(fb.toLowerCase())) {
+              nextModel = fb;
+            }
+          }
+
+          if (nextModel && nextModel !== modelToUse) {
+            triedModels.add(nextModel.toLowerCase());
+            store.set(`settings.ai.models.${provider}`, nextModel);
+            switchNotice = `Switched to ${nextModel}.\n\n`;
+            if (typeof onChunk === 'function') {
+              onChunk(switchNotice);
+            }
+            return executeAttempt(nextModel, true, 1);
+          }
+        }
+
+        // If streaming failed on attempt 1, retry once without streaming
+        if (enableStreaming && attemptNum === 1 && !errMsg.includes('key') && !errMsg.includes('quota') && !errMsg.includes('terms')) {
           console.warn(`[AIService] Streaming failed for ${provider}, retrying without streaming...`);
-          return executeAttempt(false, 2);
+          return executeAttempt(modelToUse, false, 2);
         }
 
         throw err;
@@ -522,7 +895,7 @@ class AIService {
     };
 
     try {
-      const fullText = await executeAttempt(true, 1);
+      const fullText = await executeAttempt(activeModel, true, 1);
       if (typeof onDone === 'function') onDone(fullText);
     } catch (err) {
       const mapped = this.mapFriendlyError(err, err.status);
@@ -536,23 +909,21 @@ class AIService {
     }
   }
 
-  // --- GEMINI DRIVER ---
+  // --- GEMINI DRIVER (streamGenerateContent with alt=sse, systemInstruction, role "model") ---
   async streamGemini(requestId, opts, onChunk) {
     const { apiKey, model, baseUrl, messages, systemPrompt, enableStreaming, screenshotBase64 } = opts;
     if (!apiKey) throw new Error('Gemini API key is required');
 
     const root = (baseUrl || 'https://generativelanguage.googleapis.com').replace(/\/+$/, '');
-    const cleanModel = (model || 'gemini-1.5-flash').replace(/^models\//, '');
+    const cleanModel = (model || 'gemini-2.0-flash-lite').replace(/^models\//, '');
     const action = enableStreaming ? 'streamGenerateContent?alt=sse&' : 'generateContent?';
     const url = `${root}/v1beta/models/${encodeURIComponent(cleanModel)}:${action}key=${encodeURIComponent(apiKey)}`;
 
-    // Format messages for Gemini
     const contents = [];
     for (const msg of messages) {
       const role = msg.role === 'assistant' ? 'model' : 'user';
       const parts = [{ text: msg.content || '' }];
 
-      // Attach screenshot if present on latest user message
       if (role === 'user' && msg === messages[messages.length - 1] && screenshotBase64) {
         parts.push({
           inlineData: {
@@ -581,7 +952,7 @@ class AIService {
 
       sseBuffer += chunk;
       const lines = sseBuffer.split('\n');
-      sseBuffer = lines.pop(); // Retain remainder
+      sseBuffer = lines.pop();
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -610,7 +981,7 @@ class AIService {
     return accumulatedText;
   }
 
-  // --- OPENAI COMPATIBLE DRIVER (Groq, OpenAI, DeepSeek, OpenRouter, Qwen, Custom) ---
+  // --- OPENAI-COMPATIBLE DRIVER (OpenAI, Groq, DeepSeek, Qwen, OpenRouter, Custom) ---
   async streamOpenAICompatible(requestId, opts, onChunk) {
     const { provider, apiKey, model, baseUrl, messages, systemPrompt, enableStreaming, screenshotBase64 } = opts;
     if (!apiKey) throw new Error(`${provider} API key is required`);
@@ -628,8 +999,8 @@ class AIService {
       defaultBase = 'https://openrouter.ai/api/v1';
       defaultModel = 'meta-llama/llama-3.3-70b-instruct';
     } else if (provider === 'qwen') {
-      defaultBase = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-      defaultModel = 'qwen-turbo';
+      defaultBase = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
+      defaultModel = 'qwen-plus';
     }
 
     const root = (baseUrl || defaultBase).replace(/\/+$/, '');
@@ -686,7 +1057,9 @@ class AIService {
           if (jsonStr === '[DONE]') continue;
           try {
             const data = JSON.parse(jsonStr);
-            const text = data.choices?.[0]?.delta?.content || '';
+            // Ignore raw reasoning fields
+            const delta = data.choices?.[0]?.delta;
+            const text = delta?.content || '';
             if (text) {
               accumulatedText += text;
               onChunk(text);
@@ -706,7 +1079,8 @@ class AIService {
     return accumulatedText;
   }
 
-  // --- ANTHROPIC DRIVER ---
+  // --- ANTHROPIC MESSAGES API DRIVER ---
+  // (x-api-key, anthropic-version header, top-level system, required max_tokens, SSE event types)
   async streamAnthropic(requestId, opts, onChunk) {
     const { apiKey, model, baseUrl, messages, systemPrompt, enableStreaming, screenshotBase64 } = opts;
     if (!apiKey) throw new Error('Anthropic API key is required');
@@ -787,7 +1161,7 @@ class AIService {
     return accumulatedText;
   }
 
-  // --- OLLAMA DRIVER ---
+  // --- OLLAMA /api/chat NDJSON DRIVER ---
   async streamOllama(requestId, opts, onChunk) {
     const { model, baseUrl, messages, systemPrompt, enableStreaming } = opts;
     const root = (baseUrl || 'http://localhost:11434').replace(/\/+$/, '');

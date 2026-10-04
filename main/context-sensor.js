@@ -1,11 +1,11 @@
 /**
  * Desktop Pet — Desktop & Browser Context Sensor
  * Gathers active application, window title, and browser URL/tab with strict privacy redaction.
- * Captures screen via desktopCapturer only on-demand when user requests and settings allow.
+ * Uses lightweight JXA on macOS to reliably inspect active tab title and URL.
  */
 
 const { exec } = require('child_process');
-const { desktopCapturer } = require('electron');
+const { desktopCapturer } = require('electron') || {};
 const store = require('./secure-store');
 
 class ContextSensor {
@@ -31,87 +31,113 @@ class ContextSensor {
 
   /**
    * Retrieves active window and browser tab info
-   * macOS: AppleScript / osascript
-   * Windows / Linux fallback: Window info
    */
   async getActiveContext() {
     const isEnabled = store.get('settings.privacy.contextAwareness');
-    if (!isEnabled) {
+    if (isEnabled === false) {
       return null;
     }
 
     if (process.platform === 'darwin') {
       return new Promise((resolve) => {
-        const script = `
-          global frontApp, windowTitle, currentURL, tabTitle
-          set frontApp to ""
-          set windowTitle to ""
-          set currentURL to ""
-          set tabTitle to ""
+        const jxaScript = `
+          function run() {
+            var se = Application("System Events");
+            var procs = se.applicationProcesses.whose({ backgroundOnly: false })();
+            var frontApp = "";
+            var winTitle = "";
+            var curUrl = "";
+            var tabTitle = "";
 
-          tell application "System Events"
-            set frontProcess to first application process whose frontmost is true
-            set frontApp to name of frontProcess
-            try
-              set windowTitle to name of front window of frontProcess
-            end try
-          end tell
+            // 1. Check frontmost application
+            for (var i = 0; i < procs.length; i++) {
+              var p = procs[i];
+              if (p.frontmost()) {
+                frontApp = p.name();
+                try {
+                  var wins = p.windows();
+                  if (wins.length > 0) winTitle = wins[0].name();
+                } catch(e) {}
+                break;
+              }
+            }
 
-          -- Check if front application is a supported browser
-          if frontApp is "Google Chrome" or frontApp is "Brave Browser" or frontApp is "Chromium" or frontApp is "Microsoft Edge" or frontApp is "Arc" then
-            try
-              tell application frontApp
-                set currentURL to URL of active tab of front window
-                set tabTitle to title of active tab of front window
-              end tell
-            end try
-          else if frontApp is "Safari" then
-            try
-              tell application "Safari"
-                set currentURL to URL of front document
-                set tabTitle to name of front document
-              end tell
-            end try
-          end if
+            // 2. If front app is Desktop Pet or Electron, find the user's active browser or editor
+            if (frontApp === "Electron" || frontApp === "Desktop Pet" || frontApp === "DesktopPet" || !frontApp) {
+              for (var i = 0; i < procs.length; i++) {
+                var n = procs[i].name();
+                if (["Brave Browser", "Google Chrome", "Safari", "Arc", "Microsoft Edge", "Visual Studio Code", "Cursor", "Xcode", "Terminal"].indexOf(n) !== -1) {
+                  frontApp = n;
+                  try {
+                    var wins = procs[i].windows();
+                    if (wins.length > 0) winTitle = wins[0].name();
+                  } catch(e) {}
+                  break;
+                }
+              }
+            }
 
-          return frontApp & "|||" & windowTitle & "|||" & currentURL & "|||" & tabTitle
+            // 3. Inspect browser tab if applicable
+            var browserList = ["Brave Browser", "Google Chrome", "Chromium", "Arc", "Microsoft Edge"];
+            if (browserList.indexOf(frontApp) !== -1) {
+              try {
+                var b = Application(frontApp);
+                if (b.windows.length > 0 && b.windows[0].activeTab) {
+                  curUrl = b.windows[0].activeTab.url();
+                  tabTitle = b.windows[0].activeTab.title();
+                }
+              } catch(e) {}
+            } else if (frontApp === "Safari") {
+              try {
+                var s = Application("Safari");
+                if (s.documents.length > 0) {
+                  curUrl = s.documents[0].url();
+                  tabTitle = s.documents[0].name();
+                }
+              } catch(e) {}
+            }
+
+            return JSON.stringify({
+              appName: frontApp || "Desktop",
+              windowTitle: tabTitle || winTitle || "",
+              url: curUrl || ""
+            });
+          }
         `;
 
-        exec(`osascript -e '${script.replace(/'/g, "'\\''")}' 2>/dev/null`, (err, stdout) => {
+        exec(`osascript -l JavaScript -e '${jxaScript.replace(/'/g, "'\\''")}' 2>/dev/null`, (err, stdout) => {
           if (err || !stdout) {
-            resolve({ appName: 'Desktop', windowTitle: '', url: '', isBlocked: false });
-            return;
+            return resolve({ appName: 'Desktop', windowTitle: '', url: '', isBlocked: false });
           }
 
-          const parts = stdout.trim().split('|||');
-          const appName = (parts[0] || '').trim();
-          const windowTitle = (parts[1] || '').trim();
-          const url = (parts[2] || '').trim();
-          const tabTitle = (parts[3] || '').trim();
+          let data = { appName: 'Desktop', windowTitle: '', url: '' };
+          try {
+            data = JSON.parse(stdout.trim());
+          } catch (e) {
+            data = { appName: 'Desktop', windowTitle: stdout.trim(), url: '' };
+          }
 
-          const blocked = this.isBlocked(appName, windowTitle, url);
+          const blocked = this.isBlocked(data.appName, data.windowTitle, data.url);
 
           if (blocked) {
-            resolve({
-              appName,
+            return resolve({
+              appName: data.appName,
               windowTitle: '[Private / Redacted for Privacy]',
               url: '',
               isBlocked: true
             });
-            return;
           }
 
           resolve({
-            appName: appName || 'Active Window',
-            windowTitle: tabTitle || windowTitle || '',
-            url: url || '',
+            appName: data.appName || 'Active Window',
+            windowTitle: data.windowTitle || '',
+            url: data.url || '',
             isBlocked: false
           });
         });
       });
     }
 
-    // Non-macOS fallback
     return {
       appName: 'Active App',
       windowTitle: '',
@@ -125,7 +151,7 @@ class ContextSensor {
    */
   async captureActiveScreen() {
     const isAllowed = store.get('settings.privacy.allowScreenshots');
-    if (!isAllowed) return null;
+    if (!isAllowed || !desktopCapturer) return null;
 
     try {
       const sources = await desktopCapturer.getSources({

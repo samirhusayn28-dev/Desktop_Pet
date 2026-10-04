@@ -163,7 +163,7 @@ app.whenReady().then(async () => {
     logResult('A.3 Gemini Test Connection', geminiHandled, `Gemini v1beta test endpoint handled properly. Friendly: "${geminiTest.friendly}"`);
 
     // 4. Test Connection for OpenAI (Expect friendly "no credits" or "invalid key")
-    const openaiTest = await aiService.testConnection('openai', 'sk-proj-mock-no-credits-key', 'gpt-4o-mini');
+    const openaiTest = await aiService.testConnection('openai', 'mock-openai-key-no-credits', 'gpt-4o-mini');
     const openaiHandled = typeof openaiTest.success === 'boolean' && openaiTest.friendly.length > 5;
     logResult('A.4 OpenAI Test Connection', openaiHandled, `OpenAI test endpoint handled properly. Friendly: "${openaiTest.friendly}"`);
 

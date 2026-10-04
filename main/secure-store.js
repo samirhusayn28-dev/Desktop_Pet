@@ -20,7 +20,12 @@ class SecureStore {
 
     if (!this.userDataPath) {
       const home = process.env.HOME || process.env.USERPROFILE || '.';
-      this.userDataPath = path.join(home, 'Library', 'Application Support', 'desktop-pet');
+      const packagedDir = path.join(home, 'Library', 'Application Support', 'Desktop Pet');
+      if (fs.existsSync(packagedDir)) {
+        this.userDataPath = packagedDir;
+      } else {
+        this.userDataPath = path.join(home, 'Library', 'Application Support', 'desktop-pet');
+      }
     }
 
     try {
@@ -42,11 +47,13 @@ class SecureStore {
       },
       settings: {
         general: {
-          petName: 'Bolt',
+          petName: 'Pixel',
+          userName: 'Samir',
           launchAtLogin: false,
           alwaysOnTop: true,
           rememberPosition: true,
-          showPet: true
+          showPet: true,
+          autoUpdateCheck: true
         },
         behavior: {
           idleSleepyMinutes: 2,
@@ -63,7 +70,8 @@ class SecureStore {
           highLoad: true,
           network: true,
           lateNight: true,
-          screenUnlock: true
+          welcomeStartup: true,
+          goodbyeShutdown: true
         },
         appearance: {
           scale: 1.0,
@@ -76,6 +84,7 @@ class SecureStore {
           depth: 80,
           bodyColor: '#FFFFFF',
           accentColor: '#FF7A2F',
+          glassesEnabled: false,
           panelTransparency: 0.30,
           panelBlur: 24,
           theme: 'default'
@@ -83,7 +92,7 @@ class SecureStore {
         ai: {
           activeProvider: 'gemini',
           models: {
-            gemini: 'gemini-1.5-flash',
+            gemini: 'gemini-2.0-flash-lite',
             groq: 'llama-3.3-70b-versatile',
             openai: 'gpt-4o-mini',
             anthropic: 'claude-3-5-sonnet-20241022',
@@ -121,32 +130,26 @@ class SecureStore {
           ]
         }
       },
-      todos: [
-        { id: '1', text: 'Plan next coding sprint', done: true },
-        { id: '2', text: 'Drink glass of water', done: true },
-        { id: '3', text: 'Refactor desktop pet companion', done: false }
-      ],
-      notes: [
-        { id: '1', title: 'Architecture Notes', content: 'Main process AI streaming with zero CORS.\nDedicated bubble window at screen-saver layer.\nSub-2% idle CPU.', pinned: true, updatedAt: new Date().toISOString() }
-      ],
-      reminders: [
-        { id: '1', title: 'Hydrate & drink water', time: '14:00', repeat: 'every-hour', enabled: true },
-        { id: '2', title: 'Stand up and stretch', time: '16:00', repeat: 'daily', enabled: true }
-      ],
+      todos: [],
+      notes: [],
+      reminders: [],
       clipboardHistory: [],
       chatHistory: [
         { role: 'assistant', content: "Hello! I'm your desktop coding companion. Ask me anything, or let me know what you're working on!", timestamp: Date.now() }
       ]
     };
 
+    this.lastLoadedMtime = 0;
     this.data = this.loadData();
   }
 
   loadData() {
     try {
       if (fs.existsSync(this.filePath)) {
+        const stats = fs.statSync(this.filePath);
         const fileContent = fs.readFileSync(this.filePath, 'utf8');
         const parsed = JSON.parse(fileContent);
+        this.lastLoadedMtime = stats.mtimeMs;
         return this.deepMerge(this.defaults, parsed);
       }
     } catch (err) {
@@ -155,15 +158,34 @@ class SecureStore {
     return JSON.parse(JSON.stringify(this.defaults));
   }
 
+  reloadIfChanged() {
+    try {
+      if (fs.existsSync(this.filePath)) {
+        const stats = fs.statSync(this.filePath);
+        if (!this.lastLoadedMtime || stats.mtimeMs > this.lastLoadedMtime) {
+          const fileContent = fs.readFileSync(this.filePath, 'utf8');
+          const parsed = JSON.parse(fileContent);
+          this.data = this.deepMerge(this.defaults, parsed);
+          this.lastLoadedMtime = stats.mtimeMs;
+        }
+      }
+    } catch (e) {}
+  }
+
   saveData() {
     try {
       fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8');
+      try {
+        const stats = fs.statSync(this.filePath);
+        this.lastLoadedMtime = stats.mtimeMs;
+      } catch (e) {}
     } catch (err) {
       console.error('Failed to save store:', err);
     }
   }
 
   get(keyPath) {
+    this.reloadIfChanged();
     const keys = keyPath.split('.');
     let current = this.data;
     for (const key of keys) {
@@ -174,6 +196,7 @@ class SecureStore {
   }
 
   set(keyPath, value) {
+    this.reloadIfChanged();
     const keys = keyPath.split('.');
     let current = this.data;
     for (let i = 0; i < keys.length - 1; i++) {

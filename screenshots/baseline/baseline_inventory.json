@@ -1,0 +1,62 @@
+{
+  "capturedAt": "2026-10-03T19:02:34.852Z",
+  "petEmotions": [
+    "neutral",
+    "happy",
+    "sad",
+    "surprised",
+    "sleepy",
+    "sleeping",
+    "angry",
+    "love",
+    "wink",
+    "laugh",
+    "thinking",
+    "focus",
+    "dull",
+    "dim",
+    "irritated",
+    "low-battery",
+    "charging",
+    "energized",
+    "vibing",
+    "music",
+    "stressed",
+    "confused",
+    "relieved",
+    "squint"
+  ],
+  "petAnimations": [
+    "blinking",
+    "dangling",
+    "bounce-drop",
+    "sleep-z-drift",
+    "vibing-notes",
+    "thought-dots"
+  ],
+  "systemReactions": [
+    "volume",
+    "brightness",
+    "battery",
+    "media",
+    "network",
+    "headphones",
+    "screenUnlock",
+    "highLoad",
+    "lateNight"
+  ],
+  "tabs": [
+    "chat",
+    "todo",
+    "timer",
+    "notes",
+    "reminders",
+    "tools",
+    "settings"
+  ],
+  "idleSleepyMinutes": 2,
+  "idleSleepingMinutes": 5,
+  "cursorTrackingMaxHz": 30,
+  "bubbleDurationMs": 5,
+  "defaultPetName": "Bolt"
+}

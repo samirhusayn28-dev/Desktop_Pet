@@ -82,27 +82,27 @@
 
     <!-- 2. Glassmorphic Tab Bar -->
     <nav class="panel-tabs">
-      <button class="tab-btn active" data-tab="chat" id="tab-btn-chat">
+      <button class="tab-btn active" data-tab="chat" id="tab-btn-chat" title="Chat">
         <i data-lucide="message-square"></i>
         <span class="tab-label">Chat</span>
       </button>
-      <button class="tab-btn" data-tab="todo" id="tab-btn-todo">
+      <button class="tab-btn" data-tab="todo" id="tab-btn-todo" title="To-Do">
         <i data-lucide="check-square"></i>
         <span class="tab-label">To-Do</span>
       </button>
-      <button class="tab-btn" data-tab="timer" id="tab-btn-timer">
+      <button class="tab-btn" data-tab="timer" id="tab-btn-timer" title="Timer">
         <i data-lucide="timer"></i>
         <span class="tab-label">Timer</span>
       </button>
-      <button class="tab-btn" data-tab="notes" id="tab-btn-notes">
+      <button class="tab-btn" data-tab="notes" id="tab-btn-notes" title="Notes">
         <i data-lucide="file-text"></i>
         <span class="tab-label">Notes</span>
       </button>
-      <button class="tab-btn" data-tab="reminders" id="tab-btn-reminders">
+      <button class="tab-btn" data-tab="reminders" id="tab-btn-reminders" title="Reminders">
         <i data-lucide="bell"></i>
         <span class="tab-label">Reminders</span>
       </button>
-      <button class="tab-btn" data-tab="tools" id="tab-btn-tools">
+      <button class="tab-btn" data-tab="tools" id="tab-btn-tools" title="Tools">
         <i data-lucide="wrench"></i>
         <span class="tab-label">Tools</span>
       </button>
@@ -125,7 +125,7 @@
               <div class="chat-header-meta">
                 <span class="chat-header-title" id="chat-assistant-name">Bolt Assistant</span>
                 <button type="button" class="chat-header-subtitle" id="chat-model-info" title="Click to change model in Settings">
-                  gemini • gemini-1.5-flash
+                  gemini • gemini-2.0-flash-lite
                 </button>
               </div>
               <button class="chat-broom-btn" id="btn-clear-chat" title="Clear Conversation">
@@ -163,25 +163,25 @@
           <!-- Progress Bar Card -->
           <div class="todo-progress-card">
             <div class="todo-progress-header">
-              <span class="progress-title">Daily Sprint Progress</span>
-              <span class="progress-ratio" id="todo-progress-ratio">2 / 5</span>
+              <span class="progress-title" id="todo-status-text">Daily Sprint Progress</span>
+              <span class="progress-ratio mono" id="todo-progress-ratio"><span id="todo-percent-text">0%</span></span>
             </div>
             <div class="progress-track">
-              <div class="progress-fill" id="todo-progress-fill" style="width: 40%;"></div>
+              <div class="progress-fill" id="todo-progress-fill" style="width: 0%;"></div>
             </div>
           </div>
 
           <!-- Add Task Input Row -->
           <div class="todo-input-row">
-            <input type="text" id="todo-new-input" class="terminal-input" placeholder="Add a new task (Enter)...">
-            <button class="theme-btn-primary" id="btn-add-todo">
+            <input type="text" id="todo-input-field" class="terminal-input" placeholder="Add a new task (Enter)...">
+            <button class="theme-btn-primary" id="btn-todo-add">
               <i data-lucide="plus"></i>
               <span>Add</span>
             </button>
           </div>
 
           <!-- Tasks List -->
-          <div class="todo-list-scroll" id="todo-items-list">
+          <div class="todo-list-scroll" id="todo-items-container">
             <!-- Dynamically populated tasks -->
           </div>
         </div>
@@ -193,27 +193,48 @@
           <div class="timer-card-glass">
             <!-- Mode Pills -->
             <div class="timer-mode-pills">
-              <button class="timer-mode-btn active" data-mode="pomodoro">Pomodoro (25m)</button>
-              <button class="timer-mode-btn" data-mode="short-break">Short Break (5m)</button>
-              <button class="timer-mode-btn" data-mode="long-break">Long Break (15m)</button>
+              <button class="timer-mode-btn active" data-mode="pomodoro">Pomodoro</button>
+              <button class="timer-mode-btn" data-mode="short-break">Short Break</button>
+              <button class="timer-mode-btn" data-mode="long-break">Long Break</button>
+              <button class="timer-mode-btn" data-mode="countdown">Countdown</button>
+              <button class="timer-mode-btn" data-mode="stopwatch">Stopwatch</button>
             </div>
 
-            <!-- Circular Progress & Display -->
-            <div class="timer-clock-display">
-              <div class="time-large-text" id="timer-display-digits">25:00</div>
-              <span class="timer-state-label" id="timer-state-label">FOCUS TIME</span>
+            <!-- Circular SVG Ring + Clock Display -->
+            <div class="timer-ring-wrap">
+              <svg class="timer-ring-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Track -->
+                <circle cx="100" cy="100" r="88" stroke-width="10" class="timer-ring-track"/>
+                <!-- Progress arc (stroke-dasharray=553 = 2π×88) -->
+                <circle cx="100" cy="100" r="88" stroke-width="10" class="timer-ring-progress"
+                  id="timer-ring-progress"
+                  stroke-dasharray="553"
+                  stroke-dashoffset="0"
+                  stroke-linecap="round"
+                  transform="rotate(-90 100 100)"/>
+              </svg>
+              <div class="timer-ring-inner">
+                <div class="time-large-text mono" id="timer-time-display">25:00</div>
+                <span class="timer-state-label" id="timer-sublabel">FOCUS SESSION</span>
+              </div>
             </div>
 
             <!-- Timer Controls -->
             <div class="timer-actions-row">
-              <button class="timer-ctl-btn primary" id="btn-timer-start">
+              <button class="timer-ctl-btn primary" id="btn-timer-toggle">
                 <i data-lucide="play" id="icon-timer-toggle"></i>
-                <span id="text-timer-toggle">Start</span>
+                <span id="text-timer-toggle">Start Focus</span>
               </button>
               <button class="timer-ctl-btn secondary" id="btn-timer-reset">
                 <i data-lucide="rotate-ccw"></i>
                 <span>Reset</span>
               </button>
+            </div>
+
+            <!-- Session Stats -->
+            <div class="timer-stats-pill" id="timer-pet-status">
+              <i data-lucide="award"></i>
+              <span>Completed Sessions: <strong class="mono" id="pomodoro-count">0</strong></span>
             </div>
           </div>
         </div>
@@ -233,7 +254,7 @@
             </button>
           </div>
 
-          <div class="notes-cards-scroll" id="notes-cards-list">
+          <div class="notes-cards-scroll" id="notes-container">
             <!-- Dynamically populated notes -->
           </div>
         </div>
@@ -249,7 +270,7 @@
               <span>Create Reminder</span>
             </div>
             <div class="reminder-fields-grid">
-              <input type="text" id="reminder-title-input" class="terminal-input" placeholder="Reminder title (e.g. Code Review)">
+              <input type="text" id="reminder-text-input" class="terminal-input" placeholder="Reminder title (e.g. Code Review)">
               <div class="reminder-time-row">
                 <input type="time" id="reminder-time-input" class="terminal-input mono" value="16:00">
                 <select id="reminder-repeat-select" class="terminal-select">
@@ -257,7 +278,7 @@
                   <option value="daily">Daily</option>
                   <option value="every-hour">Every Hour</option>
                 </select>
-                <button class="theme-btn-primary" id="btn-add-reminder">
+                <button class="theme-btn-primary" id="btn-save-reminder">
                   <i data-lucide="plus"></i>
                   <span>Set</span>
                 </button>
@@ -266,7 +287,7 @@
           </div>
 
           <!-- Reminders List -->
-          <div class="reminders-list-scroll" id="reminders-items-list">
+          <div class="reminders-list-scroll" id="reminders-list">
             <!-- Dynamically populated reminders -->
           </div>
         </div>
@@ -436,7 +457,7 @@
               <div class="tool-card-header">
                 <i data-lucide="clipboard"></i>
                 <span>Clipboard History</span>
-                <button class="tool-action-btn" id="btn-clear-clipboard" title="Clear History">Clear</button>
+                <button class="theme-btn-secondary" id="btn-clear-clipboard" title="Clear History">Clear</button>
               </div>
               <div class="clipboard-history-list" id="clipboard-history-list">
                 <div class="empty-hint">Copy text to save snippets here automatically.</div>
@@ -473,14 +494,23 @@
           <!-- SECTION 1: GENERAL -->
           <div class="settings-group-card">
             <div class="settings-group-title">
-              <i data-lucide="user"></i>
-              <span>General Settings</span>
+              <div class="title-with-icon">
+                <i data-lucide="user"></i>
+                <span>General Settings</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="general" title="Reset General Settings to default">Reset section</button>
             </div>
             
             <div class="setting-item">
               <label class="setting-label" for="setting-pet-name">Name your pet (max 20 characters)</label>
               <input type="text" id="setting-pet-name" class="terminal-input full-width" maxlength="20" placeholder="Pet">
               <span class="setting-hint">Appears in header, assistant title, speech bubbles, and AI prompt</span>
+            </div>
+
+            <div class="setting-item">
+              <label class="setting-label" for="setting-user-name">What should I call you? (max 20 characters)</label>
+              <input type="text" id="setting-user-name" class="terminal-input full-width" maxlength="20" placeholder="e.g. Alex">
+              <span class="setting-hint">Your pet will address you naturally in reminders, reactions, and chat</span>
             </div>
 
             <div class="setting-toggle-row">
@@ -506,13 +536,24 @@
               </div>
               <input type="checkbox" id="setting-launch-login" class="toggle-checkbox">
             </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Automatic Updates</div>
+                <div class="toggle-desc">Check for new releases in background</div>
+              </div>
+              <input type="checkbox" id="setting-auto-update" class="toggle-checkbox" checked>
+            </div>
           </div>
 
           <!-- SECTION 2: BEHAVIOR -->
           <div class="settings-group-card">
             <div class="settings-group-title">
-              <i data-lucide="sliders"></i>
-              <span>Behavior & Idle Timers</span>
+              <div class="title-with-icon">
+                <i data-lucide="sliders"></i>
+                <span>Behavior & Idle Timers</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="behavior" title="Reset Behavior Settings to default">Reset section</button>
             </div>
 
             <div class="setting-item">
@@ -559,15 +600,18 @@
           <!-- SECTION 3: SYSTEM AWARENESS REACTIONS -->
           <div class="settings-group-card">
             <div class="settings-group-title">
-              <i data-lucide="zap"></i>
-              <span>SystemSense Reactions</span>
+              <div class="title-with-icon">
+                <i data-lucide="zap"></i>
+                <span>SystemSense Reactions</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="reactions" title="Reset Reactions to default">Reset section</button>
             </div>
-            <span class="setting-hint">Pet dynamically reacts to hardware, audio, power, and environment</span>
+            <span class="setting-hint">Pet dynamically reacts to hardware, audio, power, and desktop events</span>
 
             <div class="setting-toggle-row">
               <div class="setting-toggle-text">
                 <div class="toggle-title">Screen Brightness</div>
-                <div class="toggle-desc">Dull look on low brightness, squint on max</div>
+                <div class="toggle-desc">Squints on max brightness, gets cozy/dim on low</div>
               </div>
               <input type="checkbox" id="reaction-brightness" class="toggle-checkbox" checked>
             </div>
@@ -575,7 +619,7 @@
             <div class="setting-toggle-row">
               <div class="setting-toggle-text">
                 <div class="toggle-title">Audio Volume</div>
-                <div class="toggle-desc">Irritated when max, quiet when muted</div>
+                <div class="toggle-desc">Covers ears on max volume, quiet speech when muted</div>
               </div>
               <input type="checkbox" id="reaction-volume" class="toggle-checkbox" checked>
             </div>
@@ -591,9 +635,41 @@
             <div class="setting-toggle-row">
               <div class="setting-toggle-text">
                 <div class="toggle-title">Music & Media Vibe</div>
-                <div class="toggle-desc">Groovy head-bob and musical notes when music plays</div>
+                <div class="toggle-desc">Groovy head-bob and music notes for Spotify & Apple Music</div>
               </div>
               <input type="checkbox" id="reaction-media" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Internet & Network</div>
+                <div class="toggle-desc">Notifies if Wi-Fi disconnects or reconnects</div>
+              </div>
+              <input type="checkbox" id="reaction-network" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Headphones Detection</div>
+                <div class="toggle-desc">Enters coding focus mode when headphones are connected</div>
+              </div>
+              <input type="checkbox" id="reaction-headphones" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Welcome on Startup</div>
+                <div class="toggle-desc">Warm greeting once per system boot or login</div>
+              </div>
+              <input type="checkbox" id="reaction-welcome-startup" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Goodbye on Shutdown</div>
+                <div class="toggle-desc">Short goodbye wave on shutdown, logout, or quit</div>
+              </div>
+              <input type="checkbox" id="reaction-goodbye-shutdown" class="toggle-checkbox" checked>
             </div>
 
             <div class="setting-toggle-row">
@@ -611,6 +687,117 @@
               </div>
               <input type="checkbox" id="reaction-latenight" class="toggle-checkbox" checked>
             </div>
+
+            <!-- Sensor Status Card -->
+            <div class="sensor-status-card" id="sensor-status-card">
+              <div class="sensor-status-header">
+                <div class="sensor-header-left">
+                  <span class="sensor-card-title">Hardware Sensor Diagnostics</span>
+                </div>
+                <div class="sensor-header-actions">
+                  <button type="button" class="btn-sensor-action" id="btn-refresh-sensors" title="Refresh live sensors">
+                    <i data-lucide="refresh-cw"></i>
+                    <span>Refresh</span>
+                  </button>
+                  <button type="button" class="btn-sensor-action" id="btn-open-accessibility" title="Open macOS Security & Privacy">
+                    <i data-lucide="external-link"></i>
+                    <span>Permissions</span>
+                  </button>
+                </div>
+              </div>
+              <div class="sensor-status-list" id="sensor-status-list">
+                <!-- Dynamically populated rows -->
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 3.5: SYSTEM PERMISSIONS (Requirement 4) -->
+          <div class="settings-group-card" id="settings-permissions-card">
+            <div class="settings-group-title">
+              <div class="title-with-icon">
+                <i data-lucide="shield-check"></i>
+                <span>System Permissions</span>
+              </div>
+              <button class="theme-btn-secondary recheck-perm-btn" id="btn-recheck-permissions" title="Re-check permissions">
+                <i data-lucide="refresh-cw"></i>
+                <span>Re-check</span>
+              </button>
+            </div>
+            <div id="perm-dev-notice" class="perm-dev-notice" style="display: none;">
+              <i data-lucide="info"></i>
+              <span>Running in dev mode: macOS assigns permissions to "Electron" or your Terminal application.</span>
+            </div>
+            <div class="permissions-list">
+              <!-- Accessibility -->
+              <div class="perm-item-row" id="perm-row-accessibility">
+                <div class="perm-meta">
+                  <div class="perm-title-row">
+                    <i data-lucide="mouse-pointer"></i>
+                    <span class="perm-name">Accessibility</span>
+                    <span class="perm-badge" id="badge-perm-accessibility">Checking...</span>
+                  </div>
+                  <div class="perm-desc">Required to detect frontmost active window titles and system interactions</div>
+                </div>
+                <div class="perm-actions">
+                  <button class="theme-btn-secondary perm-action-btn" id="btn-open-perm-accessibility">Open Settings</button>
+                  <button class="theme-btn-primary perm-action-btn" id="btn-request-perm-accessibility">Request</button>
+                </div>
+              </div>
+              <!-- Screen Recording -->
+              <div class="perm-item-row" id="perm-row-screen">
+                <div class="perm-meta">
+                  <div class="perm-title-row">
+                    <i data-lucide="monitor"></i>
+                    <span class="perm-name">Screen Recording</span>
+                    <span class="perm-badge" id="badge-perm-screen">Checking...</span>
+                  </div>
+                  <div class="perm-desc">Used for display brightness sensing and full-screen application detection</div>
+                </div>
+                <div class="perm-actions">
+                  <button class="theme-btn-secondary perm-action-btn" id="btn-open-perm-screen">Open Settings</button>
+                  <button class="theme-btn-primary perm-action-btn" id="btn-request-perm-screen">Request</button>
+                </div>
+              </div>
+              <!-- Automation -->
+              <div class="perm-item-row" id="perm-row-automation">
+                <div class="perm-meta">
+                  <div class="perm-title-row">
+                    <i data-lucide="bot"></i>
+                    <span class="perm-name">Automation (Apple Events)</span>
+                    <span class="perm-badge" id="badge-perm-automation">Checking...</span>
+                  </div>
+                  <div class="perm-desc">Senses active browser URLs/tabs and Spotify/Music playback for context</div>
+                </div>
+                <div class="perm-actions">
+                  <button class="theme-btn-secondary perm-action-btn" id="btn-open-perm-automation">Open Settings</button>
+                  <button class="theme-btn-primary perm-action-btn" id="btn-request-perm-automation">Request</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 3.6: PERFORMANCE & RESOURCE BUDGET (Lite Mode Removed) -->
+          <div class="settings-group-card">
+            <div class="settings-group-title">
+              <i data-lucide="gauge"></i>
+              <span>Performance & Resource Budget</span>
+            </div>
+            <span class="setting-hint">Optimized for low-spec machines running all day in the background</span>
+
+            <div class="live-usage-card" id="live-pet-usage">
+              <div class="usage-stat-col">
+                <span class="usage-label">TOTAL APP RAM</span>
+                <span class="usage-val mono" id="disp-live-ram">~95 MB</span>
+              </div>
+              <div class="usage-stat-col">
+                <span class="usage-label">TOTAL CPU</span>
+                <span class="usage-val mono" id="disp-live-cpu">0.2%</span>
+              </div>
+              <div class="usage-stat-col">
+                <span class="usage-label">BUDGET TARGET</span>
+                <span class="usage-val highlight mono" id="disp-live-budget">PASS (&lt;110MB)</span>
+              </div>
+            </div>
           </div>
 
           <!-- SECTION 4: APPEARANCE -->
@@ -620,10 +807,7 @@
                 <i data-lucide="palette"></i>
                 <span>Appearance & Glass Customization</span>
               </div>
-              <button class="theme-btn-secondary reset-appearance-btn" id="btn-reset-appearance">
-                <i data-lucide="rotate-ccw"></i>
-                <span>Reset</span>
-              </button>
+              <button type="button" class="btn-reset-section" data-section="appearance" id="btn-reset-appearance" title="Reset Appearance to default">Reset section</button>
             </div>
 
             <!-- Live 3D Pet Preview -->
@@ -636,24 +820,6 @@
             </div>
 
             <div class="appearance-sliders-grid">
-              <!-- Panel Transparency Slider (Default 30%) -->
-              <div class="setting-item">
-                <div class="slider-label-row">
-                  <label class="setting-label" for="setting-panel-transparency">Panel Transparency</label>
-                  <span class="slider-val" id="disp-panel-transparency">30%</span>
-                </div>
-                <input type="range" id="setting-panel-transparency" min="15" max="95" step="5" value="30" class="terminal-slider">
-              </div>
-
-              <!-- Blur Amount Slider (Default 24px) -->
-              <div class="setting-item">
-                <div class="slider-label-row">
-                  <label class="setting-label" for="setting-panel-blur">Blur Amount</label>
-                  <span class="slider-val" id="disp-panel-blur">24 px</span>
-                </div>
-                <input type="range" id="setting-panel-blur" min="0" max="50" step="1" value="24" class="terminal-slider">
-              </div>
-
               <!-- Overall Size Scale -->
               <div class="setting-item">
                 <div class="slider-label-row">
@@ -730,11 +896,11 @@
               <div class="setting-item full-width-item accent-color-item">
                 <div class="accent-title-row">
                   <label class="setting-label" for="setting-accent-color">Accent Color</label>
-                  <button type="button" class="btn-accent-default" id="btn-accent-default" title="Reset to default orange">Reset to default</button>
+                  <button type="button" class="theme-btn-secondary" id="btn-accent-default" title="Reset to default orange">Reset to default</button>
                 </div>
                 <div class="accent-picker-row">
                   <input type="color" id="setting-accent-color" value="#FF7A2F">
-                  <input type="text" id="disp-accent-color" class="terminal-input mono" value="#FF7A2F" readonly>
+                  <input type="text" id="disp-accent-color" class="terminal-input mono" value="#FF7A2F" maxlength="7" placeholder="#HEX">
                   <div class="accent-swatches">
                     <button type="button" class="swatch-btn active" data-color="#FF7A2F" style="background:#FF7A2F;" title="Classic Amber (Default)"></button>
                     <button type="button" class="swatch-btn" data-color="#38BDF8" style="background:#38BDF8;" title="Sky Blue"></button>
@@ -752,8 +918,17 @@
                 <div class="color-picker-row">
                   <input type="color" id="setting-pet-bodycolor" value="#FFFFFF">
                   <input type="text" id="disp-pet-bodycolor" class="terminal-input mono" value="#FFFFFF" readonly>
-                  <button class="tool-action-btn" id="btn-bodycolor-white" title="Reset to White">Pure White</button>
+                  <button class="theme-btn-secondary" id="btn-bodycolor-white" title="Reset to White">Pure White</button>
                 </div>
+              </div>
+
+              <!-- Glasses Toggle (Item G1) -->
+              <div class="setting-toggle-row full-width-item" style="margin-top: 4px;">
+                <div class="setting-toggle-text">
+                  <div class="toggle-title">Round Glasses</div>
+                  <div class="toggle-desc">Cute spectacles centered on eyes</div>
+                </div>
+                <input type="checkbox" id="setting-pet-glasses" class="toggle-checkbox">
               </div>
             </div>
           </div>
@@ -761,8 +936,11 @@
           <!-- SECTION 5: AI PROVIDER CONFIGURATION -->
           <div class="settings-group-card">
             <div class="settings-group-title">
-              <i data-lucide="cpu"></i>
-              <span>AI Provider Configuration</span>
+              <div class="title-with-icon">
+                <i data-lucide="cpu"></i>
+                <span>AI Provider Configuration</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="ai" title="Reset AI Provider Configuration to default">Reset section</button>
             </div>
             
             <div class="setting-item">
@@ -828,8 +1006,11 @@
           <!-- SECTION 6: PRIVACY & CONTEXT -->
           <div class="settings-group-card">
             <div class="settings-group-title">
-              <i data-lucide="shield-check"></i>
-              <span>Privacy & Context Awareness</span>
+              <div class="title-with-icon">
+                <i data-lucide="shield-check"></i>
+                <span>Privacy & Context Awareness</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="privacy" title="Reset Privacy Settings to default">Reset section</button>
             </div>
             <span class="setting-hint">Strict privacy: Context is checked ONLY when you send a prompt, never in background.</span>
 
@@ -854,6 +1035,103 @@
               <textarea id="privacy-blocklist" class="terminal-input full-width mono" rows="3" placeholder="1password, bitwarden, bank, login, incognito"></textarea>
               <span class="setting-hint">Windows or URLs containing these words are never sent to AI providers</span>
             </div>
+          </div>
+
+          <!-- SECTION 6.5: DATA MANAGEMENT (IMPORT / EXPORT - Item I1) -->
+          <div class="settings-group-card" id="section-data-management">
+            <div class="settings-group-title">
+              <div class="title-with-icon">
+                <i data-lucide="database"></i>
+                <span>Data Management</span>
+              </div>
+            </div>
+            <span class="setting-hint">Backup and restore your settings, to-dos, reminders, and notes. API keys and sensitive credentials are never exported.</span>
+
+            <div class="data-actions-row" style="display: flex; gap: 10px; margin-top: 12px;">
+              <button type="button" class="theme-btn-secondary" id="btn-export-data" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 12px;">
+                <i data-lucide="download"></i>
+                <span>Export Data</span>
+              </button>
+              <button type="button" class="theme-btn-secondary" id="btn-import-data" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 12px;">
+                <i data-lucide="upload"></i>
+                <span>Import Data</span>
+              </button>
+            </div>
+
+            <!-- Import Preview Box -->
+            <div id="import-preview-box" class="import-preview-card" style="display: none; margin-top: 14px; padding: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px;">
+              <div style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="file-check" style="width: 15px; height: 15px; color: #10B981;"></i>
+                <span>Backup Preview</span>
+              </div>
+              <div id="import-counts-summary" style="font-size: 12px; opacity: 0.85; margin-bottom: 10px; line-height: 1.5;"></div>
+
+              <div id="import-notes-strategy-wrap" style="margin-bottom: 10px; font-size: 12px;">
+                <div style="font-weight: 500; margin-bottom: 4px;">Notes Handling:</div>
+                <div style="display: flex; gap: 16px;">
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="notes-import-strategy" value="merge" checked>
+                    <span>Merge with existing</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="notes-import-strategy" value="replace">
+                    <span>Replace existing</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button type="button" class="theme-btn-secondary" id="btn-cancel-import" style="padding: 5px 12px; font-size: 12px;">Cancel</button>
+                <button type="button" class="theme-btn-primary" id="btn-confirm-import" style="padding: 5px 14px; font-size: 12px;">Confirm &amp; Apply</button>
+              </div>
+            </div>
+
+            <!-- Status Feedback Message -->
+            <div id="data-status-msg" style="display: none; margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 12px;"></div>
+          </div>
+
+          <!-- SECTION 7: ABOUT DESKTOP PET (Item W1) -->
+          <div class="settings-group-card" id="section-about">
+            <div class="settings-group-title">
+              <i data-lucide="info"></i>
+              <span>About Desktop Pet</span>
+            </div>
+            
+            <div class="about-card-body">
+              <div class="about-author-title">Designed &amp; Developed by Samir Husayn</div>
+              <a href="#" class="about-github-pill" id="btn-about-github" title="Visit GitHub Profile">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                <span>samirhusayn28-dev</span>
+              </a>
+
+              <div class="about-meta-row">
+                <span class="about-meta-label">App Version</span>
+                <span class="about-meta-val" id="about-version-display">v1.0.0</span>
+              </div>
+
+              <div class="about-actions-grid">
+                <button type="button" class="theme-btn-secondary" id="btn-about-check-updates">
+                  <i data-lucide="refresh-cw"></i>
+                  <span>Check for updates</span>
+                </button>
+                <button type="button" class="theme-btn-secondary" id="btn-about-show-welcome">
+                  <i data-lucide="sparkles"></i>
+                  <span>Show welcome again</span>
+                </button>
+              </div>
+
+              <div class="about-update-status hidden" id="about-update-status"></div>
+            </div>
+          </div>
+
+          <!-- Reset All Settings (Item S1) -->
+          <div class="settings-reset-all-wrap">
+            <button type="button" class="btn-reset-all" id="btn-reset-all-settings" title="Reset all preferences to default values">
+              <i data-lucide="rotate-ccw"></i>
+              <span>Reset all settings</span>
+            </button>
           </div>
 
         </div>
