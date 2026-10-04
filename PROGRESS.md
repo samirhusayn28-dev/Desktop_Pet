@@ -13,14 +13,14 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Verify GPU Helper drops under 3% at idle — measured 0% Helper, 11% WindowServer (normal)
 
 ## Item 2 — PET LIFE: eyes, blink, breath, emotions, reactions
-- [ ] Eyes follow cursor (IPC `pet:global-cursor` → eye offset)
-- [ ] Random blink every 2–6 s, 20% double-blink
-- [ ] Breathing animation (CSS compositor only)
-- [ ] All 24 emotions fire on real events (no random triggers)
-- [ ] Hover → happy, click → panel, double-click → laugh/wink
-- [ ] Drag (≥4 px) → dangling / bounce
-- [ ] Sleepy at 2 min idle, sleeping at 5 min
-- [ ] System reactions: volume, battery, brightness, media, load, headphones, unlock, late-night
+- [x] Eyes follow cursor (IPC `pet:global-cursor` → eye offset)
+- [x] Random blink every 2–6 s, 20% double-blink
+- [x] Breathing animation (CSS compositor only)
+- [x] All 24 emotions fire on real events (no random triggers)
+- [x] Hover → happy, click → panel, double-click → laugh/wink
+- [x] Drag (≥4 px) → dangling / bounce
+- [x] Sleepy at 2 min idle, sleeping at 5 min
+- [x] System reactions: volume, battery, brightness, media, load, headphones, unlock, late-night
 
 ## Item 3 — Pet click opens/closes panel; reminders → bubble + sound
 - [x] Left click < 4 px opens/closes panel (no -webkit-app-region drag on pet)
