@@ -140,8 +140,8 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Test via `--simulate-boot`, `--simulate-shutdown`, powerMonitor events, `pmset displaysleepnow`
 
 ## Item R1 — FINAL RELEASE
-- [ ] All gates passed: all items in PROGRESS.md verified on packaged app, idle numbers met with glasses OFF & ON, --selftest passes, secrets scan clean, README updated, working tree clean
-- [ ] Version 1.0.1 in package.json & CHANGELOG, asset names `Desktop-Pet-${version}-mac-x64.dmg` & `Desktop-Pet-${version}-win-x64.exe`
-- [ ] Release workflow with smoke test + build jobs, merge to main, tag v1.0.1, push and monitor CI
+- [x] All gates passed: all items in PROGRESS.md verified on packaged app, idle numbers met with glasses OFF & ON, --selftest passes, secrets scan clean, README updated, working tree clean
+- [x] Version 1.0.1 in package.json & CHANGELOG, asset names `Desktop-Pet-${version}-mac-x64.dmg` & `Desktop-Pet-${version}-win-x64.exe`
+- [x] Release workflow with smoke test + build jobs, merge to main, tag v1.0.1, push and monitor CI
 
 

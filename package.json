@@ -1,11 +1,13 @@
 {
   "name": "desktop-pet",
   "productName": "Desktop Pet",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Desktop Pet – Minimal 3D Face-Bot Companion",
   "main": "main/index.js",
   "scripts": {
     "start": "electron .",
+    "selftest": "electron . --selftest",
+    "test:selftest": "electron . --selftest",
     "preview": "electron scripts/capture_preview.js",
     "preview:emotions": "electron facebot_preview.html",
     "verify": "electron scripts/verify_real_desktop_pet.js",
