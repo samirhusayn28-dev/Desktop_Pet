@@ -31,7 +31,11 @@ const CENTRAL_DEFAULTS = {
     idleSleepyMinutes: 2,
     idleSleepingMinutes: 5,
     bubbleDuration: 5,
-    sounds: true,
+    soundsEnabled: false,
+    soundVolume: 50,
+    soundReminders: true,
+    soundTimer: true,
+    soundReactions: true,
     dnd: false
   },
   reactions: {
@@ -94,7 +98,14 @@ class SettingsTab {
     this.dispIdleSleeping = document.getElementById('disp-idle-sleeping');
     this.bubbleDurationSlider = document.getElementById('setting-bubble-duration');
     this.dispBubbleDuration = document.getElementById('disp-bubble-duration');
-    this.soundsToggle = document.getElementById('setting-sounds');
+    this.soundsToggle = document.getElementById('setting-sounds-enabled');
+    this.soundSubControls = document.getElementById('sound-sub-controls');
+    this.soundVolumeSlider = document.getElementById('setting-sound-volume');
+    this.dispSoundVolume = document.getElementById('disp-sound-volume');
+    this.btnTestSound = document.getElementById('btn-sound-test');
+    this.soundRemindersToggle = document.getElementById('setting-sound-reminders');
+    this.soundTimerToggle = document.getElementById('setting-sound-timer');
+    this.soundReactionsToggle = document.getElementById('setting-sound-reactions');
     this.dndToggle = document.getElementById('setting-dnd');
 
     // 3. Reactions Settings
@@ -229,7 +240,11 @@ class SettingsTab {
     const idleSleepy = store.get('settings.behavior.idleSleepyMinutes') ?? CENTRAL_DEFAULTS.behavior.idleSleepyMinutes;
     const idleSleeping = store.get('settings.behavior.idleSleepingMinutes') ?? CENTRAL_DEFAULTS.behavior.idleSleepingMinutes;
     const bubbleDuration = store.get('settings.behavior.bubbleDuration') ?? CENTRAL_DEFAULTS.behavior.bubbleDuration;
-    const sounds = store.get('settings.behavior.sounds') !== false;
+    const soundsEnabled = store.get('settings.behavior.soundsEnabled') === true;
+    const soundVolume = store.get('settings.behavior.soundVolume') ?? CENTRAL_DEFAULTS.behavior.soundVolume;
+    const soundReminders = store.get('settings.behavior.soundReminders') !== false;
+    const soundTimer = store.get('settings.behavior.soundTimer') !== false;
+    const soundReactions = store.get('settings.behavior.soundReactions') !== false;
     const dnd = store.get('settings.behavior.dnd') === true;
 
     if (this.idleSleepySlider) {
@@ -244,7 +259,15 @@ class SettingsTab {
       this.bubbleDurationSlider.value = bubbleDuration;
       if (this.dispBubbleDuration) this.dispBubbleDuration.textContent = `${bubbleDuration} sec`;
     }
-    if (this.soundsToggle) this.soundsToggle.checked = sounds;
+    if (this.soundsToggle) this.soundsToggle.checked = soundsEnabled;
+    if (this.soundSubControls) this.soundSubControls.style.display = soundsEnabled ? 'flex' : 'none';
+    if (this.soundVolumeSlider) {
+      this.soundVolumeSlider.value = soundVolume;
+      if (this.dispSoundVolume) this.dispSoundVolume.textContent = `${soundVolume}%`;
+    }
+    if (this.soundRemindersToggle) this.soundRemindersToggle.checked = soundReminders;
+    if (this.soundTimerToggle) this.soundTimerToggle.checked = soundTimer;
+    if (this.soundReactionsToggle) this.soundReactionsToggle.checked = soundReactions;
     if (this.dndToggle) this.dndToggle.checked = dnd;
 
     // 3. Reactions
@@ -722,8 +745,100 @@ class SettingsTab {
     if (this.soundsToggle) {
       this.soundsToggle.addEventListener('change', (e) => {
         const val = e.target.checked;
-        window.panelController.store.set('settings.behavior.sounds', val);
+        window.panelController.store.set('settings.behavior.soundsEnabled', val);
+        if (this.soundSubControls) {
+          this.soundSubControls.style.display = val ? 'flex' : 'none';
+        }
         if (window.soundEffects) window.soundEffects.setEnabled(val);
+        if (window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('settings:sound-changed', { soundsEnabled: val });
+        }
+        this.updateControlResetState('setting-sounds-enabled');
+      });
+    }
+
+    if (this.soundVolumeSlider) {
+      this.soundVolumeSlider.addEventListener('input', (e) => {
+        const val = Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0)));
+        if (this.dispSoundVolume) this.dispSoundVolume.textContent = `${val}%`;
+        window.panelController.store.set('settings.behavior.soundVolume', val);
+        if (window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('settings:sound-changed', { soundVolume: val });
+        }
+        this.updateControlResetState('setting-sound-volume');
+      });
+    }
+
+    if (this.btnTestSound) {
+      this.btnTestSound.addEventListener('click', () => {
+        if (window.soundManager) {
+          window.soundManager.play('chirp', 'test');
+        } else if (window.panelController && window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('pet:play-sound-request', { sound: 'chirp', category: 'test' });
+        }
+      });
+    }
+
+    if (this.soundRemindersToggle) {
+      this.soundRemindersToggle.addEventListener('change', (e) => {
+        const val = e.target.checked;
+        window.panelController.store.set('settings.behavior.soundReminders', val);
+        if (window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('settings:sound-changed', { soundReminders: val });
+        }
+        this.updateControlResetState('setting-sound-reminders');
+      });
+    }
+
+    if (this.soundTimerToggle) {
+      this.soundTimerToggle.addEventListener('change', (e) => {
+        const val = e.target.checked;
+        window.panelController.store.set('settings.behavior.soundTimer', val);
+        if (window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('settings:sound-changed', { soundTimer: val });
+        }
+        this.updateControlResetState('setting-sound-timer');
+      });
+    }
+
+    if (this.soundReactionsToggle) {
+      this.soundReactionsToggle.addEventListener('change', (e) => {
+        const val = e.target.checked;
+        window.panelController.store.set('settings.behavior.soundReactions', val);
+        if (window.panelController.ipcRenderer) {
+          window.panelController.ipcRenderer.send('settings:sound-changed', { soundReactions: val });
+        }
+        this.updateControlResetState('setting-sound-reactions');
+      });
+    }
+
+    if (window.panelController && window.panelController.ipcRenderer) {
+      window.panelController.ipcRenderer.on('settings:sound-updated', (e, newSettings) => {
+        if (!newSettings || typeof newSettings !== 'object') return;
+        if (newSettings.soundsEnabled !== undefined && this.soundsToggle) {
+          this.soundsToggle.checked = !!newSettings.soundsEnabled;
+          if (this.soundSubControls) {
+            this.soundSubControls.style.display = newSettings.soundsEnabled ? 'flex' : 'none';
+          }
+          this.updateControlResetState('setting-sounds-enabled');
+        }
+        if (newSettings.soundVolume !== undefined && this.soundVolumeSlider) {
+          this.soundVolumeSlider.value = newSettings.soundVolume;
+          if (this.dispSoundVolume) this.dispSoundVolume.textContent = `${newSettings.soundVolume}%`;
+          this.updateControlResetState('setting-sound-volume');
+        }
+        if (newSettings.soundReminders !== undefined && this.soundRemindersToggle) {
+          this.soundRemindersToggle.checked = !!newSettings.soundReminders;
+          this.updateControlResetState('setting-sound-reminders');
+        }
+        if (newSettings.soundTimer !== undefined && this.soundTimerToggle) {
+          this.soundTimerToggle.checked = !!newSettings.soundTimer;
+          this.updateControlResetState('setting-sound-timer');
+        }
+        if (newSettings.soundReactions !== undefined && this.soundReactionsToggle) {
+          this.soundReactionsToggle.checked = !!newSettings.soundReactions;
+          this.updateControlResetState('setting-sound-reactions');
+        }
       });
     }
 
@@ -1356,7 +1471,11 @@ class SettingsTab {
       { id: 'setting-idle-sleepy', section: 'behavior', key: 'settings.behavior.idleSleepyMinutes', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.idleSleepyMinutes, dispId: 'disp-idle-sleepy', suffix: ' min' },
       { id: 'setting-idle-sleeping', section: 'behavior', key: 'settings.behavior.idleSleepingMinutes', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.idleSleepingMinutes, dispId: 'disp-idle-sleeping', suffix: ' min' },
       { id: 'setting-bubble-duration', section: 'behavior', key: 'settings.behavior.bubbleDuration', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.bubbleDuration, dispId: 'disp-bubble-duration', suffix: ' sec' },
-      { id: 'setting-sounds', section: 'behavior', key: 'settings.behavior.sounds', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.sounds },
+      { id: 'setting-sounds-enabled', section: 'behavior', key: 'settings.behavior.soundsEnabled', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.soundsEnabled },
+      { id: 'setting-sound-volume', section: 'behavior', key: 'settings.behavior.soundVolume', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.soundVolume, dispId: 'disp-sound-volume', suffix: '%' },
+      { id: 'setting-sound-reminders', section: 'behavior', key: 'settings.behavior.soundReminders', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.soundReminders },
+      { id: 'setting-sound-timer', section: 'behavior', key: 'settings.behavior.soundTimer', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.soundTimer },
+      { id: 'setting-sound-reactions', section: 'behavior', key: 'settings.behavior.soundReactions', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.soundReactions },
       { id: 'setting-dnd', section: 'behavior', key: 'settings.behavior.dnd', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.dnd },
 
       // 3. Reactions

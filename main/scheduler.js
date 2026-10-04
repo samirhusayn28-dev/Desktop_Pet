@@ -7,36 +7,9 @@
 
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
 const { powerMonitor } = require('electron');
 const store = require('./secure-store');
 const bubble = require('./bubble-window');
-
-function playAudioAlert(soundName = 'alarm') {
-  if (store.get('settings.behavior.sounds') === false) return;
-
-  const candidates = [
-    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'audio', `${soundName}.aiff`),
-    path.join(__dirname, '..', 'audio', `${soundName}.aiff`),
-    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'audio', `${soundName}.wav`),
-    path.join(__dirname, '..', 'audio', `${soundName}.wav`),
-  ];
-
-  if (process.platform === 'darwin') {
-    if (soundName === 'alarm') candidates.push('/System/Library/Sounds/Hero.aiff');
-    else if (soundName === 'happy') candidates.push('/System/Library/Sounds/Glass.aiff');
-    else candidates.push('/System/Library/Sounds/Tink.aiff');
-  }
-
-  for (const p of candidates) {
-    if (fs.existsSync(p)) {
-      if (process.platform === 'darwin') {
-        exec(`afplay "${p}" &`, () => {});
-      }
-      return;
-    }
-  }
-}
 
 class Scheduler {
   constructor() {
@@ -100,6 +73,7 @@ class Scheduler {
           badge: 'HYDRATION CHECK',
           text,
           sound: 'chirp',
+          category: 'reminders',
           emotion: 'happy'
         });
       }
@@ -113,6 +87,7 @@ class Scheduler {
           badge: 'POSTURE BREAK',
           text,
           sound: 'chirp',
+          category: 'reminders',
           emotion: 'thinking'
         });
       }
@@ -126,14 +101,12 @@ class Scheduler {
       ? (userName ? `${userName}, you missed reminder: ${title}!` : `Missed reminder: ${title}!`)
       : (userName ? `Hey ${userName}, time for: ${title}!` : `Time for: ${title}!`);
 
-    // 1. Play sound via afplay/unpacked audio
-    playAudioAlert('alarm');
-
-    // 2. Pet reacts: surprised + bounce + solid speech bubble
+    // Pet reacts: surprised + bounce + solid speech bubble
     bubble.show({
       badge: isMissed ? 'MISSED REMINDER' : 'REMINDER',
       text,
       sound: 'alarm',
+      category: 'reminders',
       emotion: isMissed ? 'worried' : 'surprised',
       bounce: true,
       duration: 7000,
@@ -237,12 +210,11 @@ class Scheduler {
 
     store.set('reminders', reminders);
 
-    playAudioAlert('tap');
-
     bubble.show({
       badge: 'SNOOZED',
       text: `Reminder snoozed for ${minutes} min (${rem.time}).`,
       sound: 'tap',
+      category: 'reminders',
       emotion: 'wink',
       duration: 3500
     });

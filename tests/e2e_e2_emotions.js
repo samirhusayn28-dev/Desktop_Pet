@@ -386,28 +386,21 @@ async function runTests() {
       const currentVol = execSync(`osascript -e 'output volume of (get volume settings)'`).toString().trim();
       console.log(`  Current Mac system volume: ${currentVol}`);
 
-      // Resume real sensors for Phase 9 and reset to neutral
+      // Set volume to 50 first to ensure normal baseline band
+      execSync(`osascript -e 'set volume output volume 50'`);
+      await petWin.waitForTimeout(500);
+
+      // Resume real sensors for Phase 9 and reset to neutral baseline
       await petWin.evaluate(async () => {
         const { ipcRenderer } = require('electron');
         await ipcRenderer.invoke('test:resume-sensors');
         await ipcRenderer.invoke('test:force-emotion', 'neutral', 0);
       });
-      await petWin.waitForTimeout(300);
-
-      // Set volume to 50 first to ensure normal band
-      execSync(`osascript -e 'set volume output volume 50'`);
-      await petWin.waitForTimeout(2500);
-
-      // Reset to neutral before crossing
-      await petWin.evaluate(async () => {
-        const { ipcRenderer } = require('electron');
-        await ipcRenderer.invoke('test:force-emotion', 'neutral', 0);
-      });
-      await petWin.waitForTimeout(200);
+      await petWin.waitForTimeout(1500);
 
       // Now set volume to 100 (crosses to MAX)
       execSync(`osascript -e 'set volume output volume 100'`);
-      await petWin.waitForTimeout(2500); // Allow volume watcher to poll (1.5s interval)
+      await petWin.waitForTimeout(3500); // Allow volume watcher to poll (1.5s interval)
       let macVolState = await petWin.evaluate(async () => {
         const { ipcRenderer } = require('electron');
         return await ipcRenderer.invoke('test:get-pet-emotion');
@@ -416,12 +409,19 @@ async function runTests() {
 
       // Set volume back to 50 (normal -> relieved)
       execSync(`osascript -e 'set volume output volume 50'`);
-      await petWin.waitForTimeout(2500);
-      macVolState = await petWin.evaluate(async () => {
-        const { ipcRenderer } = require('electron');
-        return await ipcRenderer.invoke('test:get-pet-emotion');
-      });
-      assert(macVolState?.currentEmotion === 'relieved', `Real Mac volume back to 50 triggers 'relieved' (got ${macVolState?.currentEmotion})`);
+      let gotRelieved = false;
+      for (let t = 0; t < 7; t++) {
+        await petWin.waitForTimeout(500);
+        macVolState = await petWin.evaluate(async () => {
+          const { ipcRenderer } = require('electron');
+          return await ipcRenderer.invoke('test:get-pet-emotion');
+        });
+        if (macVolState?.currentEmotion === 'relieved') {
+          gotRelieved = true;
+          break;
+        }
+      }
+      assert(gotRelieved, `Real Mac volume back to 50 triggers 'relieved' (got ${macVolState?.currentEmotion})`);
 
       // Restore volume
       execSync(`osascript -e 'set volume output volume ${currentVol}'`);

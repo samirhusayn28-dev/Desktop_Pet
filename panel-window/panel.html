@@ -580,12 +580,56 @@
               <input type="range" id="setting-bubble-duration" min="2" max="12" step="1" value="5" class="terminal-slider">
             </div>
 
+            <!-- Master Sounds Toggle (Item SND1) -->
             <div class="setting-toggle-row">
               <div class="setting-toggle-text">
-                <div class="toggle-title">Notification Sounds</div>
-                <div class="toggle-desc">Play gentle robot chirps on alerts and reminders</div>
+                <div class="toggle-title">Sounds</div>
+                <div class="toggle-desc">Play sounds for reminders, timers and pet reactions</div>
               </div>
-              <input type="checkbox" id="setting-sounds" class="toggle-checkbox" checked>
+              <input type="checkbox" id="setting-sounds-enabled" class="toggle-checkbox">
+            </div>
+
+            <!-- Sounds Sub-controls (visible only when Sounds master toggle is ON) -->
+            <div id="sound-sub-controls" class="sound-sub-panel" style="display: none;">
+              <!-- Volume Slider + Test Sound Button -->
+              <div class="setting-slider-row">
+                <div class="slider-header-row">
+                  <span class="setting-label">Sound Volume</span>
+                  <div class="slider-val-wrap">
+                    <span class="slider-value" id="disp-sound-volume">50%</span>
+                    <button type="button" class="btn-sound-test" id="btn-sound-test" title="Play test sound">
+                      <i data-lucide="volume-2"></i>
+                      <span>Test sound</span>
+                    </button>
+                  </div>
+                </div>
+                <input type="range" id="setting-sound-volume" min="0" max="100" step="1" value="50" class="terminal-slider">
+              </div>
+
+              <!-- Sub-toggles -->
+              <div class="setting-toggle-row sound-sub-toggle">
+                <div class="setting-toggle-text">
+                  <div class="toggle-title">Reminders</div>
+                  <div class="toggle-desc">Sound alert when a reminder or posture check is due</div>
+                </div>
+                <input type="checkbox" id="setting-sound-reminders" class="toggle-checkbox" checked>
+              </div>
+
+              <div class="setting-toggle-row sound-sub-toggle">
+                <div class="setting-toggle-text">
+                  <div class="toggle-title">Timer &amp; Pomodoro</div>
+                  <div class="toggle-desc">Sound chime when countdown or focus interval finishes</div>
+                </div>
+                <input type="checkbox" id="setting-sound-timer" class="toggle-checkbox" checked>
+              </div>
+
+              <div class="setting-toggle-row sound-sub-toggle">
+                <div class="setting-toggle-text">
+                  <div class="toggle-title">Pet reactions</div>
+                  <div class="toggle-desc">Play gentle chirps and taps during pet interactions</div>
+                </div>
+                <input type="checkbox" id="setting-sound-reactions" class="toggle-checkbox" checked>
+              </div>
             </div>
 
             <div class="setting-toggle-row">

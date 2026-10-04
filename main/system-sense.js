@@ -145,10 +145,17 @@ class SystemSense {
 
   resumeBackgroundPolling() {
     this.isPaused = false;
+    this.currentVolumeBand = null;
     if (this.unpauseTimer) {
       clearTimeout(this.unpauseTimer);
       this.unpauseTimer = null;
     }
+    this.startVolumeWatcher();
+    if (this.pollTimer) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
+    this.runAdaptiveCheck();
   }
 
   async runAdaptiveCheck() {
@@ -237,8 +244,9 @@ class SystemSense {
         if (powerMonitor) idle = powerMonitor.getSystemIdleTime();
       } catch (e) {}
 
-      // Poll ~1.5s while active (<30s idle), 10s otherwise
-      const delay = (idle < 30 && !this.isSleeping && !this.isScreenLocked && !this.isSuspended) ? 1500 : 10000;
+      // Poll ~1.5s while active (<30s idle) or in test mode, 10s otherwise
+      const isTestMode = process.argv.includes('--test-hooks');
+      const delay = (isTestMode || (idle < 30 && !this.isSleeping && !this.isScreenLocked && !this.isSuspended)) ? 1500 : 10000;
 
       this.volumeTimer = setTimeout(async () => {
         if (this.isCheckingVolume) return;

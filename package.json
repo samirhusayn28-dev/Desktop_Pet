@@ -1,7 +1,7 @@
 {
   "name": "desktop-pet",
   "productName": "Desktop Pet",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Desktop Pet – Minimal 3D Face-Bot Companion",
   "main": "main/index.js",
   "scripts": {

@@ -2,6 +2,11 @@
 
 All notable changes to Desktop Pet are documented in this file.
 
+## [1.0.2] - 2026-10-05
+
+### Added
+- **Sounds on/off option, off by default**: Unified master sound toggle under `soundsEnabled` (off by default) controlling all reminders, timer/pomodoro alarms, and pet reactions. Includes volume slider (0-100), test sound button, category sub-toggles, Do Not Disturb muting, Welcome screen sync, and automatic one-time settings migration.
+
 ## [1.0.1] - 2026-10-04
 
 ### Added

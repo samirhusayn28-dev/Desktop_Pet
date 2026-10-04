@@ -3569,3 +3569,47 @@ button:focus-visible {
   border-color: #EF4444;
 }
 
+/* Sound Sub-Panel (Item SND1) */
+.sound-sub-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--theme-card-border, #2a2a34);
+  border-radius: 12px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.sound-sub-toggle {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.btn-sound-test {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  background: var(--theme-primary-alpha, rgba(255, 122, 47, 0.16));
+  border: 1px solid var(--theme-primary-alpha-strong, rgba(255, 122, 47, 0.28));
+  border-radius: 6px;
+  color: var(--theme-primary, #FF7A2F);
+  font-size: 11px;
+  font-weight: 500;
+  transition: var(--transition-fast);
+  cursor: pointer;
+}
+
+.btn-sound-test:hover {
+  background: var(--theme-primary, #FF7A2F);
+  color: #FFFFFF;
+}
+
+.btn-sound-test svg,
+.btn-sound-test i {
+  width: 12px;
+  height: 12px;
+}
+

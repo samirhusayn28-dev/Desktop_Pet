@@ -1061,7 +1061,31 @@ ipcMain.handle('data:apply-import', async (e, { data, notesStrategy }) => {
         store.set('settings.general', Object.assign({}, store.get('settings.general') || {}, data.settings.general));
       }
       if (data.settings.behavior) {
-        store.set('settings.behavior', Object.assign({}, store.get('settings.behavior') || {}, data.settings.behavior));
+        const beh = Object.assign({}, data.settings.behavior);
+        // Validate booleans and 0-100 volume range, migrate old settings (Item SND1)
+        if (beh.soundsEnabled === undefined) {
+          beh.soundsEnabled = false; // migrate to OFF
+        } else {
+          beh.soundsEnabled = !!beh.soundsEnabled;
+        }
+        delete beh.sounds;
+
+        if (beh.soundVolume !== undefined) {
+          const volNum = Number(beh.soundVolume);
+          beh.soundVolume = isNaN(volNum) ? 50 : Math.max(0, Math.min(100, Math.round(volNum)));
+        } else {
+          beh.soundVolume = 50;
+        }
+
+        beh.soundReminders = beh.soundReminders !== false;
+        beh.soundTimer = beh.soundTimer !== false;
+        beh.soundReactions = beh.soundReactions !== false;
+
+        store.set('settings.behavior', Object.assign({}, store.get('settings.behavior') || {}, beh));
+        relayToPet('pet:update-sound-settings', beh);
+        if (panelWindow && !panelWindow.isDestroyed()) {
+          panelWindow.webContents.send('settings:sound-updated', beh);
+        }
       }
       if (data.settings.reactions) {
         store.set('settings.reactions', Object.assign({}, store.get('settings.reactions') || {}, data.settings.reactions));
@@ -1578,13 +1602,14 @@ app.whenReady().then(async () => {
 
     // 3. Audio Assets Check
     try {
-      const audioFiles = ['alarm.aiff', 'alarm.wav', 'tap.wav', 'chirp.wav', 'happy.wav', 'pop.wav'];
+      const audioFiles = ['alarm.wav', 'tap.wav', 'chirp.wav', 'happy.wav'];
       const audioDir = path.join(__dirname, '..', 'audio');
       const foundAudio = audioFiles.filter(f => fs.existsSync(path.join(audioDir, f)));
-      if (foundAudio.length > 0) {
-        console.log(`[SELFTEST] audio-assets: PASS (${foundAudio.length}/${audioFiles.length} assets located)`);
+      if (foundAudio.length === audioFiles.length) {
+        console.log(`[SELFTEST] audio-assets: PASS (${foundAudio.length}/${audioFiles.length} bundled wav files verified)`);
       } else {
-        console.log('[SELFTEST] audio-assets: UNAVAILABLE (packaged/system sounds only)');
+        console.error(`[SELFTEST] audio-assets: FAIL (Missing ${audioFiles.length - foundAudio.length} audio files)`);
+        failedCount++;
       }
     } catch (e) {
       console.error(`[SELFTEST] audio-assets: FAIL (${e.message})`);
@@ -1686,6 +1711,25 @@ app.whenReady().then(async () => {
     createWelcomeWindow();
   }
 
+  // One-time migration for existing installs to Sounds OFF (Item SND1)
+  const soundMigrationDone = store.get('soundMigrationDone');
+  if (!soundMigrationDone) {
+    const isExistingInstall = store.get('isFirstRun') === false || store.get('settings.behavior.sounds') !== undefined;
+    store.set('settings.behavior.soundsEnabled', false);
+    store.set('soundMigrationDone', true);
+    if (isExistingInstall) {
+      setTimeout(() => {
+        bubble.show({
+          badge: '',
+          text: 'Sounds are now off by default. You can turn them on in Settings > Behavior > Sounds.',
+          duration: 6000,
+          sound: '',
+          emotion: 'neutral'
+        });
+      }, 2500);
+    }
+  }
+
   // Start background services
   scheduler.start();
   systemSense.start();
@@ -1747,6 +1791,47 @@ app.whenReady().then(async () => {
     ipcMain.handle('test:toggle-panel', () => {
       togglePanel();
       return { isPanelOpen: !!(panelWindow && !panelWindow.isDestroyed() && panelWindow.isVisible()) };
+    });
+
+    ipcMain.handle('test:get-sound-metrics', async () => {
+      if (!petWindow || petWindow.isDestroyed()) return null;
+      return await petWindow.webContents.executeJavaScript(`window.__soundTestHooks ? {
+        playCount: window.__soundTestHooks.playCount,
+        activeAudioObjects: window.__soundTestHooks.activeAudioObjects,
+        lastPlayed: window.__soundTestHooks.lastPlayed,
+        history: window.__soundTestHooks.history
+      } : { playCount: 0, activeAudioObjects: 0, lastPlayed: null, history: [] }`);
+    });
+
+    ipcMain.handle('test:reset-sound-metrics', async () => {
+      if (!petWindow || petWindow.isDestroyed()) return null;
+      return await petWindow.webContents.executeJavaScript(`if (window.__soundTestHooks) { window.__soundTestHooks.reset(); true; } else { false; }`);
+    });
+
+    ipcMain.handle('test:trigger-reminder', (e, rem) => {
+      bubble.hide();
+      scheduler.triggerReminder(rem || { id: 'test-rem', title: 'Test Reminder', time: '12:00' });
+      return true;
+    });
+
+    ipcMain.handle('test:trigger-volume-reaction', (e, vol) => {
+      bubble.hide();
+      systemSense.injectSensorReading('volume', vol);
+      return true;
+    });
+
+    ipcMain.handle('test:trigger-welcome', () => {
+      bubble.hide();
+      bootLifecycle.isSimulatedBoot = true;
+      bootLifecycle.hasGreetedThisSession = false;
+      return bootLifecycle.evaluateStartupWelcome();
+    });
+
+    ipcMain.handle('test:trigger-goodbye', () => {
+      bubble.hide();
+      bootLifecycle.isQuitting = false;
+      bootLifecycle.handleGoodbye('quit', () => {});
+      return true;
     });
 
     ipcMain.handle('test:force-emotion', (e, emotionName, duration = 4000, priority = null) => {
@@ -1900,6 +1985,7 @@ ipcMain.handle('welcome:get-init-data', () => {
     userName: store.get('settings.general.userName') || '',
     petName: store.get('settings.general.petName') || 'Bolt',
     glassesEnabled: store.get('settings.appearance.glassesEnabled') || false,
+    soundsEnabled: store.get('settings.behavior.soundsEnabled') === true,
     appearance: store.get('settings.appearance') || {},
     aiProvider: store.get('settings.ai.activeProvider') || 'gemini',
     aiModel: store.get(`settings.ai.models.${store.get('settings.ai.activeProvider') || 'gemini'}`)
@@ -1938,6 +2024,13 @@ ipcMain.on('welcome:finish', (e, data) => {
         panelWindow.webContents.send('panel:update-glasses', !!data.glassesEnabled);
       }
     }
+    if (data.soundsEnabled !== undefined) {
+      store.set('settings.behavior.soundsEnabled', !!data.soundsEnabled);
+      relayToPet('pet:update-sound-settings', { soundsEnabled: !!data.soundsEnabled });
+      if (panelWindow && !panelWindow.isDestroyed()) {
+        panelWindow.webContents.send('settings:sound-updated', { soundsEnabled: !!data.soundsEnabled });
+      }
+    }
     if (data.appearance) {
       const current = store.get('settings.appearance') || {};
       const updated = Object.assign({}, current, data.appearance);
@@ -1960,6 +2053,13 @@ ipcMain.on('welcome:finish', (e, data) => {
     if (data.apiKey && data.aiProvider) {
       store.setApiKey(data.aiProvider, data.apiKey);
     }
+  } else {
+    // Skip keeps sounds OFF
+    store.set('settings.behavior.soundsEnabled', false);
+    relayToPet('pet:update-sound-settings', { soundsEnabled: false });
+    if (panelWindow && !panelWindow.isDestroyed()) {
+      panelWindow.webContents.send('settings:sound-updated', { soundsEnabled: false });
+    }
   }
 
   // Both Save & Skip mark first run completed
@@ -1968,5 +2068,36 @@ ipcMain.on('welcome:finish', (e, data) => {
   if (welcomeWindow && !welcomeWindow.isDestroyed()) {
     welcomeWindow.close();
   }
+});
+
+// Sound Management IPC (Item SND1)
+ipcMain.on('pet:play-sound-request', (e, { sound, category }) => {
+  relayToPet('pet:play-sound', { sound, category });
+});
+
+ipcMain.on('settings:sound-changed', (e, newSettings) => {
+  if (newSettings && typeof newSettings === 'object') {
+    for (const [k, v] of Object.entries(newSettings)) {
+      store.set(`settings.behavior.${k}`, v);
+    }
+  }
+  relayToPet('pet:update-sound-settings', newSettings);
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    panelWindow.webContents.send('settings:sound-updated', newSettings);
+  }
+  if (welcomeWindow && !welcomeWindow.isDestroyed()) {
+    welcomeWindow.webContents.send('welcome:sound-updated', newSettings);
+  }
+});
+
+ipcMain.on('pet:get-sound-settings', (event) => {
+  event.returnValue = {
+    soundsEnabled: store.get('settings.behavior.soundsEnabled') === true,
+    soundVolume: store.get('settings.behavior.soundVolume') ?? 50,
+    soundReminders: store.get('settings.behavior.soundReminders') !== false,
+    soundTimer: store.get('settings.behavior.soundTimer') !== false,
+    soundReactions: store.get('settings.behavior.soundReactions') !== false,
+    dnd: store.get('settings.behavior.dnd') === true
+  };
 });
 

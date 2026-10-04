@@ -9,7 +9,7 @@
  * - Solid Cute Material speech bubble (notifies main to expand/shrink pet window)
  */
 
-const { ipcRenderer } = typeof require !== 'undefined' ? require('electron') : { ipcRenderer: null };
+var { ipcRenderer } = typeof require !== 'undefined' ? require('electron') : { ipcRenderer: null };
 
 const EMOTION_PRIORITIES = {
   // Level 5: ERROR_AI
@@ -227,7 +227,7 @@ class FaceBotController {
   }
 
   // --- Solid Cute Material Speech Bubble ---
-  showBubble({ text, badge = '', duration = 5000, sound = '', emotion = '', bounce = false }) {
+  showBubble({ text, badge = '', duration = 5000, sound = '', category = '', emotion = '', bounce = false }) {
     if (!this.bubbleEl || !text) return;
 
     if (bounce && this.container) {
@@ -266,11 +266,12 @@ class FaceBotController {
     }
 
     if (sound && window.soundEffects) {
-      if (sound === 'chirp') window.soundEffects.playChirp();
-      else if (sound === 'happy') window.soundEffects.playHappy();
-      else if (sound === 'alarm') window.soundEffects.playAlarm();
-      else if (sound === 'tap') window.soundEffects.playTap();
-      else window.soundEffects.playChirp();
+      const soundCat = category || (
+        (badge && (badge.includes('REMINDER') || badge.includes('POSTURE') || badge.includes('HYDRATION') || badge.includes('SNOOZED')))
+          ? 'reminders'
+          : ((badge && (badge.includes('TIMER') || badge.includes('POMODORO') || badge.includes('BREAK'))) ? 'timer' : 'reactions')
+      );
+      window.soundEffects.play(sound, soundCat);
     }
 
     if (emotion) {

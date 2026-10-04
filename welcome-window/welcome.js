@@ -47,6 +47,7 @@ class WelcomeController {
     this.inputUserName = document.getElementById('input-user-name');
     this.inputPetName = document.getElementById('input-pet-name');
     this.toggleGlasses = document.getElementById('toggle-glasses');
+    this.toggleSounds = document.getElementById('toggle-sounds');
 
     // Appearance Sliders
     this.inputScale = document.getElementById('input-scale');
@@ -100,6 +101,9 @@ class WelcomeController {
         if (initData.glassesEnabled !== undefined) {
           this.appearance.glassesEnabled = !!initData.glassesEnabled;
           this.toggleGlasses.checked = this.appearance.glassesEnabled;
+        }
+        if (this.toggleSounds) {
+          this.toggleSounds.checked = initData.soundsEnabled === true;
         }
         if (initData.aiProvider) {
           this.selectProvider.value = initData.aiProvider;
@@ -239,6 +243,18 @@ class WelcomeController {
     // 7. Test connection
     this.btnTestConn?.addEventListener('click', () => this.testConnection());
 
+    // 7.5. Sounds toggle
+    this.toggleSounds?.addEventListener('change', () => {
+      const isEnabled = !!this.toggleSounds.checked;
+      ipcRenderer.send('settings:sound-changed', { soundsEnabled: isEnabled });
+    });
+
+    ipcRenderer.on('welcome:sound-updated', (event, data) => {
+      if (data && data.soundsEnabled !== undefined && this.toggleSounds) {
+        this.toggleSounds.checked = !!data.soundsEnabled;
+      }
+    });
+
     // 8. Save & Start
     this.btnSaveStart?.addEventListener('click', () => this.finish(true));
 
@@ -313,6 +329,7 @@ class WelcomeController {
     const userName = (this.inputUserName?.value || '').trim();
     const petName = (this.inputPetName?.value || 'Bolt').trim();
     const glassesEnabled = !!this.toggleGlasses?.checked;
+    const soundsEnabled = !!this.toggleSounds?.checked;
     const aiProvider = this.selectProvider?.value || 'gemini';
     const aiModel = this.selectModel?.value || this.providerDefaults[aiProvider];
     const apiKey = (this.inputApiKey?.value || '').trim();
@@ -322,6 +339,7 @@ class WelcomeController {
       userName,
       petName,
       glassesEnabled,
+      soundsEnabled,
       appearance: this.appearance,
       accentColor: this.appearance.accentColor,
       aiProvider,

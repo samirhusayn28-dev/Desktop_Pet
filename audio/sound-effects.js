@@ -1,142 +1,269 @@
 /**
- * Desktop Pet — Procedural Web Audio Sound Effects Synthesizer
- * Zero external audio files required! Lightweight, instant, 100% reliable.
+ * Desktop Pet — Unified Sound Manager (Item SND1)
+ *
+ * Requirements:
+ * - Master setting `soundsEnabled` (default false).
+ * - When sounds are OFF: ZERO audio element, ZERO AudioContext, no files loaded, no external process spawned.
+ * - Switching sounds OFF stops anything playing immediately.
+ * - When ON: plays through pet window's renderer, lazy Audio element creation on first use,
+ *   bundled files under 50 KB, autoplayPolicy 'no-user-gesture-required',
+ *   respects volume (0-100) and sub-toggles (reminders, timer, reactions),
+ *   mutes while Do Not Disturb is active, releases audio resources shortly after playback.
+ * - Same code path on macOS and Windows (no afplay, no PowerShell).
  */
 
-class SoundEffects {
+(function() {
+const { ipcRenderer } = typeof require !== 'undefined' ? require('electron') : { ipcRenderer: null };
+const storeModule = typeof require !== 'undefined' ? (function() {
+  try { return require('../main/store'); } catch(e) { return null; }
+})() : null;
+
+class SoundManager {
   constructor() {
-    this.ctx = null;
-    this.enabled = true;
+    this.currentAudio = null;
+    this.cleanupTimer = null;
+    this.isPetWindow = typeof window !== 'undefined' && window.location.href.includes('pet.html');
+
+    // Cached settings (updated via store or IPC)
+    this.settings = {
+      soundsEnabled: false,
+      soundVolume: 50,
+      soundReminders: true,
+      soundTimer: true,
+      soundReactions: true,
+      dnd: false
+    };
+
+    this.init();
   }
 
   init() {
-    if (!this.ctx && typeof window !== 'undefined') {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
+    this.loadSettings();
+
+    if (ipcRenderer) {
+      ipcRenderer.on('pet:update-sound-settings', (event, newSettings) => {
+        this.updateSettings(newSettings);
+      });
+
+      ipcRenderer.on('pet:stop-sound', () => {
+        this.stopAll();
+      });
+
+      if (this.isPetWindow) {
+        ipcRenderer.on('pet:play-sound', (event, { sound, category }) => {
+          this.play(sound, category);
+        });
       }
     }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+  }
+
+  loadSettings() {
+    try {
+      if (ipcRenderer) {
+        const remote = ipcRenderer.sendSync('pet:get-sound-settings');
+        if (remote) {
+          Object.assign(this.settings, remote);
+        }
+      } else if (storeModule) {
+        this.settings.soundsEnabled = storeModule.get('settings.behavior.soundsEnabled') === true;
+        this.settings.soundVolume = storeModule.get('settings.behavior.soundVolume') ?? 50;
+        this.settings.soundReminders = storeModule.get('settings.behavior.soundReminders') !== false;
+        this.settings.soundTimer = storeModule.get('settings.behavior.soundTimer') !== false;
+        this.settings.soundReactions = storeModule.get('settings.behavior.soundReactions') !== false;
+        this.settings.dnd = storeModule.get('settings.behavior.dnd') === true;
+      }
+    } catch (e) {}
+  }
+
+  updateSettings(newSettings) {
+    if (!newSettings || typeof newSettings !== 'object') return;
+    const wasEnabled = this.settings.soundsEnabled;
+    Object.assign(this.settings, newSettings);
+
+    // If sounds was switched OFF, stop anything playing immediately!
+    if (wasEnabled && !this.settings.soundsEnabled) {
+      this.stopAll();
     }
   }
 
   setEnabled(val) {
-    this.enabled = !!val;
+    const boolVal = !!val;
+    this.settings.soundsEnabled = boolVal;
+    if (storeModule) {
+      storeModule.set('settings.behavior.soundsEnabled', boolVal);
+    }
+    if (!boolVal) {
+      this.stopAll();
+    }
+    if (ipcRenderer) {
+      ipcRenderer.send('settings:sound-changed', { soundsEnabled: boolVal });
+    }
   }
 
-  // Cute robot chirp on hover or pet click
-  playChirp() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sine';
-    const now = this.ctx.currentTime;
-
-    osc.frequency.setValueAtTime(540, now);
-    osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
-    osc.frequency.exponentialRampToValueAtTime(1180, now + 0.16);
-
-    gain.gain.setValueAtTime(0.08, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.23);
+  stopAll() {
+    if (this.cleanupTimer) {
+      clearTimeout(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+    if (this.currentAudio) {
+      try {
+        this.currentAudio.pause();
+        this.currentAudio.currentTime = 0;
+        this.currentAudio.src = '';
+        if (typeof this.currentAudio.remove === 'function') {
+          this.currentAudio.remove();
+        }
+      } catch (e) {}
+      this.currentAudio = null;
+    }
+    if (typeof window !== 'undefined' && window.__soundTestHooks) {
+      window.__soundTestHooks.activeAudioObjects = 0;
+    }
   }
 
-  // Double click or Happy state celebration chime
-  playHappy() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
+  /**
+   * Main play method
+   * @param {string} soundName - 'chirp', 'happy', 'alarm', 'tap'
+   * @param {string} category - 'reminders', 'timer', 'reactions', 'test'
+   */
+  play(soundName, category = 'reactions') {
+    // 1. If not running in pet window, delegate to pet window renderer
+    if (!this.isPetWindow) {
+      if (ipcRenderer) {
+        ipcRenderer.send('pet:play-sound-request', { sound: soundName, category });
+      }
+      return false;
+    }
 
-    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-    const now = this.ctx.currentTime;
+    // Always ensure latest settings before evaluating
+    this.loadSettings();
 
-    notes.forEach((freq, idx) => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
+    // 2. Strict Check: If sounds are OFF, DO NOTHING!
+    // No audio element or AudioContext is created, no audio file is loaded, no external process spawned.
+    // (Test sound button in settings passes category: 'test' which tests audio when pressed)
+    if (!this.settings.soundsEnabled && category !== 'test') {
+      return false;
+    }
 
-      osc.type = 'triangle';
-      const noteStart = now + idx * 0.08;
+    // 3. Do Not Disturb check: mute while DND is active (except explicit test button)
+    if (this.settings.dnd && category !== 'test') {
+      return false;
+    }
 
-      osc.frequency.setValueAtTime(freq, noteStart);
-      gain.gain.setValueAtTime(0.07, noteStart);
-      gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 0.25);
+    // 4. Sub-toggles check
+    if (category === 'reminders' && !this.settings.soundReminders) return false;
+    if (category === 'timer' && !this.settings.soundTimer) return false;
+    if (category === 'reactions' && !this.settings.soundReactions) return false;
 
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
+    // 5. Volume check
+    const volNum = Number(this.settings.soundVolume);
+    const volume = (isNaN(volNum) ? 50 : Math.max(0, Math.min(100, volNum))) / 100;
+    if (volume <= 0) return false;
 
-      osc.start(noteStart);
-      osc.stop(noteStart + 0.26);
-    });
+    // 6. Stop any currently playing audio before starting new one
+    this.stopAll();
+
+    // 7. Resolve small bundled audio file (<50 KB)
+    const validSounds = ['alarm', 'chirp', 'happy', 'tap'];
+    const sName = validSounds.includes(soundName) ? soundName : 'chirp';
+    const soundUrl = new URL(`../audio/${sName}.wav`, window.location.href).href;
+
+    try {
+      // Lazily create Audio element on first use
+      const audio = new Audio(soundUrl);
+      audio.volume = volume;
+      this.currentAudio = audio;
+
+      if (window.__soundTestHooks) {
+        window.__soundTestHooks.activeAudioObjects++;
+        window.__soundTestHooks.playCount++;
+        window.__soundTestHooks.lastPlayed = { sound: sName, category, volume };
+        window.__soundTestHooks.history.push({ sound: sName, category, volume, time: Date.now() });
+      }
+
+      const cleanup = () => {
+        if (this.cleanupTimer) {
+          clearTimeout(this.cleanupTimer);
+          this.cleanupTimer = null;
+        }
+        audio.onended = null;
+        audio.onerror = null;
+        try {
+          audio.pause();
+          audio.src = '';
+          if (typeof audio.remove === 'function') audio.remove();
+        } catch (e) {}
+        if (this.currentAudio === audio) {
+          this.currentAudio = null;
+        }
+        if (window.__soundTestHooks && window.__soundTestHooks.activeAudioObjects > 0) {
+          window.__soundTestHooks.activeAudioObjects--;
+        }
+      };
+
+      audio.onended = cleanup;
+      audio.onerror = cleanup;
+
+      // Release audio resources shortly after playback (max 4s safety cleanup)
+      this.cleanupTimer = setTimeout(cleanup, 4000);
+
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {
+          cleanup();
+        });
+      }
+      return true;
+    } catch (err) {
+      return false;
+    }
   }
 
-  // Reminder alarm or Pomodoro finish
-  playAlarm() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-
-    const notes = [880, 1100, 880, 1320];
-    const now = this.ctx.currentTime;
-
-    notes.forEach((freq, idx) => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'sine';
-      const start = now + idx * 0.14;
-
-      osc.frequency.setValueAtTime(freq, start);
-      gain.gain.setValueAtTime(0.1, start);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start(start);
-      osc.stop(start + 0.36);
-    });
+  playChirp(category = 'reactions') {
+    return this.play('chirp', category);
   }
 
-  // Subtle tap sound for UI interactions
-  playTap() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
+  playHappy(category = 'reactions') {
+    return this.play('happy', category);
+  }
 
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+  playAlarm(category = 'reminders') {
+    return this.play('alarm', category);
+  }
 
-    osc.type = 'sine';
-    const now = this.ctx.currentTime;
-
-    osc.frequency.setValueAtTime(420, now);
-    osc.frequency.exponentialRampToValueAtTime(140, now + 0.04);
-
-    gain.gain.setValueAtTime(0.04, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.06);
+  playTap(category = 'reactions') {
+    return this.play('tap', category);
   }
 }
 
-const soundEffectsInstance = new SoundEffects();
+// Global test hooks setup
 if (typeof window !== 'undefined') {
-  window.soundEffects = soundEffectsInstance;
+  if (!window.__soundTestHooks) {
+    window.__soundTestHooks = {
+      playCount: 0,
+      activeAudioObjects: 0,
+      lastPlayed: null,
+      history: [],
+      getPlayCount() { return this.playCount; },
+      getActiveAudioObjectsCount() { return this.activeAudioObjects; },
+      reset() {
+        this.playCount = 0;
+        this.activeAudioObjects = 0;
+        this.lastPlayed = null;
+        this.history = [];
+      }
+    };
+  }
 }
+
+const soundManagerInstance = new SoundManager();
+
+if (typeof window !== 'undefined') {
+  window.soundEffects = soundManagerInstance;
+  window.soundManager = soundManagerInstance;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = soundEffectsInstance;
+  module.exports = soundManagerInstance;
 }
+})();

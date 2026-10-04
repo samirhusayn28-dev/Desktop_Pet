@@ -175,7 +175,6 @@ class TimerTab {
 
   handleFinish() {
     this.pause();
-    if (window.soundEffects) window.soundEffects.playAlarm();
 
     const name = (window.panelController && window.panelController.store ? window.panelController.store.get('settings.general.userName') : '') || '';
 
@@ -192,7 +191,7 @@ class TimerTab {
         // Pet celebrates with laugh!
         window.panelController.notifyPet('pet:set-state', { state: 'laugh', duration: 5000 });
         const breakMsg = name ? `Great focus session, ${name}! Time for a 5-min break.` : 'Focus block done! Take a 5-min break.';
-        window.panelController.notifyPet('pet:show-bubble', { badge: 'POMODORO COMPLETE', text: breakMsg, duration: 6000, sound: 'alarm', emotion: 'laugh' });
+        window.panelController.notifyPet('pet:show-bubble', { badge: 'POMODORO COMPLETE', text: breakMsg, duration: 6000, sound: 'alarm', category: 'timer', emotion: 'laugh' });
       } else {
         this.isBreak = false;
         this.totalSeconds = 25 * 60;
@@ -202,12 +201,12 @@ class TimerTab {
 
         window.panelController.notifyPet('pet:set-state', { state: 'happy', duration: 3500 });
         const resumeMsg = name ? `Break is over, ${name}! Ready for the next sprint?` : 'Break is over! Ready for the next sprint?';
-        window.panelController.notifyPet('pet:show-bubble', { badge: 'BREAK FINISHED', text: resumeMsg, duration: 5000, sound: 'chirp', emotion: 'happy' });
+        window.panelController.notifyPet('pet:show-bubble', { badge: 'BREAK FINISHED', text: resumeMsg, duration: 5000, sound: 'chirp', category: 'timer', emotion: 'happy' });
       }
     } else {
       window.panelController.notifyPet('pet:set-state', { state: 'laugh', duration: 4000 });
       const finishMsg = name ? `Timer finished, ${name}!` : 'Timer finished!';
-      window.panelController.notifyPet('pet:show-bubble', { badge: 'TIMER DONE', text: finishMsg, duration: 5000, sound: 'alarm', emotion: 'laugh' });
+      window.panelController.notifyPet('pet:show-bubble', { badge: 'TIMER DONE', text: finishMsg, duration: 5000, sound: 'alarm', category: 'timer', emotion: 'laugh' });
     }
   }
 

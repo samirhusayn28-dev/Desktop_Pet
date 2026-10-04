@@ -75,12 +75,19 @@ class BubbleWindowManager {
     const defaultDuration = (store.get('settings.behavior.bubbleDuration') || 5) * 1000;
     const duration = item.duration || defaultDuration;
 
+    const category = item.category || (
+      (item.badge && (item.badge.includes('REMINDER') || item.badge.includes('POSTURE') || item.badge.includes('HYDRATION') || item.badge.includes('SNOOZED')))
+        ? 'reminders'
+        : ((item.badge && (item.badge.includes('TIMER') || item.badge.includes('POMODORO') || item.badge.includes('BREAK'))) ? 'timer' : 'reactions')
+    );
+
     // Send directly to embedded bubble inside pet window
     this.petWindowRef.webContents.send('pet:show-bubble', {
       text: item.text,
       badge: item.badge || '',
       duration,
-      sound: item.sound || 'chirp',
+      sound: item.sound || '',
+      category,
       emotion: item.emotion || 'happy',
       bounce: !!item.bounce
     });

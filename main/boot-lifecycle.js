@@ -89,7 +89,7 @@ class BootLifecycle {
 
       console.log(`[BootLifecycle] Startup welcome greeting triggered: text="${text}", simulated=${this.isSimulatedBoot}`);
       if (this.relayToPet) {
-        this.relayToPet('pet:show-bubble', { text, duration: 4000 });
+        this.relayToPet('pet:show-bubble', { text, duration: 4000, sound: 'happy', category: 'reactions' });
         this.relayToPet('pet:set-state', { state: 'happy', duration: 4000 });
       }
 
@@ -134,7 +134,7 @@ class BootLifecycle {
     const text = userName ? `Bye, ${userName}!` : 'Bye!';
 
     if (this.relayToPet) {
-      this.relayToPet('pet:show-bubble', { text, duration: 1200 });
+      this.relayToPet('pet:show-bubble', { text, duration: 1200, sound: 'chirp', category: 'reactions' });
       this.relayToPet('pet:set-state', { state: 'goodbye', duration: 1200 });
     }
 

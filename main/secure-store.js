@@ -58,7 +58,11 @@ class SecureStore {
         behavior: {
           idleSleepyMinutes: 2,
           idleSleepingMinutes: 5,
-          sounds: true,
+          soundsEnabled: false,
+          soundVolume: 50,
+          soundReminders: true,
+          soundTimer: true,
+          soundReactions: true,
           dnd: false,
           bubbleDuration: 5
         },

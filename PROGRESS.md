@@ -178,10 +178,20 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [ ] Run `--selftest` and e2e test suite against unpacked app; upload logs/screenshots as artifacts
 - [ ] Add `--selftest --idle-metrics 60` reporting CPU & memory for Windows & macOS CI logs
 
+## Item SND1 — SOUND ON/OFF OPTION (SOUNDS OFF BY DEFAULT)
+- [x] Unify all existing sound settings/locations under `soundsEnabled` (default false), remove old duplicate toggles
+- [x] One-time migration for existing installs to OFF + small notification bubble on first start
+- [x] Settings -> Behavior -> Sounds: master toggle, volume slider (0-100, default 50) + "Test sound", sub-toggles (Reminders, Timer & Pomodoro, Pet reactions) with reset icons, export/import validation
+- [x] First-launch welcome screen: Sounds toggle (default OFF) synced with Settings
+- [x] When OFF: ZERO audio element/AudioContext, no files loaded, no external process spawned, silent bubbles/reactions, instant stop on toggle OFF
+- [x] When ON: play through pet window renderer, lazy Audio element creation, bundled audio files (<50KB), DND mute, release audio resources
+- [x] Comprehensive E2E tests on packaged app with Playwright & `--test-hooks` (ZERO plays with sounds OFF, categories, sub-toggles, volume scale, DND, persistence, reset, export/import, migration)
+
 ## Item PERF — RE-VERIFY RESOURCES
 - [ ] Packaged app 2-minute idle resource verification with glasses OFF and ON via `top -l 4`
 - [ ] Targets: GPU helper < 3% & < 10 wake-ups/s, renderer < 1%, main < 1%, WindowServer < 2%
 - [ ] Check panel-open and sleeping states (~0%)
+
 
 
 
