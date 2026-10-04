@@ -48,6 +48,7 @@ class FaceBotController {
     this.setupEvents();
     this.setupIPC();
     this.startBlinkLoop();
+    this.startBreathingLoop();
 
     // Default window mouse ignore state
     if (ipcRenderer) {
@@ -245,6 +246,20 @@ class FaceBotController {
     }
   }
 
+  // Lightweight Eye Blinking (uses direct scaleY transform without innerHTML re-render)
+  setBlink(isBlinking) {
+    this.isBlinking = isBlinking;
+    const eyes = this.container ? this.container.querySelectorAll('.eye-left, .eye-right') : null;
+    if (eyes && eyes.length > 0) {
+      eyes.forEach(eye => {
+        eye.style.transformOrigin = 'center';
+        eye.style.transform = isBlinking ? 'scaleY(0.12)' : '';
+      });
+    } else {
+      this.render();
+    }
+  }
+
   // Automatic random blinking (every 2-6 seconds, 20% double-blink)
   startBlinkLoop() {
     const scheduleNext = () => {
@@ -256,30 +271,42 @@ class FaceBotController {
             this.currentEmotion !== 'love' &&
             this.currentEmotion !== 'vibing' &&
             this.currentEmotion !== 'squint') {
-          this.isBlinking = true;
-          this.render();
+          this.setBlink(true);
 
           setTimeout(() => {
-            this.isBlinking = false;
-            this.render();
+            this.setBlink(false);
 
             // 20% chance of double-blink
             if (Math.random() < 0.20) {
               setTimeout(() => {
-                this.isBlinking = true;
-                this.render();
+                this.setBlink(true);
                 setTimeout(() => {
-                  this.isBlinking = false;
-                  this.render();
-                }, 100);
-              }, 140);
+                  this.setBlink(false);
+                }, 90);
+              }, 130);
             }
-          }, 120);
+          }, 110);
         }
         scheduleNext();
       }, delay);
     };
     scheduleNext();
+  }
+
+  // Periodic burst breathing (1.8s breath every 8-10s; 0 animation layers when idle)
+  startBreathingLoop() {
+    const triggerBreath = () => {
+      if (this.isSleeping || this.isDragging || !this.container) {
+        this.breathTimer = setTimeout(triggerBreath, 4000);
+        return;
+      }
+      this.container.classList.add('breath-burst');
+      setTimeout(() => {
+        if (this.container) this.container.classList.remove('breath-burst');
+        this.breathTimer = setTimeout(triggerBreath, 6500 + Math.random() * 2000);
+      }, 1850);
+    };
+    this.breathTimer = setTimeout(triggerBreath, 3500);
   }
 
   setupEvents() {

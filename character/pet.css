@@ -23,15 +23,10 @@
   transition: transform 0.12s ease-out;
 }
 
-/* 1. Subtle Idle Slow Breathing Animation */
+/* 1. Idle Body Surface — Static at idle (breathing is handled at compositor layer on viewport) */
 .emotion-neutral .facebot-body-wrap {
   transform-origin: 110px 172px;
-  animation: facebotIdleBreathe 4s ease-in-out infinite alternate;
-}
-
-@keyframes facebotIdleBreathe {
-  0% { transform: scale(1, 1); }
-  100% { transform: scale(1.015, 1.025); }
+  transform: scale(1, 1);
 }
 
 /* 2. Happy Tiny Body Bounce */
@@ -88,24 +83,18 @@
   100% { transform: scale(1); }
 }
 
-/* 7. Sleeping Slow Deep Breathing & Z's */
+/* 7. Sleeping: Still Body & Low-FPS Calm Z's */
 .emotion-sleeping .facebot-body-wrap {
-  transform-origin: 110px 172px;
-  animation: facebotSleepBreathe 3.6s ease-in-out infinite alternate;
-}
-
-@keyframes facebotSleepBreathe {
-  0% { transform: translateY(0px) scale(1, 1); }
-  100% { transform: translateY(2px) scale(1.02, 0.98); }
+  transform: translateY(1px);
 }
 
 .sleep-z-drift text {
-  animation: zDriftFloat 3.2s ease-in-out infinite;
+  animation: zDriftFloat 4.8s steps(12) infinite;
 }
 
 .sleep-z-drift text:nth-child(1) { animation-delay: 0s; }
-.sleep-z-drift text:nth-child(2) { animation-delay: 1s; }
-.sleep-z-drift text:nth-child(3) { animation-delay: 2s; }
+.sleep-z-drift text:nth-child(2) { animation-delay: 1.6s; }
+.sleep-z-drift text:nth-child(3) { animation-delay: 3.2s; }
 
 @keyframes zDriftFloat {
   0% { opacity: 0.2; transform: translateY(0px) scale(0.85); }

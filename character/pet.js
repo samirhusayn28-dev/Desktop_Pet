@@ -98,9 +98,7 @@
               <ellipse cx="${cx}" cy="${y + h + 12}" 
                        rx="${(w * 0.44).toFixed(1)}" 
                        ry="${(7 * d + 2).toFixed(1)}" 
-                       fill="#000000" 
-                       opacity="${(0.28 * d).toFixed(2)}" 
-                       filter="url(#${idPrefix}-floor-blur)" />
+                       fill="url(#${idPrefix}-floor-grad)" />
             ` : ''}
 
             <!-- 2. The 3D Rounded Rectangle Body -->
@@ -138,8 +136,7 @@
                          rx="${(w * 0.20).toFixed(1)}" ry="${(h * 0.08).toFixed(1)}" 
                          transform="rotate(-16, ${(x + w * 0.26).toFixed(1)}, ${(y + h * 0.20).toFixed(1)})" 
                          fill="url(#${idPrefix}-specular-grad)" 
-                         opacity="${(0.75 * d).toFixed(2)}" 
-                         filter="url(#${idPrefix}-specular-blur)" />
+                         opacity="${(0.75 * d).toFixed(2)}" />
               ` : ''}
 
               <!-- 3. Face Group: Eyes + Mouth with Inset Socket Depth & Cursor Parallax -->
@@ -170,15 +167,12 @@
             <feDropShadow dx="0" dy="${(2 * d).toFixed(1)}" stdDeviation="${(3 * d).toFixed(1)}" flood-color="rgba(0,0,0,${(0.12 * d).toFixed(2)})" />
           </filter>
 
-          <!-- Floor Contact Shadow Blur -->
-          <filter id="${p}-floor-blur" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="${(6 * d + 1).toFixed(1)}" />
-          </filter>
-
-          <!-- Specular Pill Blur -->
-          <filter id="${p}-specular-blur" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="2.2" />
-          </filter>
+          <!-- Floor Contact Shadow Radial Gradient (Zero GPU filter cost) -->
+          <radialGradient id="${p}-floor-grad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#000000" stop-opacity="${(0.35 * d).toFixed(2)}" />
+            <stop offset="55%" stop-color="#000000" stop-opacity="${(0.16 * d).toFixed(2)}" />
+            <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+          </radialGradient>
 
           <!-- Inset Eye / Mouth Socket Shadow Filter -->
           <filter id="${p}-socket-shadow" x="-30%" y="-30%" width="160%" height="160%">

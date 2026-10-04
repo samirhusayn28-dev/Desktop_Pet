@@ -144,38 +144,28 @@ html, body {
   justify-content: center;
   cursor: grab;
   pointer-events: auto;
-  transform-style: preserve-3d;
-  will-change: transform;
   overflow: visible;
-  animation: petBreathing 4.5s ease-in-out infinite;
 }
 
 .pet-viewport:active {
   cursor: grabbing;
 }
 
-/* Slow natural breathing */
-@keyframes petBreathing {
-  0%, 100% {
-    transform: scale(1, 1);
-  }
-  50% {
-    transform: scale(1.018, 0.988) translateY(1px);
-  }
+/* Natural breathing burst: runs only during active 1.8s burst, zero repaints when idle */
+.pet-viewport.breath-burst {
+  animation: petBreathBurst 1.8s steps(12) forwards;
 }
 
-/* Sleep slow breathing */
+@keyframes petBreathBurst {
+  0% { transform: scale(1, 1) translateY(0); }
+  50% { transform: scale(1.018, 0.988) translateY(1px); }
+  100% { transform: scale(1, 1) translateY(0); }
+}
+
+/* Sleep: completely still body, zero repaints */
 .pet-viewport.sleeping {
-  animation: petSleepBreathing 6.5s ease-in-out infinite !important;
-}
-
-@keyframes petSleepBreathing {
-  0%, 100% {
-    transform: scale(1, 1) translateY(0);
-  }
-  50% {
-    transform: scale(1.025, 0.975) translateY(2px);
-  }
+  animation: none !important;
+  transform: scale(1, 1) translateY(0);
 }
 
 /* Dangling Pose during mouse drag */

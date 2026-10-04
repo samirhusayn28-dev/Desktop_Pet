@@ -129,8 +129,8 @@ function createTray() {
 
 function getPetWindowSize(scale = 1.0) {
   const s = Math.max(0.5, Math.min(3.0, scale));
-  const w = Math.round(280 * s);
-  const h = Math.round(280 * s);
+  const w = Math.round(250 * s);
+  const h = Math.round(250 * s);
   return [w, h];
 }
 

@@ -53,3 +53,25 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Accent color picker recolors everything (pet window + panel)
 - [x] Lite mode completely removed (toggle + auto-lite logic)
 - [x] Dev/test material removed (console logs, test buttons, debug UI)
+
+## Item P1 — IDLE REPAINT
+- [x] Fix continuous 60fps repaints: cap animations, eliminate infinite loops at idle, remove animated filters/shadows
+- [x] Target on packaged app over 2 min: GPU helper < 3% CPU & < 10 wake-ups/s, Renderer < 1%, main < 1%, WindowServer increase < 2%
+
+## Item U1 — TAB BAR
+- [ ] Content-based widths (flex:0 1 auto, padding)
+- [ ] Container query / responsive collapse: narrow panel shows icon only for inactive tabs, active tab shows icon + label
+
+## Item U2 — PLAIN/UNSTYLED UI
+- [ ] Daily motivation quote styled in proper card (surface, border, radius 16, padding 16, title row with icon)
+- [ ] Permissions buttons (Re-check, Open Settings, Request) styled with shared components and proper padding/size
+- [ ] CSS reset and audit for unstyled buttons/inputs/selects/checkboxes across all tabs
+
+## Item F1 — VOLUME REACTION
+- [ ] Poll volume ~1.5s active / 10s idle with hysteresis and threshold crossings
+- [ ] Max volume (100) -> irritated, 0/muted -> shh/quiet, low (<15) -> sad, back to normal -> relieved within 2s
+
+## Item F2 — REMINDERS
+- [ ] Scheduler, bubble and sound verified in packaged app with panel closed
+- [ ] Sound playback (autoplay policy, asarUnpack audio files)
+- [ ] Reminder due -> surprised + bounce, solid speech bubble, sound, snooze/repeat, missed reminder catchup, restart survival
