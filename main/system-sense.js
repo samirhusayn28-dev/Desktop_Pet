@@ -88,34 +88,39 @@ class SystemSense {
         });
         powerMonitor.on('unlock-screen', () => {
           this.isScreenLocked = false;
-          this.handleScreenUnlock();
+          this.handleWakeEvent();
         });
         powerMonitor.on('suspend', () => {
           this.isSuspended = true;
         });
         powerMonitor.on('resume', () => {
           this.isSuspended = false;
-          this.handleScreenUnlock();
+          this.handleWakeEvent();
         });
+        try {
+          powerMonitor.on('display-sleep', () => {
+            this.isScreenLocked = true;
+          });
+          powerMonitor.on('display-wake', () => {
+            this.isScreenLocked = false;
+            this.handleWakeEvent();
+          });
+        } catch (e) {}
       }
     } catch (e) {
       console.warn('[SystemSense] PowerMonitor hook error:', e.message);
     }
   }
 
-  handleScreenUnlock() {
-    const isEnabled = store.get('settings.reactions.screenUnlock') !== false;
-    if (!isEnabled) return;
-
-    if (this.canReact('screenUnlock', 120000)) {
-      this.sendPetEmotion('happy', 4000);
-      const name = this.getUserName();
-      bubble.show({
-        badge: 'WELCOME BACK',
-        text: name ? `Welcome back, ${name}! Ready when you are.` : 'Welcome back! Ready when you are.',
-        sound: 'happy',
-        emotion: 'happy'
-      });
+  handleWakeEvent() {
+    // Item B1: Silent wake from sleep/suspend/resume/lock/unlock/display sleep.
+    // NEVER show any greeting or bubble. Silently reset idle timers and return to neutral if sleeping.
+    if (this.isSleeping) {
+      this.isSleeping = false;
+      this.sendPetEmotion('neutral', 0);
+    }
+    if (this.petWindowRef && !this.petWindowRef.isDestroyed()) {
+      this.petWindowRef.webContents.send('pet:reset-idle');
     }
   }
 
@@ -821,12 +826,12 @@ class SystemSense {
       detail: this.state.headphonesConnected ? 'Headphones Connected' : 'Speakers Active'
     });
 
-    // Screen Unlock
+    // Startup & Shutdown Lifecycle (Item B1)
     status.push({
-      id: 'screenUnlock',
-      name: 'Screen Unlock / Resume',
+      id: 'bootLifecycle',
+      name: 'Startup & Shutdown Lifecycle',
       status: 'Working',
-      detail: 'Listening for system wake/unlock'
+      detail: 'Greeting on real boot, goodbye on shutdown'
     });
 
     // System Load

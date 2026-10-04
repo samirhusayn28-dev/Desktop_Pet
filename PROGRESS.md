@@ -133,11 +133,11 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] MEASURE-ON-WINDOWS.md documentation
 
 ## Item B1 — GREETING ONLY ON REAL STARTUP, GOODBYE ONLY ON REAL SHUTDOWN
-- [ ] Remove "unlock / welcome back" reaction and toggle completely; sleep/suspend/resume, lock/unlock, display sleep/wake show no greeting
-- [ ] Startup welcome once per boot (bootTime vs lastGreetedBootTime > 60s, uptime < 30m, or lastExit = shutdown/logout); no greeting on manual restart or wake
-- [ ] Goodbye on real shutdown, reboot, logout, and tray Quit (powerMonitor 'shutdown', BrowserWindow 'session-end', tray Quit); <= 1s delay, write lastExit
-- [ ] Settings -> Reactions: "Welcome on startup" and "Goodbye on shutdown" toggles (default ON) with reset icons, export/import
-- [ ] Test via `--simulate-boot`, `--simulate-shutdown`, powerMonitor events, `pmset displaysleepnow`
+- [x] Remove "unlock / welcome back" reaction and toggle completely; sleep/suspend/resume, lock/unlock, display sleep/wake show no greeting
+- [x] Startup welcome once per boot (bootTime vs lastGreetedBootTime > 60s, uptime < 30m, or lastExit = shutdown/logout); no greeting on manual restart or wake
+- [x] Goodbye on real shutdown, reboot, logout, and tray Quit (powerMonitor 'shutdown', BrowserWindow 'session-end', tray Quit); <= 1s delay, write lastExit
+- [x] Settings -> Reactions: "Welcome on startup" and "Goodbye on shutdown" toggles (default ON) with reset icons, export/import
+- [x] Test via `--simulate-boot`, `--simulate-shutdown`, powerMonitor events, `pmset displaysleepnow`
 
 ## Item R1 — FINAL RELEASE
 - [ ] All gates passed: all items in PROGRESS.md verified on packaged app, idle numbers met with glasses OFF & ON, --selftest passes, secrets scan clean, README updated, working tree clean

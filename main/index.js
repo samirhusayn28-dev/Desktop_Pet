@@ -15,6 +15,7 @@ const scheduler = require('./scheduler');
 const systemSense = require('./system-sense');
 const contextSensor = require('./context-sensor');
 const UpdateChecker = require('./update-checker');
+const BootLifecycle = require('./boot-lifecycle');
 
 app.commandLine.appendSwitch('disable-features', 'Autofill,Translate,MediaRouter,CalculateNativeWinOcclusion,SpareRendererForSitePerProcess');
 app.commandLine.appendSwitch('renderer-process-limit', '2');
@@ -39,6 +40,7 @@ let lastCursorPos = { x: 0, y: 0 };
 let lastPanelBlurTime = 0;
 let petIdleState = 'neutral';
 let updateChecker = null;
+let bootLifecycle = null;
 
 // App naming & branding
 const defaultPetName = store.get('settings.general.petName') || 'Desktop Pet';
@@ -121,8 +123,15 @@ function createTray() {
       {
         label: `Quit ${petName}`,
         click: () => {
-          app.isQuitting = true;
-          app.quit();
+          if (bootLifecycle) {
+            bootLifecycle.handleGoodbye('quit', () => {
+              app.isQuitting = true;
+              app.quit();
+            });
+          } else {
+            app.isQuitting = true;
+            app.quit();
+          }
         }
       }
     ]);
@@ -190,6 +199,18 @@ function createPetWindow() {
   }
 
   petWindow.loadFile(path.join(__dirname, '..', 'pet-window', 'pet.html'));
+
+  if (bootLifecycle) {
+    bootLifecycle.attachWindowSessionEnd(petWindow);
+  }
+
+  petWindow.webContents.on('did-finish-load', () => {
+    if (bootLifecycle) {
+      setTimeout(() => {
+        bootLifecycle.evaluateStartupWelcome();
+      }, 1000);
+    }
+  });
 
   // Default to ignoring mouse events so transparent padding lets clicks pass straight through
   petWindow.setIgnoreMouseEvents(true, { forward: true });
@@ -1632,6 +1653,7 @@ app.whenReady().then(async () => {
     return;
   }
 
+  bootLifecycle = new BootLifecycle((channel, data) => relayToPet(channel, data));
   createTray();
   createPetWindow();
 
@@ -1680,7 +1702,15 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (e) => {
+  if (bootLifecycle && !bootLifecycle.isQuitting && !isCliTestRun) {
+    e.preventDefault();
+    bootLifecycle.handleGoodbye('shutdown', () => {
+      app.isQuitting = true;
+      app.exit(0);
+    });
+    return;
+  }
   app.isQuitting = true;
   scheduler.stop();
   systemSense.stop();
