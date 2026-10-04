@@ -242,42 +242,7 @@ function createPetWindow() {
  */
 let isPetHoveredOrInside = false;
 
-function isCursorInPetHitArea(screenX, screenY) {
-  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible()) {
-    return false;
-  }
-
-  // Always keep accepting mouse events while user is dragging
-  if (dragStartPos) {
-    return true;
-  }
-
-  const [winX, winY] = petWindow.getPosition();
-  const [winW, winH] = petWindow.getSize();
-
-  // Quick bounds reject outside pet window
-  if (screenX < winX || screenX > winX + winW || screenY < winY || screenY > winY + winH) {
-    return false;
-  }
-
-  const relX = screenX - winX;
-  const relY = screenY - winY;
-
-  // 1. Check Speech Bubble (if visible)
-  if (bubble && bubble.isShowing) {
-    const bubbleMaxW = 270;
-    const bubbleW = Math.min(bubbleMaxW, winW - 20);
-    const bubbleX = (winW - bubbleW) / 2;
-    const bubbleY = 10;
-    const bubbleH = 75;
-    const bPad = isPetHoveredOrInside ? 2 : 0;
-    if (relX >= bubbleX - bPad && relX <= bubbleX + bubbleW + bPad &&
-        relY >= bubbleY - bPad && relY <= bubbleY + bubbleH + bPad) {
-      return true;
-    }
-  }
-
-  // 2. Check Pet's Real Rounded-Rectangle Shape
+function getPetBodyRect(winW, winH) {
   const appConfig = store.get('settings.appearance') || {};
   const scale = appConfig.scale || 1.0;
   const cfgW = Math.max(60, Math.min(200, appConfig.width !== undefined ? appConfig.width : 136));
@@ -306,6 +271,33 @@ function isCursorInPetHitArea(screenX, screenY) {
   const bodyH = cfgH * k;
   const bodyR = vrx * k;
 
+  return { bodyX, bodyY, bodyW, bodyH, bodyR, size, k, cfgW, cfgH, roundness, scale };
+}
+
+function isCursorInPetHitArea(screenX, screenY) {
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible()) {
+    return false;
+  }
+
+  // Always keep accepting mouse events while user is dragging
+  if (dragStartPos) {
+    return true;
+  }
+
+  const [winX, winY] = petWindow.getPosition();
+  const [winW, winH] = petWindow.getSize();
+
+  // Quick bounds reject outside pet window
+  if (screenX < winX || screenX > winX + winW || screenY < winY || screenY > winY + winH) {
+    return false;
+  }
+
+  const relX = screenX - winX;
+  const relY = screenY - winY;
+
+  // Check Pet's Real Rounded-Rectangle Shape (bubble area is NOT counted as pet)
+  const { bodyX, bodyY, bodyW, bodyH, bodyR } = getPetBodyRect(winW, winH);
+
   // 2px hysteresis: if already inside, expand test area by 2px to prevent flicker at boundary
   const pad = isPetHoveredOrInside ? 2 : 0;
 
@@ -319,6 +311,9 @@ function isCursorInPetHitArea(screenX, screenY) {
   if (relX < minX || relX > maxX || relY < minY || relY > maxY) {
     return false;
   }
+
+  // Sharp rectangle (r <= 0)
+  if (r <= 0) return true;
 
   // Check 4 rounded corners
   if (relX < minX + r && relY < minY + r) {
@@ -355,12 +350,13 @@ function pollCursorTick() {
   try {
     const cursor = screen.getCursorScreenPoint();
 
-    // 1. Shape-accurate hit testing with 2px hysteresis (Item H1)
+    // 1. Shape-accurate hit testing with 2px hysteresis (Item H2)
     if (!dragStartPos) {
       const isInside = isCursorInPetHitArea(cursor.x, cursor.y);
       if (isInside !== isPetHoveredOrInside) {
         isPetHoveredOrInside = isInside;
         petWindow.setIgnoreMouseEvents(!isInside, { forward: true });
+        petWindow.webContents.send('pet:inside-change', isInside);
       }
     }
 
@@ -711,6 +707,7 @@ ipcMain.on('pet:drag-end', () => {
       const cursor = screen.getCursorScreenPoint();
       isPetHoveredOrInside = isCursorInPetHitArea(cursor.x, cursor.y);
       petWindow.setIgnoreMouseEvents(!isPetHoveredOrInside, { forward: true });
+      petWindow.webContents.send('pet:inside-change', isPetHoveredOrInside);
     } catch (e) {}
   }
 });
@@ -1681,6 +1678,62 @@ app.whenReady().then(async () => {
     () => panelWindow
   );
   updateChecker.start();
+
+  // Synthetic Test Hooks (--test-hooks) for automated E2E verification
+  const hasTestHooks = process.argv.includes('--test-hooks');
+  if (hasTestHooks) {
+    console.log('[TestHook] Initializing synthetic test hooks on Main Process');
+
+    ipcMain.handle('test:get-pet-geometry', () => {
+      if (!petWindow || petWindow.isDestroyed()) return null;
+      const [winX, winY] = petWindow.getPosition();
+      const [winW, winH] = petWindow.getSize();
+      const geom = getPetBodyRect(winW, winH);
+      return {
+        winX, winY, winW, winH,
+        ...geom,
+        isInside: isPetHoveredOrInside,
+        isPanelOpen: !!(panelWindow && !panelWindow.isDestroyed() && panelWindow.isVisible())
+      };
+    });
+
+    ipcMain.handle('test:hit-test-point', (e, { x, y }) => {
+      return { inside: isCursorInPetHitArea(x, y) };
+    });
+
+    ipcMain.handle('test:simulate-cursor', (e, { x, y }) => {
+      const isInside = isCursorInPetHitArea(x, y);
+      if (isInside !== isPetHoveredOrInside) {
+        isPetHoveredOrInside = isInside;
+        if (petWindow && !petWindow.isDestroyed()) {
+          petWindow.setIgnoreMouseEvents(!isInside, { forward: true });
+          petWindow.webContents.send('pet:inside-change', isInside);
+        }
+      }
+      return { isInside, isIgnoringMouse: !isInside };
+    });
+
+    ipcMain.handle('test:set-appearance', async (e, appearance) => {
+      store.set('settings.appearance', appearance);
+      relayToPet('theme:apply-custom-appearance', appearance);
+      if (petWindow && !petWindow.isDestroyed() && appearance.scale) {
+        const [newW, newH] = getPetWindowSize(appearance.scale);
+        petWindow.setSize(newW, newH);
+      }
+      await new Promise(r => setTimeout(r, 200));
+      return true;
+    });
+
+    ipcMain.handle('test:toggle-panel', () => {
+      togglePanel();
+      return { isPanelOpen: !!(panelWindow && !panelWindow.isDestroyed() && panelWindow.isVisible()) };
+    });
+
+    ipcMain.handle('test:force-emotion', (e, emotionName) => {
+      relayToPet('pet:set-state', { state: emotionName, duration: 4000 });
+      return true;
+    });
+  }
 
   // Hide dock icon on macOS (Menu-bar only desktop pet assistant)
   if (process.platform === 'darwin' && app.dock) {

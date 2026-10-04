@@ -111,7 +111,8 @@
                       fill="rgba(0, 0, 0, ${(0.16 * d).toFixed(2)})" />
               ` : ''}
               <!-- Base 3D Body Surface -->
-              <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" 
+              <rect class="facebot-body-shape" 
+                    x="${x.toFixed(1)}" y="${y.toFixed(1)}" 
                     width="${w.toFixed(1)}" height="${h.toFixed(1)}" 
                     rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" 
                     fill="url(#${idPrefix}-body-grad)" 

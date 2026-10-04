@@ -144,4 +144,44 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Version 1.0.1 in package.json & CHANGELOG, asset names `Desktop-Pet-${version}-mac-x64.dmg` & `Desktop-Pet-${version}-win-x64.exe`
 - [x] Release workflow with smoke test + build jobs, merge to main, tag v1.0.1, push and monitor CI
 
+---
+
+# Bug-Fix Round (Branch: main)
+
+## Item H2 — HOVER/CLICK ONLY ON THE PET'S SHAPE
+- [x] Investigate real cause of outside hover/click triggers (container/body events, DPI/scale, padding)
+- [x] Defense in depth: renderer `pointer-events: none` on html/body/container and `auto` ONLY on pet body shape
+- [x] Main process DIP rounded-rect hit-test with 2px hysteresis and `setIgnoreMouseEvents(!inside, { forward: true })`
+- [x] Drive hover/click/drag strictly by `insidePet` state; panel toggles only if mousedown and mouseup are inside
+- [x] Test via hook: 1px inside, 1px/5px/20px outside across sizes, pill/square roundness, glasses on, bubbles visible
+
+## Item E2 — EMOTIONS DO NOT WORK
+- [ ] Add `--emotion=<name>` hook; test each of 25 emotions via e2e screenshot inspection (glasses OFF and ON)
+- [ ] Fix triggers and define strict priority order: error/AI > user interaction > reminder > system reactions > idle
+- [ ] Ensure all temporary emotions return to correct baseline (neutral / sleepy / sleeping)
+- [ ] Test event injection via hook: volume, brightness, battery, media, network, headphones, high CPU, etc.
+
+## Item R2 — REMINDER "EDIT" BUTTON DOES NOTHING
+- [ ] Investigate cause (event listener loss, channel mismatch, CSS hidden form)
+- [ ] Implement inline edit form with custom pickers, reschedule in scheduler, persist across restarts
+- [ ] Real click e2e test: add, edit, snooze, mark done, delete, repeat; verify alert fires at new time with bubble & sound
+
+## Item PERM2 — SCREEN RECORDING STILL SHOWS "REQUEST" AFTER ALLOWING IT
+- [ ] Real status check via `systemPreferences.getMediaAccessStatus('screen')` + `desktopCapturer.getSources`
+- [ ] Differentiate "Granted", "Granted - restart the app to apply" with Restart button, "Not granted", "Denied"
+- [ ] Max 60s bounded poll (1/s) only while settings panel is open after clicking Request/Open Settings; check on app focus
+- [ ] Show app path and version, recovery hint for stuck permissions, lazy truthful permission requests
+- [ ] Windows fallback: show "No special permissions needed"
+
+## Item X1 — CROSS-PLATFORM TESTS IN CI
+- [ ] Update release workflow smoke-test job to run on macOS Intel and windows-latest
+- [ ] Run `--selftest` and e2e test suite against unpacked app; upload logs/screenshots as artifacts
+- [ ] Add `--selftest --idle-metrics 60` reporting CPU & memory for Windows & macOS CI logs
+
+## Item PERF — RE-VERIFY RESOURCES
+- [ ] Packaged app 2-minute idle resource verification with glasses OFF and ON via `top -l 4`
+- [ ] Targets: GPU helper < 3% & < 10 wake-ups/s, renderer < 1%, main < 1%, WindowServer < 2%
+- [ ] Check panel-open and sleeping states (~0%)
+
+
 

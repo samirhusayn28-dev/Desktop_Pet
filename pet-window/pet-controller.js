@@ -32,6 +32,10 @@ class FaceBotController {
     this.rafId = null;
     this.emotionTimeout = null;
 
+    // Item H2: Driven strictly by insidePet state from Main Process hit testing
+    this.isInsidePet = false;
+    this.mouseDownInside = false;
+
     this.container = document.getElementById('pet-viewport');
     this.menuEl = document.getElementById('quick-menu');
     this.bubbleEl = document.getElementById('pet-speech-bubble');
@@ -320,53 +324,41 @@ class FaceBotController {
   }
 
   setupEvents() {
-    // Mouse hover management (allows interaction with pet, bubbles, and menus)
-    const onEnterInteractive = () => {
-      if (ipcRenderer) ipcRenderer.send('pet:set-ignore-mouse-events', false);
-      if (this.currentEmotion === 'sleeping' || this.currentEmotion === 'sleepy') {
-        this.wakeUp();
-      } else if (this.currentEmotion === 'neutral') {
-        this.setEmotion('happy', 2000);
-        if (window.soundEffects) window.soundEffects.playTap();
-      }
-    };
-
-    const onLeaveInteractive = () => {
-      if (!this.isDragging && (!this.menuEl || this.menuEl.classList.contains('hidden')) && ipcRenderer) {
-        ipcRenderer.send('pet:set-ignore-mouse-events', true);
-      }
-    };
-
-    if (this.container) {
-      this.container.addEventListener('mouseenter', onEnterInteractive);
-      this.container.addEventListener('mouseleave', onLeaveInteractive);
-    }
-
-    if (this.bubbleEl) {
-      this.bubbleEl.addEventListener('mouseenter', () => {
-        if (ipcRenderer) ipcRenderer.send('pet:set-ignore-mouse-events', false);
-        // Pause auto-dismiss timer on hover
-        if (this.bubbleTimer) {
-          clearTimeout(this.bubbleTimer);
-          this.bubbleTimer = null;
+    // Item H2: Driven strictly by insidePet state from Main Process hit testing
+    if (ipcRenderer) {
+      ipcRenderer.on('pet:inside-change', (event, isInside) => {
+        this.isInsidePet = !!isInside;
+        if (this.isInsidePet) {
+          if (this.currentEmotion === 'sleeping' || this.currentEmotion === 'sleepy') {
+            this.wakeUp();
+          } else if (this.currentEmotion === 'neutral') {
+            this.setEmotion('happy', 2000);
+            if (window.soundEffects) window.soundEffects.playTap();
+          }
+        } else {
+          if (!this.isDragging) {
+            // Mouse exited pet body shape
+            if (this.currentEmotion === 'happy' && !this.emotionTimeout) {
+              this.setEmotion('neutral');
+            }
+          }
         }
-      });
-      this.bubbleEl.addEventListener('mouseleave', () => {
-        if (!this.isDragging && ipcRenderer) {
-          ipcRenderer.send('pet:set-ignore-mouse-events', true);
-        }
-        this.bubbleTimer = setTimeout(() => this.hideBubble(), 2000);
       });
     }
 
     // High-Precision Drag vs Click (<4px = click, >=4px = drag)
+    // ONLY driven if mousedown and mouseup both happened inside the shape!
     let isMouseDown = false;
     let startX = 0;
     let startY = 0;
     let hasMoved = false;
 
-    this.container.addEventListener('mousedown', (e) => {
+    window.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return; // Left click only
+      // Only proceed if mouse is inside the pet shape
+      if (!this.isInsidePet) return;
+
+      this.mouseDownInside = true;
       isMouseDown = true;
       hasMoved = false;
       startX = e.screenX;
@@ -374,7 +366,7 @@ class FaceBotController {
     });
 
     window.addEventListener('mousemove', (moveEvent) => {
-      if (!isMouseDown) return;
+      if (!isMouseDown || !this.mouseDownInside) return;
       const dist = Math.hypot(moveEvent.screenX - startX, moveEvent.screenY - startY);
 
       if (dist >= 4) {
@@ -397,7 +389,9 @@ class FaceBotController {
 
     window.addEventListener('mouseup', (upEvent) => {
       if (!isMouseDown) return;
+      const wasInsideOnStart = this.mouseDownInside;
       isMouseDown = false;
+      this.mouseDownInside = false;
 
       if (this.isDragging) {
         this.isDragging = false;
@@ -410,25 +404,29 @@ class FaceBotController {
 
         if (ipcRenderer) {
           ipcRenderer.send('pet:drag-end');
-          ipcRenderer.send('pet:set-ignore-mouse-events', false);
         }
       } else if (!hasMoved && upEvent.button === 0) {
-        // Pure Click (<4px movement): Toggle assistant panel!
-        this.handleClick();
+        // Pure Click (<4px movement):
+        // "A click toggles the panel only if mousedown and mouseup both happened inside the shape."
+        if (wasInsideOnStart && this.isInsidePet) {
+          this.handleClick();
+        }
       }
     });
 
-    // Double click for playful reaction
-    this.container.addEventListener('dblclick', () => {
-      const doubleEmo = Math.random() < 0.5 ? 'laugh' : 'wink';
-      this.setEmotion(doubleEmo, 2800);
-      if (window.soundEffects) window.soundEffects.playHappy();
+    // Double click for playful reaction: only inside pet shape
+    window.addEventListener('dblclick', (e) => {
+      if (this.isInsidePet && e.button === 0) {
+        const doubleEmo = Math.random() < 0.5 ? 'laugh' : 'wink';
+        this.setEmotion(doubleEmo, 2800);
+        if (window.soundEffects) window.soundEffects.playHappy();
+      }
     });
 
-    // Right Click Context Menu
+    // Right Click Context Menu: only inside pet shape
     window.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      if (this.menuEl) {
+      if (this.isInsidePet && this.menuEl) {
         if (ipcRenderer) ipcRenderer.send('pet:set-ignore-mouse-events', false);
         this.menuEl.classList.remove('hidden');
       }
@@ -437,7 +435,7 @@ class FaceBotController {
     window.addEventListener('mousedown', (e) => {
       if (this.menuEl && !this.menuEl.contains(e.target) && !this.menuEl.classList.contains('hidden')) {
         this.menuEl.classList.add('hidden');
-        if (!this.isDragging && ipcRenderer) {
+        if (!this.isDragging && !this.isInsidePet && ipcRenderer) {
           ipcRenderer.send('pet:set-ignore-mouse-events', true);
         }
       }
