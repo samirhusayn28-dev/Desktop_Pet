@@ -121,18 +121,9 @@ class SecureStore {
           ]
         }
       },
-      todos: [
-        { id: '1', text: 'Plan next coding sprint', done: true },
-        { id: '2', text: 'Drink glass of water', done: true },
-        { id: '3', text: 'Refactor desktop pet companion', done: false }
-      ],
-      notes: [
-        { id: '1', title: 'Architecture Notes', content: 'Main process AI streaming with zero CORS.\nDedicated bubble window at screen-saver layer.\nSub-2% idle CPU.', pinned: true, updatedAt: new Date().toISOString() }
-      ],
-      reminders: [
-        { id: '1', title: 'Hydrate & drink water', time: '14:00', repeat: 'every-hour', enabled: true },
-        { id: '2', title: 'Stand up and stretch', time: '16:00', repeat: 'daily', enabled: true }
-      ],
+      todos: [],
+      notes: [],
+      reminders: [],
       clipboardHistory: [],
       chatHistory: [
         { role: 'assistant', content: "Hello! I'm your desktop coding companion. Ask me anything, or let me know what you're working on!", timestamp: Date.now() }

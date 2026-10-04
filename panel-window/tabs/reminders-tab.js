@@ -33,11 +33,7 @@ class RemindersTab {
 
   loadReminders() {
     if (!window.panelController) return;
-    this.reminders = window.panelController.store.get('reminders') || [
-      { id: '1', title: 'Hydrate & drink water', time: '14:00', repeat: 'every-hour', enabled: true },
-      { id: '2', title: 'Stand up & stretch posture', time: '16:00', repeat: 'daily', enabled: true },
-      { id: '3', title: 'Code review & push clean commits', time: '17:30', repeat: 'once', enabled: true }
-    ];
+    this.reminders = window.panelController.store.get('reminders') || [];
     this.render();
   }
 

@@ -27,13 +27,7 @@ class TodoTab {
 
   loadTodos() {
     if (!window.panelController) return;
-    this.todos = window.panelController.store.get('todos') || [
-      { id: '1', text: 'Review project architecture', done: true },
-      { id: '2', text: 'Optimize system sensing loops', done: true },
-      { id: '3', text: 'Build responsive glass cards', done: true },
-      { id: '4', text: 'Verify pet animations & emotions', done: false },
-      { id: '5', text: 'Test packaged local Intel build', done: false }
-    ];
+    this.todos = window.panelController.store.get('todos') || [];
     this.render();
   }
 

@@ -39,7 +39,7 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Remove `Math.random()` pet CPU in tools-tab (use real Electron process metrics)
 - [x] Remove hardcoded `30 FPS` / fake FPS display
 - [x] Charts start empty, fill with real data
-- [ ] Remove any sample notes / reminders pre-populated data
+- [x] Remove any sample notes / reminders pre-populated data
 
 ## Item 6 — AI: live models, no key-less calls, friendly errors
 - [x] Retired model fallback list updated (remove `gemini-1.5-flash`, use `gemini-2.0-flash-lite` / first live model)

@@ -21,22 +21,7 @@ class NotesTab {
 
   loadNotes() {
     if (!window.panelController) return;
-    this.notes = window.panelController.store.get('notes') || [
-      {
-        id: '1',
-        title: 'Project Ideas & Architecture',
-        content: 'Integrate local models with Ollama.\nAdd audio chimes and customizable pet colors.',
-        pinned: true,
-        updatedAt: new Date(Date.now() - 3600000).toISOString()
-      },
-      {
-        id: '2',
-        title: 'Quick Shortcuts',
-        content: 'Click pet: toggle assistant panel.\nDouble click pet: playful reaction.\nRight click pet: fast context menu.',
-        pinned: false,
-        updatedAt: new Date(Date.now() - 86400000).toISOString()
-      }
-    ];
+    this.notes = window.panelController.store.get('notes') || [];
     this.render();
   }
 
