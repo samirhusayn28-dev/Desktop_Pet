@@ -630,8 +630,9 @@ class AIService {
         onChunk(reply);
         return reply;
       } catch (err) {
-        // If 503 Service Unavailable, retry with backoff 1s/3s/7s (up to attempt 3)
-        if (err.status === 503 && attemptNum < 3) {
+        // If 503 Service Unavailable or overloaded, retry with backoff 1s/3s/7s (up to attempt 3)
+        const is503 = err.status === 503 || err.code === 503 || String(err.message).includes('503') || String(err.message).toLowerCase().includes('overloaded');
+        if (is503 && attemptNum < 3) {
           const delays = [1000, 3000, 7000];
           const delay = delays[attemptNum - 1] || 2000;
           await new Promise(r => setTimeout(r, delay));

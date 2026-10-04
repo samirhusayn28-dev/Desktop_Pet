@@ -44,8 +44,8 @@ Resume any time: check boxes below, pick up from first unchecked item.
 ## Item 6 — AI: live models, no key-less calls, friendly errors
 - [x] Retired model fallback list updated (remove `gemini-1.5-flash`, use `gemini-2.0-flash-lite` / first live model)
 - [x] No model-list IPC calls triggered without a saved API key
-- [ ] "Test connection" button in Settings → AI
-- [ ] Friendly error on 503 with retry
+- [x] "Test connection" button in Settings → AI
+- [x] Friendly error on 503 with retry
 
 ## Item 7 — Small remaining items
 - [x] "What should I call you?" name used in reminders & AI system prompt
