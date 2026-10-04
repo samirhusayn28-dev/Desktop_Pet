@@ -494,8 +494,11 @@
           <!-- SECTION 1: GENERAL -->
           <div class="settings-group-card">
             <div class="settings-group-title">
-              <i data-lucide="user"></i>
-              <span>General Settings</span>
+              <div class="title-with-icon">
+                <i data-lucide="user"></i>
+                <span>General Settings</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="general" title="Reset General Settings to default">Reset section</button>
             </div>
             
             <div class="setting-item">
@@ -538,8 +541,11 @@
           <!-- SECTION 2: BEHAVIOR -->
           <div class="settings-group-card">
             <div class="settings-group-title">
-              <i data-lucide="sliders"></i>
-              <span>Behavior & Idle Timers</span>
+              <div class="title-with-icon">
+                <i data-lucide="sliders"></i>
+                <span>Behavior & Idle Timers</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="behavior" title="Reset Behavior Settings to default">Reset section</button>
             </div>
 
             <div class="setting-item">
@@ -586,8 +592,11 @@
           <!-- SECTION 3: SYSTEM AWARENESS REACTIONS -->
           <div class="settings-group-card">
             <div class="settings-group-title">
-              <i data-lucide="zap"></i>
-              <span>SystemSense Reactions</span>
+              <div class="title-with-icon">
+                <i data-lucide="zap"></i>
+                <span>SystemSense Reactions</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="reactions" title="Reset Reactions to default">Reset section</button>
             </div>
             <span class="setting-hint">Pet dynamically reacts to hardware, audio, power, and desktop events</span>
 
@@ -641,10 +650,18 @@
 
             <div class="setting-toggle-row">
               <div class="setting-toggle-text">
-                <div class="toggle-title">Screen Unlock / Welcome Back</div>
-                <div class="toggle-desc">Greets you with a warm smile when waking your Mac</div>
+                <div class="toggle-title">Welcome on Startup</div>
+                <div class="toggle-desc">Warm greeting once per system boot or login</div>
               </div>
-              <input type="checkbox" id="reaction-screenunlock" class="toggle-checkbox" checked>
+              <input type="checkbox" id="reaction-welcome-startup" class="toggle-checkbox" checked>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Goodbye on Shutdown</div>
+                <div class="toggle-desc">Short goodbye wave on shutdown, logout, or quit</div>
+              </div>
+              <input type="checkbox" id="reaction-goodbye-shutdown" class="toggle-checkbox" checked>
             </div>
 
             <div class="setting-toggle-row">
@@ -782,10 +799,7 @@
                 <i data-lucide="palette"></i>
                 <span>Appearance & Glass Customization</span>
               </div>
-              <button class="theme-btn-secondary reset-appearance-btn" id="btn-reset-appearance">
-                <i data-lucide="rotate-ccw"></i>
-                <span>Reset</span>
-              </button>
+              <button type="button" class="btn-reset-section" data-section="appearance" id="btn-reset-appearance" title="Reset Appearance to default">Reset section</button>
             </div>
 
             <!-- Live 3D Pet Preview -->
@@ -899,14 +913,26 @@
                   <button class="theme-btn-secondary" id="btn-bodycolor-white" title="Reset to White">Pure White</button>
                 </div>
               </div>
+
+              <!-- Glasses Toggle (Item G1) -->
+              <div class="setting-toggle-row full-width-item" style="margin-top: 4px;">
+                <div class="setting-toggle-text">
+                  <div class="toggle-title">Round Glasses</div>
+                  <div class="toggle-desc">Cute spectacles centered on eyes</div>
+                </div>
+                <input type="checkbox" id="setting-pet-glasses" class="toggle-checkbox">
+              </div>
             </div>
           </div>
 
           <!-- SECTION 5: AI PROVIDER CONFIGURATION -->
           <div class="settings-group-card">
             <div class="settings-group-title">
-              <i data-lucide="cpu"></i>
-              <span>AI Provider Configuration</span>
+              <div class="title-with-icon">
+                <i data-lucide="cpu"></i>
+                <span>AI Provider Configuration</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="ai" title="Reset AI Provider Configuration to default">Reset section</button>
             </div>
             
             <div class="setting-item">
@@ -972,8 +998,11 @@
           <!-- SECTION 6: PRIVACY & CONTEXT -->
           <div class="settings-group-card">
             <div class="settings-group-title">
-              <i data-lucide="shield-check"></i>
-              <span>Privacy & Context Awareness</span>
+              <div class="title-with-icon">
+                <i data-lucide="shield-check"></i>
+                <span>Privacy & Context Awareness</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="privacy" title="Reset Privacy Settings to default">Reset section</button>
             </div>
             <span class="setting-hint">Strict privacy: Context is checked ONLY when you send a prompt, never in background.</span>
 
@@ -1034,6 +1063,14 @@
 
               <div class="about-update-status hidden" id="about-update-status"></div>
             </div>
+          </div>
+
+          <!-- Reset All Settings (Item S1) -->
+          <div class="settings-reset-all-wrap">
+            <button type="button" class="btn-reset-all" id="btn-reset-all-settings" title="Reset all preferences to default values">
+              <i data-lucide="rotate-ccw"></i>
+              <span>Reset all settings</span>
+            </button>
           </div>
 
         </div>

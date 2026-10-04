@@ -102,9 +102,9 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Settings -> About: same credits, version, "Check for updates", "Show welcome again"
 
 ## Item S1 — RESET TO DEFAULT EVERYWHERE
-- [ ] Central defaults object; individual reset icon buttons for controls differing from defaults
-- [ ] "Reset section" per section, "Reset all settings" with confirmation; separate pet color and accent color resets
-- [ ] Never resets notes, to-dos, reminders, chat history, or API keys; values apply live and persist
+- [x] Central defaults object; individual reset icon buttons for controls differing from defaults
+- [x] "Reset section" per section, "Reset all settings" with confirmation; separate pet color and accent color resets
+- [x] Never resets notes, to-dos, reminders, chat history, or API keys; values apply live and persist
 
 ## Item E1 — NEW EMOTIONS (SHAPE-ONLY, NO CPU COST)
 - [ ] 11 new emotions using eye/mouth vector morphs + static SVG overlays (transform/opacity only, max 3s): yawn, dizzy, blush, excited, scared, annoyed, bored, proud, worried, grateful, goodbye
@@ -131,4 +131,17 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [ ] Windows windows: transparent frameless pet window, opaque panel window, tray icon, AppUserModelId, NSIS config
 - [ ] CLI flag `--selftest` (PASS/FAIL/UNAVAILABLE logging) and GitHub Actions workflow smoke-test job
 - [ ] MEASURE-ON-WINDOWS.md documentation
+
+## Item B1 — GREETING ONLY ON REAL STARTUP, GOODBYE ONLY ON REAL SHUTDOWN
+- [ ] Remove "unlock / welcome back" reaction and toggle completely; sleep/suspend/resume, lock/unlock, display sleep/wake show no greeting
+- [ ] Startup welcome once per boot (bootTime vs lastGreetedBootTime > 60s, uptime < 30m, or lastExit = shutdown/logout); no greeting on manual restart or wake
+- [ ] Goodbye on real shutdown, reboot, logout, and tray Quit (powerMonitor 'shutdown', BrowserWindow 'session-end', tray Quit); <= 1s delay, write lastExit
+- [ ] Settings -> Reactions: "Welcome on startup" and "Goodbye on shutdown" toggles (default ON) with reset icons, export/import
+- [ ] Test via `--simulate-boot`, `--simulate-shutdown`, powerMonitor events, `pmset displaysleepnow`
+
+## Item R1 — FINAL RELEASE
+- [ ] All gates passed: all items in PROGRESS.md verified on packaged app, idle numbers met with glasses OFF & ON, --selftest passes, secrets scan clean, README updated, working tree clean
+- [ ] Version 1.0.1 in package.json & CHANGELOG, asset names `Desktop-Pet-${version}-mac-x64.dmg` & `Desktop-Pet-${version}-win-x64.exe`
+- [ ] Release workflow with smoke test + build jobs, merge to main, tag v1.0.1, push and monitor CI
+
 

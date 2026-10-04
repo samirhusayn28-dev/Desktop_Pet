@@ -14,7 +14,59 @@ const DEFAULT_PET_APPEARANCE = {
   mouthWidth: 14,       // 6 - 28 px
   depth: 80,            // 0 - 100 (3D intensity)
   bodyColor: '#FFFFFF', // Hex
+  glassesEnabled: false,
   theme: 'default'
+};
+
+const CENTRAL_DEFAULTS = {
+  general: {
+    petName: 'Pixel',
+    userName: 'Samir',
+    alwaysOnTop: true,
+    rememberPosition: true,
+    launchAtLogin: false
+  },
+  behavior: {
+    idleSleepyMinutes: 2,
+    idleSleepingMinutes: 5,
+    bubbleDuration: 5,
+    sounds: true,
+    dnd: false
+  },
+  reactions: {
+    brightness: true,
+    volume: true,
+    battery: true,
+    media: true,
+    network: true,
+    headphones: true,
+    welcomeStartup: true,
+    goodbyeShutdown: true,
+    highLoad: true,
+    lateNight: true
+  },
+  appearance: {
+    scale: 1.0,
+    width: 136,
+    height: 120,
+    roundness: 36,
+    eyeSize: 1.0,
+    eyeSpacing: 44,
+    mouthWidth: 14,
+    depth: 80,
+    bodyColor: '#FFFFFF',
+    accentColor: '#FF7A2F',
+    glassesEnabled: false
+  },
+  ai: {
+    activeProvider: 'gemini',
+    baseUrl: ''
+  },
+  privacy: {
+    contextAwareness: true,
+    allowScreenshots: false,
+    blocklist: '1password, bitwarden, lastpass, keychain, bank, chase, wellsfargo, paypal, login, signin, incognito, private browsing'
+  }
 };
 
 const DEFAULT_ACCENT_COLOR = '#FF7A2F';
@@ -50,7 +102,8 @@ class SettingsTab {
     this.reactionMedia = document.getElementById('reaction-media');
     this.reactionNetwork = document.getElementById('reaction-network');
     this.reactionHeadphones = document.getElementById('reaction-headphones');
-    this.reactionScreenUnlock = document.getElementById('reaction-screenunlock');
+    this.reactionWelcomeStartup = document.getElementById('reaction-welcome-startup');
+    this.reactionGoodbyeShutdown = document.getElementById('reaction-goodbye-shutdown');
     this.reactionHighload = document.getElementById('reaction-highload');
     this.reactionLatenight = document.getElementById('reaction-latenight');
 
@@ -79,6 +132,8 @@ class SettingsTab {
     // 4. Appearance Controls
     this.previewContainer = document.getElementById('settings-pet-preview');
     this.resetAppearanceBtn = document.getElementById('btn-reset-appearance');
+    this.glassesToggle = document.getElementById('setting-pet-glasses');
+    this.btnResetAll = document.getElementById('btn-reset-all-settings');
 
     this.accentColorInput = document.getElementById('setting-accent-color');
     this.dispAccentColor = document.getElementById('disp-accent-color');
@@ -137,6 +192,7 @@ class SettingsTab {
   init() {
     this.loadSettings();
     this.setupEvents();
+    this.setupResetSystem();
     this.updateAppearanceUI();
     this.renderLivePreview();
     this.checkFirstRun();
@@ -147,18 +203,18 @@ class SettingsTab {
     const store = window.panelController.store;
 
     // 1. General
-    const petName = store.get('settings.general.petName') || 'Bolt';
+    const petName = store.get('settings.general.petName') || CENTRAL_DEFAULTS.general.petName;
     if (this.petNameInput) this.petNameInput.value = petName;
-    const userName = store.get('settings.general.userName') || '';
+    const userName = store.get('settings.general.userName') || CENTRAL_DEFAULTS.general.userName;
     if (this.userNameInput) this.userNameInput.value = userName;
     if (this.alwaysOnTopToggle) this.alwaysOnTopToggle.checked = store.get('settings.general.alwaysOnTop') !== false;
     if (this.rememberPosToggle) this.rememberPosToggle.checked = store.get('settings.general.rememberPosition') !== false;
     if (this.launchLoginToggle) this.launchLoginToggle.checked = store.get('settings.general.launchAtLogin') === true;
 
     // 2. Behavior
-    const idleSleepy = store.get('settings.behavior.idleSleepyMinutes') ?? 2;
-    const idleSleeping = store.get('settings.behavior.idleSleepingMinutes') ?? 5;
-    const bubbleDuration = store.get('settings.behavior.bubbleDuration') ?? 5;
+    const idleSleepy = store.get('settings.behavior.idleSleepyMinutes') ?? CENTRAL_DEFAULTS.behavior.idleSleepyMinutes;
+    const idleSleeping = store.get('settings.behavior.idleSleepingMinutes') ?? CENTRAL_DEFAULTS.behavior.idleSleepingMinutes;
+    const bubbleDuration = store.get('settings.behavior.bubbleDuration') ?? CENTRAL_DEFAULTS.behavior.bubbleDuration;
     const sounds = store.get('settings.behavior.sounds') !== false;
     const dnd = store.get('settings.behavior.dnd') === true;
 
@@ -184,7 +240,8 @@ class SettingsTab {
     if (this.reactionMedia) this.reactionMedia.checked = store.get('settings.reactions.media') !== false;
     if (this.reactionNetwork) this.reactionNetwork.checked = store.get('settings.reactions.network') !== false;
     if (this.reactionHeadphones) this.reactionHeadphones.checked = store.get('settings.reactions.headphones') !== false;
-    if (this.reactionScreenUnlock) this.reactionScreenUnlock.checked = store.get('settings.reactions.screenUnlock') !== false;
+    if (this.reactionWelcomeStartup) this.reactionWelcomeStartup.checked = store.get('settings.reactions.welcomeStartup') !== false;
+    if (this.reactionGoodbyeShutdown) this.reactionGoodbyeShutdown.checked = store.get('settings.reactions.goodbyeShutdown') !== false;
     if (this.reactionHighload) this.reactionHighload.checked = store.get('settings.reactions.highLoad') !== false;
     if (this.reactionLatenight) this.reactionLatenight.checked = store.get('settings.reactions.lateNight') !== false;
 
@@ -196,6 +253,9 @@ class SettingsTab {
     // 4. Appearance
     const savedApp = store.get('settings.appearance') || {};
     this.appearance = Object.assign({}, DEFAULT_PET_APPEARANCE, savedApp);
+    if (this.glassesToggle) {
+      this.glassesToggle.checked = !!this.appearance.glassesEnabled;
+    }
 
     const savedAccent = store.get('settings.appearance.accentColor') || DEFAULT_ACCENT_COLOR;
     this.setAccentColor(savedAccent, false);
@@ -540,6 +600,7 @@ class SettingsTab {
     if (this.dispDepth) this.dispDepth.textContent = `${Math.round(a.depth)}%`;
     if (this.bodyColorInput) this.bodyColorInput.value = a.bodyColor || '#FFFFFF';
     if (this.dispBodyColor) this.dispBodyColor.value = (a.bodyColor || '#FFFFFF').toUpperCase();
+    if (this.glassesToggle) this.glassesToggle.checked = !!a.glassesEnabled;
   }
 
   renderLivePreview() {
@@ -670,7 +731,8 @@ class SettingsTab {
       { el: this.reactionMedia, key: 'media' },
       { el: this.reactionNetwork, key: 'network' },
       { el: this.reactionHeadphones, key: 'headphones' },
-      { el: this.reactionScreenUnlock, key: 'screenUnlock' },
+      { el: this.reactionWelcomeStartup, key: 'welcomeStartup' },
+      { el: this.reactionGoodbyeShutdown, key: 'goodbyeShutdown' },
       { el: this.reactionHighload, key: 'highLoad' },
       { el: this.reactionLatenight, key: 'lateNight' }
     ];
@@ -847,6 +909,17 @@ class SettingsTab {
         if (this.dispBodyColor) this.dispBodyColor.value = '#FFFFFF';
         this.broadcastAppearance();
         if (window.soundEffects) window.soundEffects.playTap();
+      });
+    }
+
+    if (this.glassesToggle) {
+      this.glassesToggle.addEventListener('change', (e) => {
+        const val = e.target.checked;
+        this.appearance.glassesEnabled = val;
+        this.broadcastAppearance();
+        if (window.panelController && window.panelController.store) {
+          window.panelController.store.set('settings.appearance.glassesEnabled', val);
+        }
       });
     }
 
@@ -1110,6 +1183,264 @@ class SettingsTab {
     } catch (e) {
       console.warn('[SettingsTab] Could not update live app metrics:', e);
     }
+  }
+
+  /* =========================================================================
+   * ITEM S1 — RESET TO DEFAULT EVERYWHERE
+   * ========================================================================= */
+  setupResetSystem() {
+    this.resettableControls = [
+      // 1. General
+      { id: 'setting-pet-name', section: 'general', key: 'settings.general.petName', type: 'text', defaultVal: CENTRAL_DEFAULTS.general.petName },
+      { id: 'setting-user-name', section: 'general', key: 'settings.general.userName', type: 'text', defaultVal: CENTRAL_DEFAULTS.general.userName },
+      { id: 'setting-always-on-top', section: 'general', key: 'settings.general.alwaysOnTop', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.general.alwaysOnTop },
+      { id: 'setting-remember-pos', section: 'general', key: 'settings.general.rememberPosition', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.general.rememberPosition },
+      { id: 'setting-launch-login', section: 'general', key: 'settings.general.launchAtLogin', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.general.launchAtLogin },
+
+      // 2. Behavior
+      { id: 'setting-idle-sleepy', section: 'behavior', key: 'settings.behavior.idleSleepyMinutes', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.idleSleepyMinutes, dispId: 'disp-idle-sleepy', suffix: ' min' },
+      { id: 'setting-idle-sleeping', section: 'behavior', key: 'settings.behavior.idleSleepingMinutes', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.idleSleepingMinutes, dispId: 'disp-idle-sleeping', suffix: ' min' },
+      { id: 'setting-bubble-duration', section: 'behavior', key: 'settings.behavior.bubbleDuration', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.bubbleDuration, dispId: 'disp-bubble-duration', suffix: ' sec' },
+      { id: 'setting-sounds', section: 'behavior', key: 'settings.behavior.sounds', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.sounds },
+      { id: 'setting-dnd', section: 'behavior', key: 'settings.behavior.dnd', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.dnd },
+
+      // 3. Reactions
+      { id: 'reaction-brightness', section: 'reactions', key: 'settings.reactions.brightness', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.brightness },
+      { id: 'reaction-volume', section: 'reactions', key: 'settings.reactions.volume', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.volume },
+      { id: 'reaction-battery', section: 'reactions', key: 'settings.reactions.battery', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.battery },
+      { id: 'reaction-media', section: 'reactions', key: 'settings.reactions.media', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.media },
+      { id: 'reaction-network', section: 'reactions', key: 'settings.reactions.network', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.network },
+      { id: 'reaction-headphones', section: 'reactions', key: 'settings.reactions.headphones', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.headphones },
+      { id: 'reaction-welcome-startup', section: 'reactions', key: 'settings.reactions.welcomeStartup', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.welcomeStartup },
+      { id: 'reaction-goodbye-shutdown', section: 'reactions', key: 'settings.reactions.goodbyeShutdown', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.goodbyeShutdown },
+      { id: 'reaction-highload', section: 'reactions', key: 'settings.reactions.highLoad', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.highLoad },
+      { id: 'reaction-latenight', section: 'reactions', key: 'settings.reactions.lateNight', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.lateNight },
+
+      // 4. Appearance
+      { id: 'setting-pet-scale', section: 'appearance', prop: 'scale', type: 'slider', defaultVal: CENTRAL_DEFAULTS.appearance.scale, isFloat: true, dispId: 'disp-pet-scale', suffix: '%' },
+      { id: 'setting-pet-width', section: 'appearance', prop: 'width', type: 'slider', defaultVal: CENTRAL_DEFAULTS.appearance.width, dispId: 'disp-pet-width', suffix: ' px' },
+      { id: 'setting-pet-height', section: 'appearance', prop: 'height', type: 'slider', defaultVal: CENTRAL_DEFAULTS.appearance.height, dispId: 'disp-pet-height', suffix: ' px' },
+      { id: 'setting-pet-roundness', section: 'appearance', prop: 'roundness', type: 'slider', defaultVal: CENTRAL_DEFAULTS.appearance.roundness, dispId: 'disp-pet-roundness', suffix: '%' },
+      { id: 'setting-pet-eyesize', section: 'appearance', prop: 'eyeSize', type: 'slider', defaultVal: CENTRAL_DEFAULTS.appearance.eyeSize, isFloat: true, dispId: 'disp-pet-eyesize', suffix: 'x' },
+      { id: 'setting-pet-eyespacing', section: 'appearance', prop: 'eyeSpacing', type: 'slider', defaultVal: CENTRAL_DEFAULTS.appearance.eyeSpacing, dispId: 'disp-pet-eyespacing', suffix: ' px' },
+      { id: 'setting-pet-mouthwidth', section: 'appearance', prop: 'mouthWidth', type: 'slider', defaultVal: CENTRAL_DEFAULTS.appearance.mouthWidth, dispId: 'disp-pet-mouthwidth', suffix: ' px' },
+      { id: 'setting-pet-depth', section: 'appearance', prop: 'depth', type: 'slider', defaultVal: CENTRAL_DEFAULTS.appearance.depth, dispId: 'disp-pet-depth', suffix: '%' },
+      { id: 'setting-accent-color', section: 'appearance', prop: 'accentColor', type: 'accentColor', defaultVal: CENTRAL_DEFAULTS.appearance.accentColor },
+      { id: 'setting-pet-bodycolor', section: 'appearance', prop: 'bodyColor', type: 'bodyColor', defaultVal: CENTRAL_DEFAULTS.appearance.bodyColor },
+      { id: 'setting-pet-glasses', section: 'appearance', prop: 'glassesEnabled', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.appearance.glassesEnabled },
+
+      // 5. AI Configuration (Provider and Custom Base URL only; API Keys are NEVER reset)
+      { id: 'setting-ai-provider', section: 'ai', key: 'settings.ai.activeProvider', type: 'select', defaultVal: CENTRAL_DEFAULTS.ai.activeProvider },
+      { id: 'setting-ai-baseurl', section: 'ai', key: 'baseUrl', type: 'baseUrl', defaultVal: CENTRAL_DEFAULTS.ai.baseUrl },
+
+      // 6. Privacy
+      { id: 'privacy-context', section: 'privacy', key: 'settings.privacy.contextAwareness', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.privacy.contextAwareness },
+      { id: 'privacy-screenshots', section: 'privacy', key: 'settings.privacy.allowScreenshots', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.privacy.allowScreenshots },
+      { id: 'privacy-blocklist', section: 'privacy', key: 'settings.privacy.blocklist', type: 'blocklist', defaultVal: CENTRAL_DEFAULTS.privacy.blocklist }
+    ];
+
+    // Ensure reset buttons exist for all resettable controls
+    this.resettableControls.forEach(ctrl => {
+      const el = document.getElementById(ctrl.id);
+      if (!el) return;
+
+      let btn = document.querySelector(`.btn-ctrl-reset[data-ctrl="${ctrl.id}"]`);
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-ctrl-reset hidden';
+        btn.dataset.ctrl = ctrl.id;
+        btn.title = 'Reset to default';
+        btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`;
+
+        if (ctrl.dispId) {
+          const disp = document.getElementById(ctrl.dispId);
+          if (disp && disp.parentNode) {
+            disp.parentNode.insertBefore(btn, disp.nextSibling);
+          }
+        } else if (el.classList.contains('toggle-checkbox')) {
+          el.parentNode.insertBefore(btn, el);
+        } else if (ctrl.type === 'accentColor') {
+          const target = document.getElementById('btn-accent-default');
+          if (target && target.parentNode) {
+            target.parentNode.insertBefore(btn, target.nextSibling);
+          }
+        } else if (ctrl.type === 'bodyColor') {
+          const target = document.getElementById('btn-bodycolor-white');
+          if (target && target.parentNode) {
+            target.parentNode.insertBefore(btn, target.nextSibling);
+          }
+        } else {
+          const label = el.parentNode ? el.parentNode.querySelector('label') : null;
+          if (label) {
+            label.style.display = 'inline-flex';
+            label.style.alignItems = 'center';
+            label.appendChild(btn);
+          } else if (el.parentNode) {
+            el.parentNode.insertBefore(btn, el);
+          }
+        }
+      }
+
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.resetControl(ctrl);
+      };
+    });
+
+    // Wire Section Reset Buttons
+    document.querySelectorAll('.btn-reset-section').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        const section = btn.dataset.section;
+        if (section) this.resetSection(section);
+      };
+    });
+
+    // Wire Reset All Settings Button
+    if (this.btnResetAll) {
+      this.btnResetAll.onclick = (e) => {
+        e.preventDefault();
+        const msg = "Are you sure you want to reset all preferences to default? This will not delete your notes, to-dos, reminders, chat history, or API keys.";
+        if (window.confirm(msg)) {
+          this.resetAllSettings();
+        }
+      };
+    }
+
+    // Dynamic visibility updater
+    const pane = document.getElementById('pane-settings');
+    if (pane) {
+      pane.addEventListener('input', () => this.updateAllResetButtons());
+      pane.addEventListener('change', () => this.updateAllResetButtons());
+    }
+
+    this.updateAllResetButtons();
+  }
+
+  resetControl(ctrl) {
+    const el = document.getElementById(ctrl.id);
+    if (!el) return;
+    const store = window.panelController ? window.panelController.store : null;
+
+    if (ctrl.type === 'text') {
+      el.value = ctrl.defaultVal;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      if (store && ctrl.key) store.set(ctrl.key, ctrl.defaultVal);
+    } else if (ctrl.type === 'checkbox') {
+      el.checked = !!ctrl.defaultVal;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      if (ctrl.prop) {
+        this.appearance[ctrl.prop] = !!ctrl.defaultVal;
+        this.broadcastAppearance();
+      }
+      if (store && ctrl.key) store.set(ctrl.key, !!ctrl.defaultVal);
+    } else if (ctrl.type === 'slider') {
+      el.value = ctrl.defaultVal;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      if (ctrl.prop) {
+        this.appearance[ctrl.prop] = ctrl.defaultVal;
+        this.broadcastAppearance();
+      }
+      if (store && ctrl.key) store.set(ctrl.key, ctrl.defaultVal);
+      if (ctrl.dispId) {
+        const disp = document.getElementById(ctrl.dispId);
+        if (disp) disp.textContent = ctrl.isFloat && ctrl.suffix === '%' ? `${Math.round(ctrl.defaultVal * 100)}%` : `${ctrl.defaultVal}${ctrl.suffix || ''}`;
+      }
+    } else if (ctrl.type === 'accentColor') {
+      this.setAccentColor(ctrl.defaultVal, true);
+    } else if (ctrl.type === 'bodyColor') {
+      this.appearance.bodyColor = ctrl.defaultVal;
+      if (this.bodyColorInput) this.bodyColorInput.value = ctrl.defaultVal;
+      if (this.dispBodyColor) this.dispBodyColor.value = ctrl.defaultVal.toUpperCase();
+      this.broadcastAppearance();
+    } else if (ctrl.type === 'select') {
+      el.value = ctrl.defaultVal;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      if (store && ctrl.key) store.set(ctrl.key, ctrl.defaultVal);
+    } else if (ctrl.type === 'baseUrl') {
+      const providerId = this.providerSelect ? this.providerSelect.value : 'gemini';
+      el.value = '';
+      if (store) store.set(`settings.ai.baseUrls.${providerId}`, '');
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (ctrl.type === 'blocklist') {
+      const defaultStr = '1password, bitwarden, lastpass, keychain, bank, chase, wellsfargo, paypal, login, signin, incognito, private browsing';
+      el.value = defaultStr;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      if (store && ctrl.key) {
+        store.set(ctrl.key, defaultStr.split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
+      }
+    }
+
+    if (window.soundEffects) window.soundEffects.playTap();
+    this.updateAllResetButtons();
+  }
+
+  updateAllResetButtons() {
+    if (!this.resettableControls) return;
+    this.resettableControls.forEach(ctrl => {
+      const el = document.getElementById(ctrl.id);
+      const btn = document.querySelector(`.btn-ctrl-reset[data-ctrl="${ctrl.id}"]`);
+      if (!el || !btn) return;
+
+      let isDiff = false;
+      if (ctrl.type === 'text') {
+        isDiff = (el.value.trim() !== String(ctrl.defaultVal).trim());
+      } else if (ctrl.type === 'checkbox') {
+        isDiff = (el.checked !== !!ctrl.defaultVal);
+      } else if (ctrl.type === 'slider') {
+        const cur = ctrl.isFloat ? parseFloat(el.value) : parseInt(el.value, 10);
+        isDiff = (cur !== ctrl.defaultVal);
+      } else if (ctrl.type === 'accentColor') {
+        const cur = (this.appearance.primaryColor || el.value || '').toUpperCase();
+        isDiff = (cur !== ctrl.defaultVal.toUpperCase());
+      } else if (ctrl.type === 'bodyColor') {
+        const cur = (this.appearance.bodyColor || el.value || '').toUpperCase();
+        isDiff = (cur !== ctrl.defaultVal.toUpperCase());
+      } else if (ctrl.type === 'select') {
+        isDiff = (el.value !== ctrl.defaultVal);
+      } else if (ctrl.type === 'baseUrl') {
+        isDiff = (el.value.trim() !== '');
+      } else if (ctrl.type === 'blocklist') {
+        const defaultStr = '1password, bitwarden, lastpass, keychain, bank, chase, wellsfargo, paypal, login, signin, incognito, private browsing';
+        isDiff = (el.value.trim().toLowerCase() !== defaultStr.toLowerCase());
+      }
+
+      if (isDiff) {
+        btn.classList.remove('hidden');
+      } else {
+        btn.classList.add('hidden');
+      }
+    });
+  }
+
+  resetSection(sectionName) {
+    if (!this.resettableControls) return;
+
+    if (sectionName === 'appearance') {
+      this.appearance = Object.assign({}, DEFAULT_PET_APPEARANCE);
+      this.updateAppearanceUI();
+      this.broadcastAppearance();
+      this.setAccentColor(DEFAULT_ACCENT_COLOR);
+    } else {
+      this.resettableControls.filter(c => c.section === sectionName).forEach(ctrl => {
+        this.resetControl(ctrl);
+      });
+    }
+
+    if (window.soundEffects) window.soundEffects.playChirp();
+    this.updateAllResetButtons();
+  }
+
+  resetAllSettings() {
+    ['general', 'behavior', 'reactions', 'appearance', 'ai', 'privacy'].forEach(sec => {
+      this.resetSection(sec);
+    });
+    if (window.soundEffects) window.soundEffects.playChirp();
+    this.updateAllResetButtons();
   }
 }
 

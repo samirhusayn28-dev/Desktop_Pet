@@ -47,7 +47,8 @@ class SecureStore {
       },
       settings: {
         general: {
-          petName: 'Bolt',
+          petName: 'Pixel',
+          userName: 'Samir',
           launchAtLogin: false,
           alwaysOnTop: true,
           rememberPosition: true,
@@ -68,7 +69,8 @@ class SecureStore {
           highLoad: true,
           network: true,
           lateNight: true,
-          screenUnlock: true
+          welcomeStartup: true,
+          goodbyeShutdown: true
         },
         appearance: {
           scale: 1.0,
@@ -81,6 +83,7 @@ class SecureStore {
           depth: 80,
           bodyColor: '#FFFFFF',
           accentColor: '#FF7A2F',
+          glassesEnabled: false,
           panelTransparency: 0.30,
           panelBlur: 24,
           theme: 'default'
