@@ -63,9 +63,9 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Container query / responsive collapse: narrow panel shows icon only for inactive tabs, active tab shows icon + label
 
 ## Item U2 — PLAIN/UNSTYLED UI
-- [ ] Daily motivation quote styled in proper card (surface, border, radius 16, padding 16, title row with icon)
-- [ ] Permissions buttons (Re-check, Open Settings, Request) styled with shared components and proper padding/size
-- [ ] CSS reset and audit for unstyled buttons/inputs/selects/checkboxes across all tabs
+- [x] Daily motivation quote styled in proper card (surface, border, radius 16, padding 16, title row with icon)
+- [x] Permissions buttons (Re-check, Open Settings, Request) styled with shared components and proper padding/size
+- [x] CSS reset and audit for unstyled buttons/inputs/selects/checkboxes across all tabs
 
 ## Item F1 — VOLUME REACTION
 - [ ] Poll volume ~1.5s active / 10s idle with hysteresis and threshold crossings

@@ -36,6 +36,28 @@
                       box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Universal Form & Control Reset — Prevent macOS native control styling leaks */
+button,
+input,
+select,
+textarea {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  outline: none;
+  box-sizing: border-box;
+}
+
+button {
+  cursor: pointer;
+  user-select: none;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -928,16 +950,111 @@ body, .panel-header, .panel-tabs, .tab-btn, .win-btn, .sensor-status-card, .todo
   border: none;
   border-radius: 10px;
   font-family: var(--font-sans);
+  font-size: 12px;
   font-weight: 700;
+  padding: 8px 14px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   box-shadow: 0 4px 14px var(--theme-primary-alpha-strong, rgba(255, 122, 47, 0.3));
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
+  white-space: nowrap;
 }
 
 .theme-btn-primary:hover {
   filter: brightness(1.12);
   transform: translateY(-1px);
   box-shadow: 0 6px 18px var(--theme-primary-alpha-strong, rgba(255, 122, 47, 0.4));
+}
+
+.theme-btn-primary:active {
+  transform: translateY(1px);
+}
+
+.theme-btn-secondary {
+  background: #23232a;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.theme-btn-secondary:hover {
+  background: #2c2c35;
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #FFFFFF;
+}
+
+.theme-btn-secondary:active {
+  transform: translateY(1px);
+}
+
+.perm-action-btn {
+  height: 32px;
+  min-width: 105px;
+  padding: 0 14px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+/* Daily Motivation Quote Card — Proper surface, border, radius 16, padding 16, title row with icon */
+.quote-glass-card,
+.quote-tool-card {
+  background: #1e1e24;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quote-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--theme-primary, #FF7A2F);
+}
+
+.quote-header svg,
+.quote-header i[data-lucide] {
+  width: 14px;
+  height: 14px;
+  color: var(--theme-primary, #FF7A2F);
+}
+
+.quote-text,
+.tool-quote-text {
+  font-size: 13.5px;
+  font-style: italic;
+  line-height: 1.45;
+  color: #FFFFFF;
+  margin: 0;
+}
+
+.quote-author,
+.tool-quote-author {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 2px;
+  display: block;
 }
 
 /* ==========================================================================
