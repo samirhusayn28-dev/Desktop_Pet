@@ -122,8 +122,17 @@ class FaceBotController {
   }
 
   // --- Solid Cute Material Speech Bubble ---
-  showBubble({ text, badge = '', duration = 5000, sound = '', emotion = '' }) {
+  showBubble({ text, badge = '', duration = 5000, sound = '', emotion = '', bounce = false }) {
     if (!this.bubbleEl || !text) return;
+
+    if (bounce && this.container) {
+      this.container.classList.remove('bounce-drop');
+      void this.container.offsetWidth;
+      this.container.classList.add('bounce-drop');
+      setTimeout(() => {
+        if (this.container) this.container.classList.remove('bounce-drop');
+      }, 500);
+    }
 
     if (this.bubbleTimer) {
       clearTimeout(this.bubbleTimer);

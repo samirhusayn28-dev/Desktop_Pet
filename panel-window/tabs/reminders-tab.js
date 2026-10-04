@@ -134,59 +134,8 @@ class RemindersTab {
   startChecker() {
     if (this.checkInterval) clearInterval(this.checkInterval);
     this.checkInterval = setInterval(() => {
-      this.checkDueReminders();
-    }, 15000); // Check every 15 seconds
-  }
-
-  checkDueReminders() {
-    const now = new Date();
-    const currentHours = now.getHours().toString().padStart(2, '0');
-    const currentMins = now.getMinutes().toString().padStart(2, '0');
-    const currentTimeStr = `${currentHours}:${currentMins}`;
-    const todayDateStr = now.toDateString();
-
-    this.reminders.forEach(r => {
-      if (!r.enabled) return;
-
-      let isDue = false;
-      if (r.repeat === 'every-hour') {
-        const targetMin = (r.time || '00:00').split(':')[1];
-        if (currentMins === targetMin && r.lastTriggered !== `${todayDateStr}-${currentHours}`) {
-          isDue = true;
-          r.lastTriggered = `${todayDateStr}-${currentHours}`;
-        }
-      } else {
-        if (r.time === currentTimeStr && r.lastTriggered !== todayDateStr) {
-          isDue = true;
-          r.lastTriggered = todayDateStr;
-          if (r.repeat === 'once') {
-            r.enabled = false;
-          }
-        }
-      }
-
-      if (isDue) {
-        this.triggerAlert(r);
-      }
-    });
-
-    this.saveReminders();
-  }
-
-  triggerAlert(reminder) {
-    if (window.soundEffects) window.soundEffects.playAlarm();
-    // Pet pops out with natural speech bubble addressing user by name
-    const name = (window.panelController.store.get('settings.general.userName') || '').trim();
-    const alertText = name ? `Hey ${name}, time for: ${reminder.title}!` : `Time for: ${reminder.title}!`;
-
-    window.panelController.notifyPet('pet:set-state', { state: 'happy', duration: 7000 });
-    window.panelController.notifyPet('pet:show-bubble', {
-      badge: 'REMINDER',
-      text: alertText,
-      duration: 8000,
-      sound: 'alarm',
-      emotion: 'happy'
-    });
+      this.loadReminders();
+    }, 5000); // Keep UI list synced with main process scheduler
   }
 
   render() {

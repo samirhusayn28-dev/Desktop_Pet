@@ -133,8 +133,10 @@ class SoundEffects {
   }
 }
 
+const soundEffectsInstance = new SoundEffects();
+if (typeof window !== 'undefined') {
+  window.soundEffects = soundEffectsInstance;
+}
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = new SoundEffects();
-} else if (typeof window !== 'undefined') {
-  window.soundEffects = new SoundEffects();
+  module.exports = soundEffectsInstance;
 }

@@ -20,7 +20,12 @@ class SecureStore {
 
     if (!this.userDataPath) {
       const home = process.env.HOME || process.env.USERPROFILE || '.';
-      this.userDataPath = path.join(home, 'Library', 'Application Support', 'desktop-pet');
+      const packagedDir = path.join(home, 'Library', 'Application Support', 'Desktop Pet');
+      if (fs.existsSync(packagedDir)) {
+        this.userDataPath = packagedDir;
+      } else {
+        this.userDataPath = path.join(home, 'Library', 'Application Support', 'desktop-pet');
+      }
     }
 
     try {
@@ -130,14 +135,17 @@ class SecureStore {
       ]
     };
 
+    this.lastLoadedMtime = 0;
     this.data = this.loadData();
   }
 
   loadData() {
     try {
       if (fs.existsSync(this.filePath)) {
+        const stats = fs.statSync(this.filePath);
         const fileContent = fs.readFileSync(this.filePath, 'utf8');
         const parsed = JSON.parse(fileContent);
+        this.lastLoadedMtime = stats.mtimeMs;
         return this.deepMerge(this.defaults, parsed);
       }
     } catch (err) {
@@ -146,15 +154,34 @@ class SecureStore {
     return JSON.parse(JSON.stringify(this.defaults));
   }
 
+  reloadIfChanged() {
+    try {
+      if (fs.existsSync(this.filePath)) {
+        const stats = fs.statSync(this.filePath);
+        if (!this.lastLoadedMtime || stats.mtimeMs > this.lastLoadedMtime) {
+          const fileContent = fs.readFileSync(this.filePath, 'utf8');
+          const parsed = JSON.parse(fileContent);
+          this.data = this.deepMerge(this.defaults, parsed);
+          this.lastLoadedMtime = stats.mtimeMs;
+        }
+      }
+    } catch (e) {}
+  }
+
   saveData() {
     try {
       fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8');
+      try {
+        const stats = fs.statSync(this.filePath);
+        this.lastLoadedMtime = stats.mtimeMs;
+      } catch (e) {}
     } catch (err) {
       console.error('Failed to save store:', err);
     }
   }
 
   get(keyPath) {
+    this.reloadIfChanged();
     const keys = keyPath.split('.');
     let current = this.data;
     for (const key of keys) {
@@ -165,6 +192,7 @@ class SecureStore {
   }
 
   set(keyPath, value) {
+    this.reloadIfChanged();
     const keys = keyPath.split('.');
     let current = this.data;
     for (let i = 0; i < keys.length - 1; i++) {

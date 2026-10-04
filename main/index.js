@@ -168,7 +168,8 @@ function createPetWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       spellcheck: false,
-      backgroundThrottling: true
+      backgroundThrottling: true,
+      autoplayPolicy: 'no-user-gesture-required'
     }
   });
 
@@ -417,7 +418,8 @@ function createPanelWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       spellcheck: false,
-      backgroundThrottling: true
+      backgroundThrottling: true,
+      autoplayPolicy: 'no-user-gesture-required'
     }
   });
 

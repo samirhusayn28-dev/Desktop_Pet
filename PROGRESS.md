@@ -72,6 +72,6 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Max volume (100) -> irritated, 0/muted -> shh/quiet, low (<15) -> sad, back to normal -> relieved within 2s
 
 ## Item F2 — REMINDERS
-- [ ] Scheduler, bubble and sound verified in packaged app with panel closed
-- [ ] Sound playback (autoplay policy, asarUnpack audio files)
-- [ ] Reminder due -> surprised + bounce, solid speech bubble, sound, snooze/repeat, missed reminder catchup, restart survival
+- [x] Scheduler, bubble and sound verified in packaged app with panel closed
+- [x] Sound playback (autoplay policy, asarUnpack audio files)
+- [x] Reminder due -> surprised + bounce, solid speech bubble, sound, snooze/repeat, missed reminder catchup, restart survival

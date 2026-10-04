@@ -81,7 +81,8 @@ class BubbleWindowManager {
       badge: item.badge || '',
       duration,
       sound: item.sound || 'chirp',
-      emotion: item.emotion || 'happy'
+      emotion: item.emotion || 'happy',
+      bounce: !!item.bounce
     });
 
     if (this.currentTimeout) clearTimeout(this.currentTimeout);
