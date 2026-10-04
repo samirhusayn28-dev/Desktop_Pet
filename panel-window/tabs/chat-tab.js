@@ -277,8 +277,7 @@ class ChatTab {
         provider: activeProviderId,
         model,
         baseUrl,
-        messages: this.messages.slice(0, -1),
-        systemPrompt: `You are ${petName}, a minimal, friendly desktop pet companion. Keep answers clear, helpful, and concise. Format code in markdown with language tags.`,
+        messages: this.messages.slice(0, -1).filter(m => !m.isError),
         contextInfo: this.currentContext,
         screenshotBase64
       });
@@ -388,6 +387,7 @@ class ChatTab {
 
   formatMarkdown(text) {
     if (!text) return '';
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<\/?think>/gi, '').trim();
 
     const codeBlocks = [];
     let processed = text.replace(/```([a-zA-Z0-9_-]*)\r?\n?([\s\S]*?)```/g, (match, lang, code) => {

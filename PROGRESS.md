@@ -75,3 +75,60 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Scheduler, bubble and sound verified in packaged app with panel closed
 - [x] Sound playback (autoplay policy, asarUnpack audio files)
 - [x] Reminder due -> surprised + bounce, solid speech bubble, sound, snooze/repeat, missed reminder catchup, restart survival
+
+## Item C1 — CHAT MUST WORK WITH ALL PROVIDERS
+- [x] Default model: chat-capable models only, exclude non-chat patterns, priority families, migrate saved excluded/missing models, collapsed "Other models (not for chat)" group
+- [x] One adapter per API format streaming correctly: Anthropic Messages API, Gemini streamGenerateContent SSE, OpenAI-compatible (OpenAI, Groq, DeepSeek, Qwen DashScope intl/china base URLs, OpenRouter, Custom), Ollama /api/chat NDJSON
+- [x] System prompt with pet name & user name, reply in same language/script (Roman Urdu/Hinglish support), concise
+- [x] Strip <think> and reasoning_content/thinking, keep roles correct, trim history, handle empty chunks & [DONE], handle mid-stream errors
+- [x] Truthful error messages (401/403, 402, 429, 503 retry backoff 1s/3s/7s, 404 retry, terms acceptance, offline), auto-fallback next chat model (max 2), non-streaming retry on stream failure, truthful Test connection
+- [x] Test with saved Groq & Gemini keys ("hello", "kya haal hai"), validate request formats for others (mark UNVERIFIED if keyless)
+
+## Item P2 — RENDERER IDLE WAKE-UPS
+- [ ] Measure packaged Desktop Pet Helper (Renderer) idle wake-ups over 2 min with cursor still
+- [ ] Identify and fix timer/event/rAF/IPC/animation wake-up sources in pet window
+- [ ] Target: renderer under 1% CPU and under 10 wake-ups/s with cursor still (report before/after)
+
+## Item H1 — HOVER/CLICK OUTSIDE THE PET
+- [ ] Shape-accurate hit-testing in main process (reusing existing cursor poll, no extra timers) based on pet size/width/height/roundness + bubble rect
+- [ ] setIgnoreMouseEvents(!inside) with 2px hysteresis, keep accepting events while dragging, transparent padding passes clicks through
+- [ ] Verify click 20px outside pet edge passes to background app without opening panel
+
+## Item W1 — FIRST-LAUNCH WELCOME SCREEN + ABOUT
+- [ ] First-launch centered solid welcome window (480x660), destroyed after closing; live pet reacts to changes
+- [ ] Credits: "Designed & Developed by Samir Husayn" with clickable GitHub link "samirhusayn28-dev"
+- [ ] Inputs: "What should I call you?", "Name your pet", "Customize your pet" (expandable appearance controls + accent color), "Chat" setup (provider, model, key with show/hide, test connection)
+- [ ] Buttons: "Save & Start" (persists everything, safeStorage for keys) and "Skip" (uses defaults, marks first-run done)
+- [ ] Settings -> About: same credits, version, "Check for updates", "Show welcome again"
+
+## Item S1 — RESET TO DEFAULT EVERYWHERE
+- [ ] Central defaults object; individual reset icon buttons for controls differing from defaults
+- [ ] "Reset section" per section, "Reset all settings" with confirmation; separate pet color and accent color resets
+- [ ] Never resets notes, to-dos, reminders, chat history, or API keys; values apply live and persist
+
+## Item E1 — NEW EMOTIONS (SHAPE-ONLY, NO CPU COST)
+- [ ] 11 new emotions using eye/mouth vector morphs + static SVG overlays (transform/opacity only, max 3s): yawn, dizzy, blush, excited, scared, annoyed, bored, proud, worried, grateful, goodbye
+- [ ] Rate limits and individual toggles in Settings -> Reactions; test via triggers and hidden `--emotion=<name>` CLI flag
+
+## Item G1 — GLASSES FOR THE PET
+- [ ] Static black round-frame glasses SVG (#111111, transparent fill) centered on eyes, derived from pet size/eye size/eye spacing, clamped to body
+- [ ] Part of face layer (tilts & breathes with face, doesn't follow cursor); eye-follow clamped inside lenses
+- [ ] Layer order: body -> blush -> eyes/mouth -> glasses frame -> overlays/bubbles; all emotions & blink clearly visible
+- [ ] Setting `glassesEnabled` (default OFF), toggle in Welcome screen, Settings -> Appearance, reset, export/import
+- [ ] Re-measure idle with glasses ON (GPU helper < 3% & < 10 wake-ups/s, renderer < 1%, main < 1%)
+
+## Item I1 — IMPORT / EXPORT SETTINGS AND NOTES
+- [ ] Settings -> Data: Export JSON with version via native save dialog (API keys excluded)
+- [ ] Import: native open dialog, schema/version/size validation, preview counts, notes merge vs replace, automatic backup in userData before applying, friendly error on corrupt files
+
+## Item U3 — UPDATE CHECKER
+- [ ] GITHUB_REPO = "samirhusayn28-dev/Desktop_Pet", check 60s after start and every 24h, plus "Check now" in About
+- [ ] Call GitHub releases/latest API, compare semver, notify with bubble + badge + OS asset download link, "Skip this version" option, toggle in Settings
+
+## Item WIN1 — WINDOWS PARITY
+- [ ] Cross-platform APIs, path separators, powerMonitor, nativeTheme, net.online, shortcuts
+- [ ] Windows sensor helper, adaptive scheduler, rate limits, graceful "Unavailable" state
+- [ ] Windows windows: transparent frameless pet window, opaque panel window, tray icon, AppUserModelId, NSIS config
+- [ ] CLI flag `--selftest` (PASS/FAIL/UNAVAILABLE logging) and GitHub Actions workflow smoke-test job
+- [ ] MEASURE-ON-WINDOWS.md documentation
+

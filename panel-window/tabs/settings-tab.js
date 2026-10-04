@@ -287,7 +287,11 @@ class SettingsTab {
       openai: 'https://api.openai.com/v1',
       gemini: 'https://generativelanguage.googleapis.com',
       anthropic: 'https://api.anthropic.com/v1',
-      ollama: 'http://localhost:11434'
+      ollama: 'http://localhost:11434',
+      qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+      deepseek: 'https://api.deepseek.com/v1',
+      openrouter: 'https://openrouter.ai/api/v1',
+      custom: 'https://api.openai.com/v1'
     };
 
     const baseUrl = store.get(`settings.ai.baseUrls.${providerId}`) || defaultUrls[providerId] || '';
@@ -298,6 +302,107 @@ class SettingsTab {
     if (this.apiKeyRow) {
       this.apiKeyRow.style.opacity = (providerId === 'ollama') ? '0.4' : '1';
     }
+  }
+
+  isNonChatModel(id) {
+    if (!id) return true;
+    const s = String(id).toLowerCase();
+    const excludePatterns = [
+      'tts', 'orpheus', 'whisper', 'speech', 'audio', 'transcribe',
+      'realtime', 'guard', 'safeguard', 'moderation', 'embed', 'rerank',
+      'allam', 'arabic', 'saudi', 'image', 'dall-e', 'imagen', 'veo',
+      'bilingual', 'clip', 'vision-preview', 'vl-', 'embedding', 'distil-whisper',
+      'text-embedding', 'deepseek-vl', 'qwen-vl', 'ocr'
+    ];
+    return excludePatterns.some(pattern => s.includes(pattern));
+  }
+
+  getPriorityDefaultModel(providerId, models = []) {
+    const modelIds = models.map(m => (typeof m === 'string' ? m : m.id));
+    const eligible = modelIds.filter(id => !this.isNonChatModel(id));
+
+    if (providerId === 'groq') {
+      const match =
+        eligible.find(id => /llama-3\.[1-9]-.*versatile/i.test(id)) ||
+        eligible.find(id => /llama-3\.[1-9]-.*instant/i.test(id)) ||
+        eligible.find(id => /llama-3.*versatile/i.test(id)) ||
+        eligible.find(id => /llama-3.*instant/i.test(id)) ||
+        eligible.find(id => /gpt-oss/i.test(id)) ||
+        eligible.find(id => /qwen/i.test(id)) ||
+        eligible.find(id => /kimi/i.test(id)) ||
+        eligible.find(id => /llama/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'llama-3.3-70b-versatile';
+    }
+
+    if (providerId === 'openai') {
+      const match =
+        eligible.find(id => /^gpt-4o-mini/i.test(id)) ||
+        eligible.find(id => /mini/i.test(id)) ||
+        eligible.find(id => /^gpt-4o/i.test(id)) ||
+        eligible.find(id => /^gpt-4/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'gpt-4o-mini';
+    }
+
+    if (providerId === 'gemini') {
+      const match =
+        eligible.find(id => /gemini-2\.5-flash/i.test(id)) ||
+        eligible.find(id => /gemini-2\.0-flash/i.test(id)) ||
+        eligible.find(id => /gemini-2\.0-flash-lite/i.test(id)) ||
+        eligible.find(id => /gemini-1\.5-flash/i.test(id)) ||
+        eligible.find(id => /flash/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'gemini-2.0-flash-lite';
+    }
+
+    if (providerId === 'deepseek') {
+      const match = eligible.find(id => /deepseek-chat/i.test(id)) || eligible.find(id => /chat/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'deepseek-chat';
+    }
+
+    if (providerId === 'qwen') {
+      const match =
+        eligible.find(id => /qwen-plus/i.test(id)) ||
+        eligible.find(id => /qwen-turbo/i.test(id)) ||
+        eligible.find(id => /qwen-max/i.test(id)) ||
+        eligible.find(id => /qwen/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'qwen-plus';
+    }
+
+    if (providerId === 'openrouter') {
+      const match =
+        eligible.find(id => /llama-3\.[1-9]/i.test(id)) ||
+        eligible.find(id => /claude-3-5/i.test(id)) ||
+        eligible.find(id => /gpt-4o/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'meta-llama/llama-3.3-70b-instruct';
+    }
+
+    if (providerId === 'anthropic') {
+      const match = eligible.find(id => /claude-3-5-sonnet/i.test(id)) || eligible.find(id => /claude-3-5-haiku/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'claude-3-5-sonnet-20241022';
+    }
+
+    if (providerId === 'ollama') {
+      const match = eligible.find(id => /llama3/i.test(id)) || eligible.find(id => /mistral/i.test(id));
+      if (match) return match;
+      if (eligible.length > 0) return eligible[0];
+      return 'llama3:latest';
+    }
+
+    if (eligible.length > 0) return eligible[0];
+    return modelIds[0] || 'default';
   }
 
   async loadModelsForProvider(providerId, options = {}) {
@@ -334,53 +439,54 @@ class SettingsTab {
 
       this.modelSelect.innerHTML = '';
       if (Array.isArray(models) && models.length > 0) {
-        models.forEach(m => {
-          const opt = document.createElement('option');
-          opt.value = m.id;
-          opt.textContent = m.name || m.id;
-          this.modelSelect.appendChild(opt);
-        });
+        const chatModels = models.filter(m => !this.isNonChatModel(m.id));
+        const otherModels = models.filter(m => this.isNonChatModel(m.id));
 
-        const isExcluded = (id) => {
-          if (!id) return true;
-          const s = id.toLowerCase();
-          return ['allam', 'whisper', 'audio', 'tts', 'embedding', 'embed', 'guard', 'moderation', 'vision-preview', 'vl-'].some(k => s.includes(k));
-        };
+        if (chatModels.length > 0) {
+          const chatGroup = document.createElement('optgroup');
+          chatGroup.label = 'Chat Models';
+          chatModels.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.name || m.id;
+            chatGroup.appendChild(opt);
+          });
+          this.modelSelect.appendChild(chatGroup);
+        }
+
+        if (otherModels.length > 0) {
+          const otherGroup = document.createElement('optgroup');
+          otherGroup.label = 'Other models (not for chat)';
+          otherModels.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = `${m.name || m.id} (not for chat)`;
+            otherGroup.appendChild(opt);
+          });
+          this.modelSelect.appendChild(otherGroup);
+        }
 
         const savedModel = store.get(`settings.ai.models.${providerId}`);
-        const exists = models.some(m => m.id === savedModel && !isExcluded(m.id));
+        const isExcluded = !savedModel || this.isNonChatModel(savedModel);
+        const existsInChat = chatModels.some(m => m.id === savedModel);
 
-        if (exists) {
-          this.modelSelect.value = savedModel;
-        } else {
-          // Select sensible general-purpose chat default from priority list
-          let def = models.find(m => !isExcluded(m.id))?.id || models[0].id;
-          if (providerId === 'groq') {
-            const p = models.find(m => m.id.includes('llama-3.3-70b-versatile')) ||
-                      models.find(m => m.id.includes('llama-3.1-70b-versatile')) ||
-                      models.find(m => m.id.includes('llama-3.1-8b-instant')) ||
-                      models.find(m => !isExcluded(m.id));
-            if (p) def = p.id;
-          } else if (providerId === 'gemini') {
-            const flash = models.find(m => (m.id.includes('gemini-2.0-flash') || m.id.includes('gemini-2.0-flash-lite')) && !isExcluded(m.id)) ||
-                          models.find(m => m.id.includes('flash') && !isExcluded(m.id));
-            if (flash) def = flash.id;
-          } else if (providerId === 'openai') {
-            const mini = models.find(m => m.id.includes('gpt-4o-mini')) ||
-                         models.find(m => m.id.includes('gpt-4o'));
-            if (mini) def = mini.id;
-          }
-
+        if (isExcluded || !existsInChat) {
+          const def = this.getPriorityDefaultModel(providerId, chatModels.length > 0 ? chatModels : models);
           this.modelSelect.value = def;
           store.set(`settings.ai.models.${providerId}`, def);
-        }
-
-        if (this.modelStatusHint) {
-          this.modelStatusHint.textContent = `${models.length} active models loaded. Default: ${this.modelSelect.value}`;
-          this.modelStatusHint.className = 'model-status-hint success';
+          if (this.modelStatusHint) {
+            this.modelStatusHint.textContent = `Migrated model from ${savedModel || 'none'} to ${def} (chat-optimized).`;
+            this.modelStatusHint.className = 'model-status-hint info';
+          }
+        } else {
+          this.modelSelect.value = savedModel;
+          if (this.modelStatusHint) {
+            this.modelStatusHint.textContent = `${chatModels.length} chat models active. Selected: ${savedModel}`;
+            this.modelStatusHint.className = 'model-status-hint success';
+          }
         }
       } else {
-        const _fbMap = { gemini: 'gemini-2.0-flash-lite', groq: 'llama-3.3-70b-versatile', openai: 'gpt-4o-mini', anthropic: 'claude-3-5-haiku-20241022', deepseek: 'deepseek-chat' };
+        const _fbMap = { gemini: 'gemini-2.0-flash-lite', groq: 'llama-3.3-70b-versatile', openai: 'gpt-4o-mini', anthropic: 'claude-3-5-haiku-20241022', deepseek: 'deepseek-chat', qwen: 'qwen-plus' };
         const fallback = _fbMap[providerId] || 'default';
         this.modelSelect.innerHTML = `<option value="${fallback}">${fallback}</option>`;
         if (this.modelStatusHint) {

@@ -1022,7 +1022,43 @@ ipcMain.handle('system:get-app-metrics', async () => {
 });
 
 // App Lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  if (process.argv.includes('--test-chat')) {
+    console.log('=== RUNNING PACKAGED CLI CHAT TEST ===');
+    const groqKey = store.getApiKey('groq');
+    console.log('Groq key exists:', Boolean(groqKey), groqKey ? `(length: ${groqKey.length})` : '');
+    const geminiKey = store.getApiKey('gemini');
+    console.log('Gemini key exists:', Boolean(geminiKey));
+
+    if (groqKey) {
+      console.log('\n--- 1. Testing "hello" with Groq ---');
+      await aiService.streamChat('cli_test_1', {
+        provider: 'groq',
+        messages: [{ role: 'user', content: 'hello' }]
+      }, (chunk) => process.stdout.write(chunk), (done) => {
+        console.log('\n[DONE hello]:', done);
+      }, (err) => {
+        console.error('\n[ERR hello]:', err);
+      });
+
+      console.log('\n--- 2. Testing "kya haal hai" with Groq ---');
+      await aiService.streamChat('cli_test_2', {
+        provider: 'groq',
+        messages: [{ role: 'user', content: 'kya haal hai' }]
+      }, (chunk) => process.stdout.write(chunk), (done) => {
+        console.log('\n[DONE kya haal hai]:', done);
+      }, (err) => {
+        console.error('\n[ERR kya haal hai]:', err);
+      });
+
+      console.log('\n--- 3. Testing connection on Groq ---');
+      const testRes = await aiService.testConnection('groq', groqKey);
+      console.log('Groq test connection result:', testRes);
+    }
+    app.exit(0);
+    return;
+  }
+
   createTray();
   createPetWindow();
 
