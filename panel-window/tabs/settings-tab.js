@@ -24,7 +24,8 @@ const CENTRAL_DEFAULTS = {
     userName: 'Samir',
     alwaysOnTop: true,
     rememberPosition: true,
-    launchAtLogin: false
+    launchAtLogin: false,
+    autoUpdateCheck: true
   },
   behavior: {
     idleSleepyMinutes: 2,
@@ -84,6 +85,7 @@ class SettingsTab {
     this.alwaysOnTopToggle = document.getElementById('setting-always-on-top');
     this.rememberPosToggle = document.getElementById('setting-remember-pos');
     this.launchLoginToggle = document.getElementById('setting-launch-login');
+    this.autoUpdateToggle = document.getElementById('setting-auto-update');
 
     // 2. Behavior Settings
     this.idleSleepySlider = document.getElementById('setting-idle-sleepy');
@@ -221,6 +223,7 @@ class SettingsTab {
     if (this.alwaysOnTopToggle) this.alwaysOnTopToggle.checked = store.get('settings.general.alwaysOnTop') !== false;
     if (this.rememberPosToggle) this.rememberPosToggle.checked = store.get('settings.general.rememberPosition') !== false;
     if (this.launchLoginToggle) this.launchLoginToggle.checked = store.get('settings.general.launchAtLogin') === true;
+    if (this.autoUpdateToggle) this.autoUpdateToggle.checked = store.get('settings.general.autoUpdateCheck') !== false;
 
     // 2. Behavior
     const idleSleepy = store.get('settings.behavior.idleSleepyMinutes') ?? CENTRAL_DEFAULTS.behavior.idleSleepyMinutes;
@@ -1210,7 +1213,56 @@ class SettingsTab {
         }
         if (this.aboutUpdateStatus) {
           this.aboutUpdateStatus.classList.remove('hidden');
-          this.aboutUpdateStatus.textContent = 'Checking for updates...';
+          this.aboutUpdateStatus.style.display = 'block';
+          this.aboutUpdateStatus.innerHTML = '<span style="opacity:0.8;">Checking for updates...</span>';
+        }
+      });
+    }
+
+    if (this.autoUpdateToggle) {
+      this.autoUpdateToggle.addEventListener('change', (e) => {
+        window.panelController.store.set('settings.general.autoUpdateCheck', e.target.checked);
+      });
+    }
+
+    if (window.panelController && window.panelController.ipcRenderer) {
+      window.panelController.ipcRenderer.on('update:status', (event, { result, isManual }) => {
+        if (!this.aboutUpdateStatus) return;
+        this.aboutUpdateStatus.classList.remove('hidden');
+        this.aboutUpdateStatus.style.display = 'block';
+
+        if (result.status === 'up_to_date') {
+          if (isManual) {
+            this.aboutUpdateStatus.innerHTML = `<span style="color:#10B981;">✓ Desktop Pet is up to date (v${result.currentVersion}).</span>`;
+          }
+        } else if (result.status === 'update_available') {
+          this.aboutUpdateStatus.innerHTML = `
+            <div style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 8px; padding: 10px; margin-top: 6px;">
+              <div style="font-weight: 600; color: #38BDF8; margin-bottom: 2px;">Update Available: v${result.latestVersion}</div>
+              <div style="font-size: 11px; opacity: 0.85; margin-bottom: 8px;">A new release is available on GitHub.</div>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="theme-btn-primary" id="btn-update-download" style="padding: 4px 10px; font-size: 11px;">Download Update</button>
+                <button type="button" class="theme-btn-secondary" id="btn-update-skip" style="padding: 4px 10px; font-size: 11px;">Skip this version</button>
+              </div>
+            </div>
+          `;
+          const dlBtn = document.getElementById('btn-update-download');
+          const skipBtn = document.getElementById('btn-update-skip');
+          if (dlBtn) {
+            dlBtn.addEventListener('click', () => {
+              window.panelController.ipcRenderer.send('update:open-download', result.downloadUrl || result.releaseUrl);
+            });
+          }
+          if (skipBtn) {
+            skipBtn.addEventListener('click', () => {
+              window.panelController.ipcRenderer.send('update:skip-version', result.latestVersion);
+              this.aboutUpdateStatus.innerHTML = `<span style="opacity:0.7;">Skipped v${result.latestVersion}.</span>`;
+            });
+          }
+        } else if (result.status === 'error') {
+          this.aboutUpdateStatus.innerHTML = `<span style="color:#EF4444;">${result.error || "Couldn't check for updates. Check your internet connection."}</span>`;
+        } else if (result.status === 'no_releases') {
+          this.aboutUpdateStatus.innerHTML = `<span style="opacity:0.8;">No published releases found yet.</span>`;
         }
       });
     }
@@ -1298,6 +1350,7 @@ class SettingsTab {
       { id: 'setting-always-on-top', section: 'general', key: 'settings.general.alwaysOnTop', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.general.alwaysOnTop },
       { id: 'setting-remember-pos', section: 'general', key: 'settings.general.rememberPosition', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.general.rememberPosition },
       { id: 'setting-launch-login', section: 'general', key: 'settings.general.launchAtLogin', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.general.launchAtLogin },
+      { id: 'setting-auto-update', section: 'general', key: 'settings.general.autoUpdateCheck', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.general.autoUpdateCheck },
 
       // 2. Behavior
       { id: 'setting-idle-sleepy', section: 'behavior', key: 'settings.behavior.idleSleepyMinutes', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.idleSleepyMinutes, dispId: 'disp-idle-sleepy', suffix: ' min' },

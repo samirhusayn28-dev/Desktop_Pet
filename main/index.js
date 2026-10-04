@@ -14,6 +14,7 @@ const bubble = require('./bubble-window');
 const scheduler = require('./scheduler');
 const systemSense = require('./system-sense');
 const contextSensor = require('./context-sensor');
+const UpdateChecker = require('./update-checker');
 
 app.commandLine.appendSwitch('disable-features', 'Autofill,Translate,MediaRouter,CalculateNativeWinOcclusion,SpareRendererForSitePerProcess');
 app.commandLine.appendSwitch('renderer-process-limit', '2');
@@ -37,6 +38,7 @@ let idlePollInterval = null;
 let lastCursorPos = { x: 0, y: 0 };
 let lastPanelBlurTime = 0;
 let petIdleState = 'neutral';
+let updateChecker = null;
 
 // App naming & branding
 const defaultPetName = store.get('settings.general.petName') || 'Desktop Pet';
@@ -1112,6 +1114,30 @@ ipcMain.handle('data:apply-import', async (e, { data, notesStrategy }) => {
   }
 });
 
+// Update Checker IPC (Item U3)
+ipcMain.on('update:check-now', async () => {
+  if (updateChecker) {
+    await updateChecker.check(true);
+  }
+});
+
+ipcMain.handle('update:check-status', async () => {
+  if (updateChecker) {
+    return await updateChecker.check(true);
+  }
+  return { status: 'error', error: 'Update checker not initialized.' };
+});
+
+ipcMain.on('update:skip-version', (e, version) => {
+  store.set('settings.general.skippedVersion', version);
+});
+
+ipcMain.on('update:open-download', (e, url) => {
+  if (url && typeof url === 'string') {
+    shell.openExternal(url);
+  }
+});
+
 // Behavior & Reactions IPC
 ipcMain.on('behavior:update', (e, updates) => {
   if (updates.idleSleepyMinutes !== undefined) {
@@ -1511,6 +1537,11 @@ app.whenReady().then(async () => {
   // Start background services
   scheduler.start();
   systemSense.start();
+  updateChecker = new UpdateChecker(
+    (channel, data) => relayToPet(channel, data),
+    () => panelWindow
+  );
+  updateChecker.start();
 
   // Hide dock icon on macOS (Menu-bar only desktop pet assistant)
   if (process.platform === 'darwin' && app.dock) {

@@ -52,7 +52,8 @@ class SecureStore {
           launchAtLogin: false,
           alwaysOnTop: true,
           rememberPosition: true,
-          showPet: true
+          showPet: true,
+          autoUpdateCheck: true
         },
         behavior: {
           idleSleepyMinutes: 2,

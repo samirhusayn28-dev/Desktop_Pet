@@ -122,8 +122,8 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Import: native open dialog, schema/version/size validation, preview counts, notes merge vs replace, automatic backup in userData before applying, friendly error on corrupt files
 
 ## Item U3 — UPDATE CHECKER
-- [ ] GITHUB_REPO = "samirhusayn28-dev/Desktop_Pet", check 60s after start and every 24h, plus "Check now" in About
-- [ ] Call GitHub releases/latest API, compare semver, notify with bubble + badge + OS asset download link, "Skip this version" option, toggle in Settings
+- [x] GITHUB_REPO = "samirhusayn28-dev/Desktop_Pet", check 60s after start and every 24h, plus "Check now" in About
+- [x] Call GitHub releases/latest API, compare semver, notify with bubble + badge + OS asset download link, "Skip this version" option, toggle in Settings
 
 ## Item WIN1 — WINDOWS PARITY
 - [ ] Cross-platform APIs, path separators, powerMonitor, nativeTheme, net.online, shortcuts
