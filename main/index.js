@@ -894,17 +894,19 @@ ipcMain.on('pet:drag-move', (e, { screenX, screenY }) => {
     screen.getDisplayNearestPoint({ x: screenX, y: screenY }) ||
     screen.getPrimaryDisplay();
   const bounds = display.bounds;
+  const workArea = display.workArea; // Excludes menu bar (macOS) and taskbar (Windows)
   const [petW, petH] = petWindow.getSize();
   const { bodyX, bodyY, bodyW, bodyH } = getPetBodyRect(petW, petH);
 
   let newPetX = Math.round(screenX - dragStartPos.offsetX);
   let newPetY = Math.round(screenY - dragStartPos.offsetY);
 
-  // Constrain pet body rect within screen display bounds (can reach screen corners and edges without invisible wall)
-  const minPetX = bounds.x - bodyX;
-  const maxPetX = bounds.x + bounds.width - bodyX - bodyW;
-  const minPetY = bounds.y - bodyY;
-  const maxPetY = bounds.y + bounds.height - bodyY - bodyH;
+  // Constrain pet body rect within usable screen workArea (can reach screen corners and edges
+  // without hiding behind Windows taskbar, macOS menu bar, or dock on any platform)
+  const minPetX = workArea.x - bodyX;
+  const maxPetX = workArea.x + workArea.width - bodyX - bodyW;
+  const minPetY = workArea.y - bodyY;
+  const maxPetY = workArea.y + workArea.height - bodyY - bodyH;
 
   newPetX = Math.round(Math.max(minPetX, Math.min(maxPetX, newPetX)));
   newPetY = Math.round(Math.max(minPetY, Math.min(maxPetY, newPetY)));
@@ -918,8 +920,8 @@ ipcMain.on('pet:drag-move', (e, { screenX, screenY }) => {
     let newPanX = newPetX + panelDragOffset.diffX;
     let newPanY = newPetY + panelDragOffset.diffY;
 
-    newPanX = Math.max(bounds.x, Math.min(bounds.x + bounds.width - panW, newPanX));
-    newPanY = Math.max(bounds.y, Math.min(bounds.y + bounds.height - panH, newPanY));
+    newPanX = Math.max(workArea.x, Math.min(workArea.x + workArea.width - panW, newPanX));
+    newPanY = Math.max(workArea.y, Math.min(workArea.y + workArea.height - panH, newPanY));
 
     panelWindow.setPosition(newPanX, newPanY);
   }
