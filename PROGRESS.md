@@ -232,8 +232,8 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Tests: long reminder title, 300-char AI error, long word without spaces, emoji, RTL text, screen edges, max pet size, glasses ON
 
 ## Item V1 — VERSION SHOWN IN THE APP = RELEASE VERSION
-- [ ] Single source of truth: `package.json` "version" across git tag, file names, `app.getVersion()`, Settings -> About, tray tooltip, update checker
-- [ ] CI check: release workflow fails early if pushed tag != "v" + package.json version
+- [x] Single source of truth: `package.json` "version" across git tag, file names, `app.getVersion()`, Settings -> About, tray tooltip, update checker
+- [x] CI check: release workflow fails early if pushed tag != "v" + package.json version
 
 ## Item UI4 — POLISH THE TABS + NEW APP-WIDE FONT
 - [ ] Bundled local fonts (zero network, cross-platform identical): Nunito (400, 600, 700), Fredoka (500, 600, tabular-nums), JetBrains Mono (code blocks only). Fallback system stack.

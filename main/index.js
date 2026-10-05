@@ -96,7 +96,7 @@ function createTray() {
     } else {
       tray.setImage(icon);
     }
-    tray.setToolTip(`${petName} — Desktop Pet`);
+    tray.setToolTip(`${petName} v${app.getVersion()}`);
 
     const contextMenu = Menu.buildFromTemplate([
       {

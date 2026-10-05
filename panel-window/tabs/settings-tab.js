@@ -364,9 +364,10 @@ class SettingsTab {
         const platform = (typeof process !== 'undefined' && process.platform === 'darwin')
           ? 'macOS (Intel x64)'
           : ((typeof process !== 'undefined' && process.platform === 'win32') ? 'Windows (x64)' : (typeof process !== 'undefined' ? process.platform : ''));
-        this.aboutVersionDisplay.textContent = `v${v || '1.0.2'}${platform ? ` • ${platform}` : ''}`;
+        const displayVersion = v ? `v${v}` : 'v1.0.0';
+        this.aboutVersionDisplay.textContent = `${displayVersion}${platform ? ` • ${platform}` : ''}`;
       } catch (e) {
-        this.aboutVersionDisplay.textContent = 'v1.0.2';
+        this.aboutVersionDisplay.textContent = 'v1.0.0';
       }
     }
   }
