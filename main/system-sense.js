@@ -139,6 +139,8 @@ public class PixieAudio {
 
 $script:lastDevId = ""
 $script:lastIsHp = "false"
+$script:lastBrCheck = 0
+$script:lastBrVal = "NA"
 
 function Get-PixieFastAudio {
     $audio = [PixieAudio]::AudioState()
@@ -161,7 +163,17 @@ function Get-PixieFastAudio {
             $script:lastIsHp = $isHp
         }
     } catch {}
-    return "$audio;$isHp"
+
+    $batt = [PixieAudio]::BatteryState()
+
+    $nowTicks = [Environment]::TickCount
+    if (($nowTicks - $script:lastBrCheck) -gt 700 -or $script:lastBrCheck -eq 0) {
+        $script:lastBrCheck = $nowTicks
+        $script:lastBrVal = Get-PixieBrightness
+    }
+    $br = $script:lastBrVal
+
+    return "$audio;$isHp;$batt;$br"
 }
 
 function Get-PixieBrightness {
@@ -178,43 +190,7 @@ function Get-PixieBrightness {
 }
 
 function Get-PixieAll {
-    $audio = [PixieAudio]::AudioState()
-    $isHp = "false"
-    try {
-        $parts = $audio.Split(',')
-        $devId = if ($parts.Length -ge 4) { $parts[3] } else { "" }
-        if ($devId) {
-            $reg = "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render\\$devId\\Properties"
-            $p = Get-ItemProperty -Path $reg -ErrorAction SilentlyContinue
-            if ($p) {
-                $desc = "" + $p.'{a45c254e-df1c-4efd-8020-67d146a850e0},2' + " " + $p.'{b3f8fa53-0004-438e-9002-d4c46f370a0f},6'
-                if ($desc -match 'headphone|headset|earphone|airpod|bud|earbud|airpods|beats|bose|sony|jbl|wh-|wf-|sennheiser|plantronics|razer|hyperx|steelseries|wireless stereo|bluetooth audio') {
-                    $isHp = "true"
-                }
-            }
-        }
-    } catch {}
-
-    $br = Get-PixieBrightness
-
-    $batt = "NA"
-    try {
-        $b = Get-CimInstance -ClassName Win32_Battery -ErrorAction SilentlyContinue
-        if ($b) {
-            $chg = ($b.BatteryStatus -eq 2 -or $b.BatteryStatus -eq 4 -or $b.BatteryStatus -eq 6)
-            $batt = "$($b.EstimatedChargeRemaining),$chg"
-        }
-    } catch {
-        try {
-            $b = Get-WmiObject -Class Win32_Battery -ErrorAction SilentlyContinue
-            if ($b) {
-                $chg = ($b.BatteryStatus -eq 2 -or $b.BatteryStatus -eq 4 -or $b.BatteryStatus -eq 6)
-                $batt = "$($b.EstimatedChargeRemaining),$chg"
-            }
-        } catch {}
-    }
-
-    return "$audio;$isHp;$br;$batt"
+    return Get-PixieFastAudio
 }
 
 Write-Output "PIXIE_READY"
@@ -478,12 +454,12 @@ class SystemSense {
       console.warn('[SystemSense] checkAllSensors error:', e);
     }
 
-    // Adaptive interval: 3s if recent change detected, 15s if pet is sleeping, 6s when stable
-    let nextDelay = 6000;
+    // Adaptive interval: 1.2s on change, 8s if pet is sleeping, 2.5s when active (fast reactions)
+    let nextDelay = 2500;
     if (this.isSleeping) {
-      nextDelay = 15000;
+      nextDelay = 8000;
     } else if (this.recentChangeDetected) {
-      nextDelay = 3000;
+      nextDelay = 1200;
       this.recentChangeDetected = false;
     }
 
@@ -595,8 +571,10 @@ class SystemSense {
         // Ultra-fast C# CoreAudio query (<2ms execution, no slow WMI)
         winPsQuery('Get-PixieFastAudio', 1500).then((result) => {
           if (!result) return resolve();
-          // Format: vol,mute,peak,devId;isHp
+          // Format: vol,mute,peak,devId;isHp;batt;br
           const sections = result.split(';');
+
+          // 1. Audio
           const audioParts = (sections[0] || '').split(',');
           const vol = parseInt(audioParts[0], 10);
           const muted = (audioParts[1] || '').trim() === 'true';
@@ -607,15 +585,41 @@ class SystemSense {
             this._applyVolumeBandLogic(vol, muted);
           }
 
-          // Real-time headphone detection from Core Audio (<1ms registry friendly name)
+          // 2. Real-time headphone detection from Core Audio (<1ms registry friendly name)
           if (sections.length > 1) {
             const isHp = sections[1].trim() === 'true';
             this._applyHeadphoneState(isHp);
           }
 
-          // Real-time audio activity detection (peak > 5 means audio is actively outputting)
+          // 3. Real-time audio activity detection (peak > 5 means audio is actively outputting)
           const isAudioActive = peak >= 5;
           this.processAudioPlayingState(isAudioActive).catch(() => {});
+
+          // 4. Battery (<1ms kernel32 GetSystemPowerStatus via C#)
+          if (sections.length > 2) {
+            const battRaw = (sections[2] || '').trim();
+            if (battRaw && battRaw !== 'NA' && battRaw.includes(',')) {
+              const [pctStr, chgStr] = battRaw.split(',');
+              const pct = parseInt(pctStr, 10);
+              const isCharging = chgStr.toLowerCase() === 'true';
+              if (!isNaN(pct)) {
+                this.processBatteryState(pct, isCharging);
+              }
+            }
+          }
+
+          // 5. Brightness (<1ms cached / fast WMI query)
+          if (sections.length > 3) {
+            const brRaw = (sections[3] || '').trim();
+            if (brRaw && brRaw !== 'NA') {
+              const brPct = parseInt(brRaw, 10);
+              if (!isNaN(brPct)) {
+                this.state.brightnessAvailable = true;
+                this.state.brightnessLevel = brPct;
+                this._applyBrightnessBandLogic(brPct);
+              }
+            }
+          }
 
           resolve();
         }).catch(() => resolve());
@@ -846,7 +850,7 @@ class SystemSense {
     // Plugged in
     if (!this.state.batteryCharging && isCharging) {
       this.state.batteryCharging = true;
-      if (this.canReact('battery', 30000)) {
+      if (this.canReact('battery_plug', 10000)) {
         this.sendPetEmotion('charging', 4000);
         bubble.show({
           badge: 'CHARGER CONNECTED',
@@ -859,7 +863,7 @@ class SystemSense {
     // Unplugged
     else if (this.state.batteryCharging && !isCharging) {
       this.state.batteryCharging = false;
-      if (this.canReact('battery', 30000)) {
+      if (this.canReact('battery_unplug', 10000)) {
         this.sendPetEmotion('surprised', 2500);
         bubble.show({
           badge: 'ON BATTERY',
@@ -1112,7 +1116,7 @@ class SystemSense {
     }
     if (isHeadphones && !this.state.headphonesConnected) {
       this.state.headphonesConnected = true;
-      if (this.canReact('headphones', 60000)) {
+      if (this.canReact('headphones_connect', 15000)) {
         this.sendPetEmotion('focus', 4000);
         const name = this.getUserName();
         bubble.show({
@@ -1124,7 +1128,7 @@ class SystemSense {
       }
     } else if (!isHeadphones && this.state.headphonesConnected) {
       this.state.headphonesConnected = false;
-      if (this.canReact('headphones', 60000)) {
+      if (this.canReact('headphones_disconnect', 15000)) {
         this.sendPetEmotion('neutral', 2500);
         bubble.show({
           badge: 'HEADPHONES DISCONNECTED',

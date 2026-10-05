@@ -2,6 +2,31 @@
 
 All notable changes to Pixie are documented in this file.
 
+## [1.0.9] - 2026-10-06 — **Removal of Bulb Glow, 11 Glasses Frames, Windows Reminders & Zero-Latency System Sense**
+
+### Removed
+- **Electric Bulb Glow Effect Removed**: Completely removed `.pet-bulb-active` CSS drop-shadow/pulse animations and `setBulbActive` controller routines as requested.
+
+### Added
+- **More Glasses Frame Shapes**: Expanded glasses frame shapes to 11 styles:
+  - Round (Classic Circular), Square (Retro Geek), Rectangle (Sleek Modern), Hexagon (Geometric Chic), Cat-Eye (Chic & Winged), Oval (Soft & Friendly), Aviator (Double-Bridge), Browline / Clubmaster (Iconic Vintage), Semi-Rimless (Flat-Top), Heart (Sweet & Kawaii), and Star (Fun & Starry).
+  - All selectable from Settings > Appearance > Glasses Frame Shape.
+
+### Fixed
+- **Windows Reminders Not Working**:
+  - Fixed Windows `setAlwaysOnTop` crash: `'screen-saver'` window level is macOS-exclusive; on Windows, safe `setAlwaysOnTop(true)` and `moveTop()` are used to prevent `TypeError` from terminating the reminder trigger sequence.
+  - Added robust `parseReminderTime()` supporting 24-hour, 12-hour AM/PM (`2:30 PM`), seconds (`14:30:00`), and whitespace.
+  - Added 2-minute tolerance window in `evaluateReminders` preventing system lag from dropping scheduled reminders.
+  - Added native Windows `shell.beep()` audio fallback and normalized cross-platform audio path resolution.
+  - Added `reminder:triggered` IPC handler in panel reminders tab for live synchronization.
+- **Windows System Sense Latency**:
+  - Eliminated sensor lag by unifying audio, headphones, battery, and brightness into a high-frequency 300ms query (`Get-PixieFastAudio`).
+  - Switched Windows battery detection to direct kernel32 `GetSystemPowerStatus` via C#, eliminating slow WMI queries.
+  - Disabled `backgroundThrottling` on `petWindow` to prevent Chromium from delaying background event loops and pet reactions when other apps are active.
+
+## [1.0.8] - 2026-10-05 — **Customization and Color Pickers**
+- Added glasses frame selection, glasses color picker, eyes color picker, mouth color picker.
+
 ## [1.0.7] - 2026-10-05 — **Auto-Update Detection Reliability Fix**
 
 ### Fixed

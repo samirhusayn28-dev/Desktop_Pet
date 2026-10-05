@@ -188,7 +188,7 @@ function createPetWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       spellcheck: false,
-      backgroundThrottling: true,
+      backgroundThrottling: false,
       autoplayPolicy: 'no-user-gesture-required'
     }
   });
@@ -197,6 +197,11 @@ function createPetWindow() {
     try {
       petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
       petWindow.setAlwaysOnTop(true, 'screen-saver');
+    } catch (e) {}
+  } else {
+    try {
+      petWindow.setAlwaysOnTop(true);
+      petWindow.moveTop();
     } catch (e) {}
   }
 

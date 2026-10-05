@@ -124,6 +124,13 @@ class RemindersTab {
           this.render();
         }
       });
+
+      window.panelController.ipcRenderer.on('reminder:triggered', (e, { reminder, isMissed }) => {
+        this.loadReminders();
+        if (window.soundEffects) {
+          window.soundEffects.play('alarm', 'reminders');
+        }
+      });
     }
   }
 

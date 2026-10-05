@@ -20,6 +20,25 @@ const { powerMonitor, Notification } = require('electron');
 const store = require('./secure-store');
 const bubble = require('./bubble-window');
 
+function parseReminderTime(timeStr) {
+  if (!timeStr) return null;
+  const s = String(timeStr).trim();
+  const match = s.match(/^(\d{1,2}):(\d{1,2})(?::\d{1,2})?\s*(am|pm)?$/i);
+  if (!match) {
+    const parts = s.split(':');
+    let h = parseInt(parts[0], 10);
+    let m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return null;
+    return { hours: h, minutes: m };
+  }
+  let h = parseInt(match[1], 10);
+  let m = parseInt(match[2], 10);
+  const ampm = match[3] ? match[3].toLowerCase() : null;
+  if (ampm === 'pm' && h < 12) h += 12;
+  if (ampm === 'am' && h === 12) h = 0;
+  return { hours: h, minutes: m };
+}
+
 class Scheduler {
   constructor() {
     this.timer = null;
@@ -124,12 +143,14 @@ class Scheduler {
     for (const rem of reminders) {
       if (!rem.enabled) continue;
 
-      const [rHoursRaw, rMinsRaw] = (rem.time || '').split(':');
-      const rHours = parseInt(rHoursRaw, 10);
-      const rMins = parseInt(rMinsRaw, 10);
-      if (isNaN(rHours) || isNaN(rMins)) continue;
+      const parsed = parseReminderTime(rem.time);
+      if (!parsed) continue;
+      const { hours: rHours, minutes: rMins } = parsed;
 
-      const isTimeMatch = (rHours === currentHours && rMins === currentMins);
+      const remTotalMins = rHours * 60 + rMins;
+      const nowTotalMins = currentHours * 60 + currentMins;
+      const diff = nowTotalMins - remTotalMins;
+
       let isDue = false;
       let triggerKey;
 
@@ -138,11 +159,12 @@ class Scheduler {
         isDue = (rMins === currentMins);
       } else if (rem.repeat === 'daily') {
         triggerKey = todayDateStr;
-        isDue = isTimeMatch;
+        // Fire if due right now or within last 2 minutes (prevents missed reminders on lag)
+        isDue = (diff >= 0 && diff <= 2);
       } else {
         // repeat: 'once'
         triggerKey = todayDateStr;
-        isDue = isTimeMatch;
+        isDue = (diff >= 0 && diff <= 2);
       }
 
       if (!isDue) continue;
@@ -199,10 +221,9 @@ class Scheduler {
     for (const rem of reminders) {
       if (!rem.enabled) continue;
 
-      const [rHoursRaw, rMinsRaw] = (rem.time || '').split(':');
-      const rHours = parseInt(rHoursRaw, 10);
-      const rMins = parseInt(rMinsRaw, 10);
-      if (isNaN(rHours) || isNaN(rMins)) continue;
+      const parsed = parseReminderTime(rem.time);
+      if (!parsed) continue;
+      const { hours: rHours, minutes: rMins } = parsed;
 
       const remTotalMins = rHours * 60 + rMins;
       // Fire if reminder is within [now - 2min, now]
@@ -255,10 +276,9 @@ class Scheduler {
     for (const rem of reminders) {
       if (!rem.enabled) continue;
 
-      const [rHoursRaw, rMinsRaw] = (rem.time || '').split(':');
-      const rHours = parseInt(rHoursRaw, 10);
-      const rMins = parseInt(rMinsRaw, 10);
-      if (isNaN(rHours) || isNaN(rMins)) continue;
+      const parsed = parseReminderTime(rem.time);
+      if (!parsed) continue;
+      const { hours: rHours, minutes: rMins } = parsed;
 
       const remTotalMins = rHours * 60 + rMins;
       const minutesMissed = nowTotalMins - remTotalMins;
@@ -311,10 +331,9 @@ class Scheduler {
     for (const rem of reminders) {
       if (!rem.enabled) continue;
 
-      const [rHoursRaw, rMinsRaw] = (rem.time || '').split(':');
-      const rHours = parseInt(rHoursRaw, 10);
-      const rMins = parseInt(rMinsRaw, 10);
-      if (isNaN(rHours) || isNaN(rMins)) continue;
+      const parsed = parseReminderTime(rem.time);
+      if (!parsed) continue;
+      const { hours: rHours, minutes: rMins } = parsed;
 
       const remTotalMins = rHours * 60 + rMins;
 
@@ -379,20 +398,36 @@ class Scheduler {
       console.warn('[Scheduler] Native notification error:', e.message);
     }
 
-    // 2. Bring pet to top & wake if sleeping
+    // Windows fallback: native system audio beep in case desktop notifications are suppressed
+    if (process.platform === 'win32') {
+      try {
+        const { shell } = require('electron');
+        if (shell && typeof shell.beep === 'function') shell.beep();
+      } catch (_) {}
+    }
+
+    // 2. Bring pet to top & wake if sleeping (cross-platform safe: 'screen-saver' level is macOS only!)
     try {
-      if (this.petWindowRef && !this.petWindowRef.isDestroyed()) {
-        this.petWindowRef.show();
-        this.petWindowRef.setAlwaysOnTop(true, 'screen-saver');
-        this.petWindowRef.webContents.send('pet:reset-idle');
-        this.petWindowRef.webContents.send('pet:set-state', {
+      const petWin = this.petWindowRef || bubble.petWindowRef;
+      if (petWin && !petWin.isDestroyed()) {
+        petWin.show();
+        if (process.platform === 'darwin') {
+          petWin.setAlwaysOnTop(true, 'screen-saver');
+        } else {
+          petWin.setAlwaysOnTop(true);
+          try { petWin.moveTop(); } catch (_) {}
+        }
+        petWin.webContents.send('pet:reset-idle');
+        petWin.webContents.send('pet:set-state', {
           state: isMissed ? 'worried' : 'surprised',
           duration: 5000,
           priority: 5,
           force: true
         });
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[Scheduler] Wake pet error:', e.message);
+    }
 
     // 3. Speech bubble with loud reminder alarm
     try {
@@ -404,9 +439,12 @@ class Scheduler {
         emotion: isMissed ? 'worried' : 'surprised',
         bounce: true,
         duration: 8000,
-        critical: true
+        critical: true,
+        force: true
       });
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[Scheduler] Bubble show error:', e.message);
+    }
 
     // 4. Notify panel window
     try {

@@ -168,7 +168,18 @@ class SoundManager {
     // 7. Resolve small bundled audio file (<50 KB)
     const validSounds = ['alarm', 'chirp', 'happy', 'tap'];
     const sName = validSounds.includes(soundName) ? soundName : 'chirp';
-    const soundUrl = new URL(`../audio/${sName}.wav`, window.location.href).href;
+    let soundUrl;
+    try {
+      if (typeof require !== 'undefined') {
+        const pathModule = require('path');
+        const localPath = pathModule.resolve(__dirname, '..', 'audio', `${sName}.wav`);
+        soundUrl = 'file://' + localPath.replace(/\\/g, '/');
+      } else {
+        soundUrl = new URL(`../audio/${sName}.wav`, window.location.href).href;
+      }
+    } catch (_) {
+      soundUrl = new URL(`../audio/${sName}.wav`, window.location.href).href;
+    }
 
     try {
       // Lazily create Audio element on first use

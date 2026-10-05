@@ -43,7 +43,7 @@
     primaryColor: '#FF7A2F',
     primaryGlow: '#FF5A1F',
     glassesEnabled: false,
-    glassesShape: 'round',    // 'round', 'square', 'cateye', 'oval', 'aviator'
+    glassesShape: 'round',    // 'round', 'square', 'rectangular', 'hexagon', 'cateye', 'oval', 'aviator', 'clubmaster', 'semi-rimless', 'heart', 'star'
     glassesColor: '#181820',   // frame color hex
     eyesColor: '#181820',      // eyes color hex
     mouthColor: '#181820'      // mouth color hex
@@ -192,6 +192,85 @@
           rightLens = `<rect x="${(rx - r).toFixed(1)}" y="${(ey - r).toFixed(1)}" width="${(r * 2).toFixed(1)}" height="${(r * 2).toFixed(1)}" rx="4" ry="4" fill="none" stroke="${frameColor}" stroke-width="2.6" />`;
           bridge = `<line x1="${(lx + r).toFixed(1)}" y1="${(ey - r*0.2).toFixed(1)}" x2="${(rx - r).toFixed(1)}" y2="${(ey - r*0.2).toFixed(1)}" stroke="${frameColor}" stroke-width="2.4" stroke-linecap="round" />`;
           break;
+
+        case 'rectangular':
+          leftLens = `<rect x="${(lx - r * 1.15).toFixed(1)}" y="${(ey - r * 0.75).toFixed(1)}" width="${(r * 2.3).toFixed(1)}" height="${(r * 1.5).toFixed(1)}" rx="3" ry="3" fill="none" stroke="${frameColor}" stroke-width="2.6" />`;
+          rightLens = `<rect x="${(rx - r * 1.15).toFixed(1)}" y="${(ey - r * 0.75).toFixed(1)}" width="${(r * 2.3).toFixed(1)}" height="${(r * 1.5).toFixed(1)}" rx="3" ry="3" fill="none" stroke="${frameColor}" stroke-width="2.6" />`;
+          bridge = `<line x1="${(lx + r * 1.15).toFixed(1)}" y1="${(ey - r * 0.1).toFixed(1)}" x2="${(rx - r * 1.15).toFixed(1)}" y2="${(ey - r * 0.1).toFixed(1)}" stroke="${frameColor}" stroke-width="2.4" stroke-linecap="round" />`;
+          break;
+
+        case 'hexagon': {
+          const getHexPts = (cx0, cy0, rad) => {
+            const pts = [];
+            for (let i = 0; i < 6; i++) {
+              const angle = (Math.PI / 3) * i - Math.PI / 6;
+              pts.push(`${(cx0 + rad * Math.cos(angle)).toFixed(1)},${(cy0 + rad * Math.sin(angle)).toFixed(1)}`);
+            }
+            return pts.join(' ');
+          };
+          leftLens = `<polygon points="${getHexPts(lx, ey, r * 1.05)}" fill="none" stroke="${frameColor}" stroke-width="2.6" stroke-linejoin="round" />`;
+          rightLens = `<polygon points="${getHexPts(rx, ey, r * 1.05)}" fill="none" stroke="${frameColor}" stroke-width="2.6" stroke-linejoin="round" />`;
+          bridge = `<line x1="${(lx + r * 0.9).toFixed(1)}" y1="${ey.toFixed(1)}" x2="${(rx - r * 0.9).toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${frameColor}" stroke-width="2.4" stroke-linecap="round" />`;
+          break;
+        }
+
+        case 'clubmaster':
+          leftLens = `
+            <path d="M ${(lx - r * 1.15).toFixed(1)} ${(ey - r * 0.35).toFixed(1)} Q ${(lx - r * 0.4).toFixed(1)} ${(ey - r * 1.05).toFixed(1)}, ${(lx + r * 0.95).toFixed(1)} ${(ey - r * 0.55).toFixed(1)}" fill="none" stroke="${frameColor}" stroke-width="3.8" stroke-linecap="round" />
+            <path d="M ${(lx - r * 1.05).toFixed(1)} ${(ey - r * 0.25).toFixed(1)} Q ${(lx - r * 0.95).toFixed(1)} ${(ey + r * 1.05).toFixed(1)}, ${lx.toFixed(1)} ${(ey + r * 1.05).toFixed(1)} Q ${(lx + r * 0.9).toFixed(1)} ${(ey + r * 1.05).toFixed(1)}, ${(lx + r * 0.9).toFixed(1)} ${(ey - r * 0.45).toFixed(1)}" fill="none" stroke="${frameColor}" stroke-width="2.0" stroke-linecap="round" />
+          `;
+          rightLens = `
+            <path d="M ${(rx + r * 1.15).toFixed(1)} ${(ey - r * 0.35).toFixed(1)} Q ${(rx + r * 0.4).toFixed(1)} ${(ey - r * 1.05).toFixed(1)}, ${(rx - r * 0.95).toFixed(1)} ${(ey - r * 0.55).toFixed(1)}" fill="none" stroke="${frameColor}" stroke-width="3.8" stroke-linecap="round" />
+            <path d="M ${(rx + r * 1.05).toFixed(1)} ${(ey - r * 0.25).toFixed(1)} Q ${(rx + r * 0.95).toFixed(1)} ${(ey + r * 1.05).toFixed(1)}, ${rx.toFixed(1)} ${(ey + r * 1.05).toFixed(1)} Q ${(rx - r * 0.9).toFixed(1)} ${(ey + r * 1.05).toFixed(1)}, ${(rx - r * 0.9).toFixed(1)} ${(ey - r * 0.45).toFixed(1)}" fill="none" stroke="${frameColor}" stroke-width="2.0" stroke-linecap="round" />
+          `;
+          bridge = `<path d="M ${(lx + r * 0.9).toFixed(1)} ${(ey - r * 0.5).toFixed(1)} Q ${cx} ${(ey - r * 0.75).toFixed(1)}, ${(rx - r * 0.9).toFixed(1)} ${(ey - r * 0.5).toFixed(1)}" stroke="${frameColor}" stroke-width="2.4" stroke-linecap="round" fill="none" />`;
+          break;
+
+        case 'semi-rimless':
+          leftLens = `
+            <line x1="${(lx - r * 1.15).toFixed(1)}" y1="${(ey - r * 0.8).toFixed(1)}" x2="${(lx + r * 1.05).toFixed(1)}" y2="${(ey - r * 0.8).toFixed(1)}" stroke="${frameColor}" stroke-width="3.2" stroke-linecap="round" />
+            <path d="M ${(lx - r * 1.05).toFixed(1)} ${(ey - r * 0.7).toFixed(1)} Q ${(lx - r * 1.0).toFixed(1)} ${(ey + r * 0.95).toFixed(1)}, ${lx.toFixed(1)} ${(ey + r * 0.95).toFixed(1)} Q ${(lx + r * 0.95).toFixed(1)} ${(ey + r * 0.95).toFixed(1)}, ${(lx + r * 0.95).toFixed(1)} ${(ey - r * 0.7).toFixed(1)}" fill="none" stroke="${frameColor}" stroke-width="2.0" stroke-linecap="round" />
+          `;
+          rightLens = `
+            <line x1="${(rx - r * 1.05).toFixed(1)}" y1="${(ey - r * 0.8).toFixed(1)}" x2="${(rx + r * 1.15).toFixed(1)}" y2="${(ey - r * 0.8).toFixed(1)}" stroke="${frameColor}" stroke-width="3.2" stroke-linecap="round" />
+            <path d="M ${(rx - r * 0.95).toFixed(1)} ${(ey - r * 0.7).toFixed(1)} Q ${(rx - r * 0.95).toFixed(1)} ${(ey + r * 0.95).toFixed(1)}, ${rx.toFixed(1)} ${(ey + r * 0.95).toFixed(1)} Q ${(rx + r * 1.0).toFixed(1)} ${(ey + r * 0.95).toFixed(1)}, ${(rx + r * 1.05).toFixed(1)} ${(ey - r * 0.7).toFixed(1)}" fill="none" stroke="${frameColor}" stroke-width="2.0" stroke-linecap="round" />
+          `;
+          bridge = `<line x1="${(lx + r * 1.05).toFixed(1)}" y1="${(ey - r * 0.8).toFixed(1)}" x2="${(rx - r * 1.05).toFixed(1)}" y2="${(ey - r * 0.8).toFixed(1)}" stroke="${frameColor}" stroke-width="2.6" stroke-linecap="round" />`;
+          break;
+
+        case 'heart': {
+          const getHeartPath = (cx0, cy0, rad) => {
+            const topY = cy0 - rad * 0.35;
+            const botY = cy0 + rad * 1.05;
+            const peakY = cy0 - rad * 1.05;
+            const cpX = rad * 1.15;
+            return `M ${cx0.toFixed(1)} ${topY.toFixed(1)} ` +
+              `C ${(cx0 - rad * 0.35).toFixed(1)} ${peakY.toFixed(1)}, ${(cx0 - cpX).toFixed(1)} ${(cy0 - rad * 0.3).toFixed(1)}, ${(cx0 - cpX * 0.55).toFixed(1)} ${(cy0 + rad * 0.4).toFixed(1)} ` +
+              `Q ${(cx0 - rad * 0.15).toFixed(1)} ${(cy0 + rad * 0.75).toFixed(1)}, ${cx0.toFixed(1)} ${botY.toFixed(1)} ` +
+              `Q ${(cx0 + rad * 0.15).toFixed(1)} ${(cy0 + rad * 0.75).toFixed(1)}, ${(cx0 + cpX * 0.55).toFixed(1)} ${(cy0 + rad * 0.4).toFixed(1)} ` +
+              `C ${(cx0 + cpX).toFixed(1)} ${(cy0 - rad * 0.3).toFixed(1)}, ${(cx0 + rad * 0.35).toFixed(1)} ${peakY.toFixed(1)}, ${cx0.toFixed(1)} ${topY.toFixed(1)} Z`;
+          };
+          leftLens = `<path d="${getHeartPath(lx, ey, r)}" fill="none" stroke="${frameColor}" stroke-width="2.6" stroke-linejoin="round" />`;
+          rightLens = `<path d="${getHeartPath(rx, ey, r)}" fill="none" stroke="${frameColor}" stroke-width="2.6" stroke-linejoin="round" />`;
+          bridge = `<line x1="${(lx + r * 0.75).toFixed(1)}" y1="${ey.toFixed(1)}" x2="${(rx - r * 0.75).toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${frameColor}" stroke-width="2.4" stroke-linecap="round" />`;
+          break;
+        }
+
+        case 'star': {
+          const getStarPts = (cx0, cy0, rOut, rIn) => {
+            const pts = [];
+            for (let i = 0; i < 10; i++) {
+              const angle = (Math.PI / 5) * i - Math.PI / 2;
+              const rad = (i % 2 === 0) ? rOut : rIn;
+              pts.push(`${(cx0 + rad * Math.cos(angle)).toFixed(1)},${(cy0 + rad * Math.sin(angle)).toFixed(1)}`);
+            }
+            return pts.join(' ');
+          };
+          leftLens = `<polygon points="${getStarPts(lx, ey, r * 1.2, r * 0.55)}" fill="none" stroke="${frameColor}" stroke-width="2.4" stroke-linejoin="round" />`;
+          rightLens = `<polygon points="${getStarPts(rx, ey, r * 1.2, r * 0.55)}" fill="none" stroke="${frameColor}" stroke-width="2.4" stroke-linejoin="round" />`;
+          bridge = `<line x1="${(lx + r * 0.85).toFixed(1)}" y1="${ey.toFixed(1)}" x2="${(rx - r * 0.85).toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${frameColor}" stroke-width="2.2" stroke-linecap="round" />`;
+          break;
+        }
 
         case 'cateye':
           leftLens = `<path d="M ${(lx - r - 3).toFixed(1)} ${(ey - r - 2).toFixed(1)} Q ${(lx + r).toFixed(1)} ${(ey - r + 1).toFixed(1)}, ${(lx + r).toFixed(1)} ${(ey + 1).toFixed(1)} Q ${(lx + r * 0.5).toFixed(1)} ${(ey + r).toFixed(1)}, ${(lx - r * 0.5).toFixed(1)} ${(ey + r).toFixed(1)} Q ${(lx - r).toFixed(1)} ${(ey + r * 0.5).toFixed(1)}, ${(lx - r - 3).toFixed(1)} ${(ey - r - 2).toFixed(1)} Z" fill="none" stroke="${frameColor}" stroke-width="2.6" stroke-linejoin="round" />`;
