@@ -173,7 +173,14 @@ class TodoTab {
       const empty = document.createElement('div');
       empty.className = 'tab-empty-state';
       empty.innerHTML = `
-        <i data-lucide="check-circle-2"></i>
+        <div class="empty-pet-face-wrap">
+          <svg class="empty-pet-face-svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect x="4" y="6" width="40" height="36" rx="14" fill="var(--accent-soft)" stroke="var(--accent-border)" stroke-width="1.5"/>
+            <circle cx="17" cy="22" r="3" fill="var(--accent)"/>
+            <circle cx="31" cy="22" r="3" fill="var(--accent)"/>
+            <path d="M20 28 Q24 32 28 28" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
         <span class="empty-title">All tasks completed</span>
         <span class="empty-subtitle">Add a new task above to stay productive!</span>
       `;

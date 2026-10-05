@@ -26,7 +26,8 @@
   --theme-text-secondary: rgba(255, 255, 255, 0.65);
   --theme-text-muted: rgba(255, 255, 255, 0.42);
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-title: 'Fredoka', 'Nunito', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
 
   --transition-fast: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
@@ -442,7 +443,7 @@ svg.lucide {
   min-height: 0 !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
-  padding: 12px 16px 16px 16px !important;
+  padding: 20px !important;
   box-sizing: border-box !important;
 }
 
@@ -3879,6 +3880,819 @@ button:focus-visible {
   text-align: center;
   color: var(--text-muted, #8E8E93);
   padding: 14px 10px;
+}
+
+/* ==========================================================================
+   ITEM UI4: APP-WIDE POLISH & COMPONENT SYSTEM
+   ========================================================================== */
+
+/* Typography Rules */
+h1, h2, h3, h4,
+.panel-title,
+.card-title,
+.progress-title,
+.create-card-title,
+.timer-custom-card-title,
+.settings-group-title,
+.empty-title,
+.note-card-title,
+.quote-header,
+.chat-header-title {
+  font-family: var(--font-title);
+  line-height: 1.2;
+}
+
+body, p, span, input, select, textarea, button {
+  font-family: var(--font-sans);
+}
+
+.mono, code, pre, .terminal-mono {
+  font-family: var(--font-mono) !important;
+}
+
+/* Page titles */
+.page-title, .first-run-title {
+  font-size: 19px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+/* Card titles */
+.card-title,
+.create-card-title,
+.timer-custom-card-title,
+.settings-group-title,
+.todo-progress-header .progress-title {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+/* Body & captions */
+.body-text, p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #F4F4F5;
+}
+
+.caption-text, .setting-hint, .timer-custom-sub, .empty-subtitle, .about-meta-label {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #9A9AA6;
+}
+
+/* Minimum interactive target height & control radius */
+button,
+input[type="text"],
+input[type="number"],
+input[type="time"],
+select,
+.tab-btn,
+.theme-btn-primary,
+.theme-btn-secondary,
+.timer-ctl-btn,
+.timer-mode-btn,
+.preset-chip {
+  min-height: 40px;
+  border-radius: var(--radius-control, 12px);
+  box-sizing: border-box;
+}
+
+/* Micro-feedback (120-150ms transform & opacity only) */
+button,
+.tab-btn,
+.timer-mode-btn,
+.preset-chip,
+.theme-btn-primary,
+.theme-btn-secondary,
+.note-btn,
+.btn-ctrl-reset {
+  transition: transform 140ms ease, opacity 140ms ease, background-color 140ms ease;
+}
+
+button:hover:not(:disabled),
+.tab-btn:hover:not(:disabled),
+.theme-btn-primary:hover:not(:disabled),
+.theme-btn-secondary:hover:not(:disabled) {
+  opacity: 0.93;
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled),
+.tab-btn:active:not(:disabled),
+.theme-btn-primary:active:not(:disabled),
+.theme-btn-secondary:active:not(:disabled) {
+  opacity: 0.85;
+  transform: translateY(0);
+}
+
+/* Auto contrast on accent-filled elements */
+.theme-btn-primary,
+button.theme-btn-primary,
+.timer-ctl-btn.primary,
+.timer-mode-btn.active,
+.preset-chip.active {
+  color: var(--theme-on-accent, #FFFFFF) !important;
+  background: var(--accent) !important;
+}
+
+.theme-btn-primary svg,
+.timer-ctl-btn.primary svg {
+  stroke: var(--theme-on-accent, #FFFFFF) !important;
+}
+
+/* Universal Card System */
+.todo-progress-card,
+.timer-card-glass,
+.timer-custom-card,
+.reminder-create-card,
+.quote-glass-card,
+.settings-group-card,
+.chat-glass-card {
+  background: color-mix(in srgb, var(--accent) 5%, #181820) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 15%, #2A2A35) !important;
+  border-radius: 16px !important;
+  padding: 18px 20px !important;
+  margin-bottom: 14px !important;
+}
+
+/* Universal Empty State */
+.tab-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 20px;
+  text-align: center;
+  gap: 10px;
+  width: 100%;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
+}
+
+.empty-pet-face-wrap {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.empty-title {
+  font-family: var(--font-title);
+  font-size: 16px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.empty-subtitle {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: #9A9AA6;
+  line-height: 1.5;
+  max-width: 280px;
+}
+
+/* --- TAB SPECIFIC POLISH --- */
+
+/* 1. Timer Tab */
+.timer-mode-pills {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+}
+
+.timer-mode-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #B0B0BC;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.timer-mode-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.time-large-text,
+#timer-time-display {
+  font-family: var(--font-title) !important;
+  font-size: 46px !important;
+  font-weight: 600 !important;
+  font-variant-numeric: tabular-nums !important;
+  font-feature-settings: 'tnum' 1 !important;
+  letter-spacing: -0.5px;
+  color: #FFFFFF;
+}
+
+.timer-state-label,
+#timer-sublabel {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.timer-session-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 6px;
+}
+
+.timer-session-dots {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.session-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.session-dot.filled {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.timer-actions-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  justify-content: center;
+}
+
+.timer-ctl-btn {
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.timer-ctl-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* 2. Notes Tab */
+.notes-top-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.notes-top-bar .search-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 10px;
+}
+
+.notes-top-bar .search-input-wrap input {
+  width: 100%;
+  font-size: 14px;
+  color: #FFFFFF;
+}
+
+.notes-cards-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.note-card {
+  border-radius: 16px;
+  padding: 16px 18px;
+  background: color-mix(in srgb, var(--accent) 6%, #191921);
+  border: 1px solid color-mix(in srgb, var(--accent) 15%, #282834);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 140ms ease, opacity 140ms ease;
+  box-sizing: border-box;
+}
+
+.note-card:hover {
+  transform: translateY(-1px);
+}
+
+.note-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.note-card-title {
+  font-family: var(--font-title);
+  font-size: 15.5px;
+  font-weight: 600;
+  color: #FFFFFF;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.note-time-chip {
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #9A9AA6;
+  flex-shrink: 0;
+}
+
+.note-card-content,
+.note-card-preview {
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.note-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.note-btn {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #B0B0BC;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.note-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #FFFFFF;
+}
+
+.note-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.note-editor-card {
+  border-radius: 16px;
+  padding: 18px 20px;
+  background: color-mix(in srgb, var(--accent) 5%, #191921);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, #2A2A35);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.note-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.note-editor-title-input {
+  font-family: var(--font-title);
+  font-size: 17px;
+  font-weight: 600;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #FFFFFF;
+  flex: 1;
+}
+
+.note-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.note-editor-textarea {
+  min-height: 160px;
+  line-height: 1.5;
+  font-size: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #FFFFFF;
+  resize: vertical;
+  font-family: var(--font-sans);
+}
+
+.note-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 3. Reminders Tab */
+.reminder-fields-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.form-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #B0B0BC;
+}
+
+.form-field-label svg {
+  width: 14px;
+  height: 14px;
+}
+
+.reminder-time-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.reminders-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-title);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--accent);
+  margin: 16px 0 8px 4px;
+}
+
+.reminders-group-heading.done {
+  color: #9A9AA6;
+}
+
+.group-count-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.reminders-group-heading.done .group-count-pill {
+  background: rgba(255, 255, 255, 0.08);
+  color: #9A9AA6;
+}
+
+.reminder-item {
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  min-height: 52px;
+  background: color-mix(in srgb, var(--accent) 5%, #191921);
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, #282834);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.reminder-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.reminder-bell-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.reminder-item.disabled .reminder-bell-icon {
+  background: rgba(255, 255, 255, 0.06);
+  color: #9A9AA6;
+}
+
+.reminder-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.reminder-title {
+  font-weight: 600;
+  font-size: 14.5px;
+  color: #FFFFFF;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reminder-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reminder-time-badge {
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 8px;
+  font-size: 11.5px;
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reminder-repeat-badge {
+  border-radius: 9999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.reminder-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.reminder-snooze-btn {
+  min-height: 38px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.reminder-edit-btn,
+.reminder-delete-btn {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.reminder-edit-btn:hover,
+.reminder-delete-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* 4. Settings & About Open Source Licenses */
+.about-licenses-box {
+  margin-top: 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.about-licenses-toggle {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent;
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.licenses-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.about-licenses-list {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.license-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.license-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.license-author {
+  font-size: 11.5px;
+  color: #9A9AA6;
+}
+
+/* Item UI4: Strict Overflow Prevention across all pane sizes (>= 420px) */
+.timer-pane-layout,
+.timer-custom-card,
+.timer-custom-grid,
+.countdown-stepper-triple-row,
+.countdown-steppers-group,
+.tools-pane-layout,
+.useful-tools-grid,
+.tool-card,
+.converter-box {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.countdown-steppers-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.timer-step-input.mini {
+  width: 36px;
+  height: 26px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.timer-step-btn.mini {
+  width: 22px;
+  height: 26px;
+}
+
+.reminder-item {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.reminder-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.reminder-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.reminder-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.reminder-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.useful-tools-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.converter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.converter-row input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.clipboard-item {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.clip-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: #CCCCCC;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 

@@ -132,6 +132,58 @@ class NotesTab {
 
   render() {
     if (!this.container) return;
+
+    // If an editor view is open for a note:
+    if (this.editingNoteId) {
+      const note = this.notes.find(n => n.id === this.editingNoteId);
+      if (note) {
+        this.container.innerHTML = '';
+        const editor = document.createElement('div');
+        editor.className = 'note-editor-card';
+        editor.innerHTML = `
+          <div class="note-editor-header">
+            <input type="text" class="terminal-input note-editor-title-input" value="${note.title.replace(/"/g, '&quot;')}" placeholder="Note title...">
+            <div class="note-editor-actions">
+              <button type="button" class="theme-btn-secondary note-editor-back-btn"><i data-lucide="arrow-left"></i><span>Back</span></button>
+              <button type="button" class="theme-btn-primary note-editor-save-btn"><i data-lucide="check"></i><span>Save</span></button>
+            </div>
+          </div>
+          <textarea class="terminal-input note-editor-textarea" placeholder="Start typing your note...">${note.content}</textarea>
+          <div class="note-editor-footer">
+            <span class="note-time-chip">${this.formatDate(note.updatedAt)}</span>
+            <button type="button" class="note-btn note-delete-btn" title="Delete note"><i data-lucide="trash-2"></i></button>
+          </div>
+        `;
+        const titleInput = editor.querySelector('.note-editor-title-input');
+        const textInput = editor.querySelector('.note-editor-textarea');
+
+        editor.querySelector('.note-editor-back-btn').addEventListener('click', () => {
+          this.editingNoteId = null;
+          this.render();
+        });
+
+        editor.querySelector('.note-editor-save-btn').addEventListener('click', () => {
+          this.updateNote(note.id, titleInput.value, textInput.value);
+          this.editingNoteId = null;
+          this.render();
+          if (window.soundEffects) window.soundEffects.playTap();
+        });
+
+        editor.querySelector('.note-delete-btn').addEventListener('click', () => {
+          this.editingNoteId = null;
+          this.deleteNote(note.id);
+        });
+
+        this.container.appendChild(editor);
+        if (window.panelController && typeof window.panelController.refreshIcons === 'function') {
+          window.panelController.refreshIcons();
+        }
+        return;
+      } else {
+        this.editingNoteId = null;
+      }
+    }
+
     const query = this.searchInput ? this.searchInput.value.toLowerCase().trim() : '';
     const filtered = this.notes.filter(n =>
       (n.title && n.title.toLowerCase().includes(query)) ||
@@ -144,7 +196,14 @@ class NotesTab {
       const empty = document.createElement('div');
       empty.className = 'tab-empty-state';
       empty.innerHTML = `
-        <i data-lucide="file-text"></i>
+        <div class="empty-pet-face-wrap">
+          <svg class="empty-pet-face-svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect x="4" y="6" width="40" height="36" rx="14" fill="var(--accent-soft)" stroke="var(--accent-border)" stroke-width="1.5"/>
+            <circle cx="17" cy="22" r="3" fill="var(--accent)"/>
+            <circle cx="31" cy="22" r="3" fill="var(--accent)"/>
+            <path d="M20 28 Q24 32 28 28" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
         <span class="empty-title">No notes found</span>
         <span class="empty-subtitle">${query ? 'No notes matched your search query.' : 'Click "New" above to start jotting down thoughts!'}</span>
       `;
@@ -161,10 +220,11 @@ class NotesTab {
       card.innerHTML = `
         <div class="note-card-header">
           <div class="note-card-title" contenteditable="true" spellcheck="false">${note.title}</div>
-          <span class="note-timestamp mono">${this.formatDate(note.updatedAt)}</span>
+          <span class="note-time-chip note-timestamp mono">${this.formatDate(note.updatedAt)}</span>
         </div>
-        <div class="note-card-content" contenteditable="true" spellcheck="false">${note.content}</div>
+        <div class="note-card-content note-card-preview" contenteditable="true" spellcheck="false">${note.content}</div>
         <div class="note-actions">
+          <button class="note-btn note-edit-btn" title="Open editor"><i data-lucide="edit-3"></i></button>
           <button class="note-btn note-copy-btn" title="Copy to clipboard"><i data-lucide="copy"></i></button>
           <button class="note-btn note-pin-btn ${note.pinned ? 'active' : ''}" title="${note.pinned ? 'Unpin note' : 'Pin to top'}">
             <i data-lucide="pin"></i>
@@ -182,6 +242,12 @@ class NotesTab {
 
       titleEl.addEventListener('blur', saveCurrent);
       contentEl.addEventListener('blur', saveCurrent);
+
+      card.querySelector('.note-edit-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.editingNoteId = note.id;
+        this.render();
+      });
 
       card.querySelector('.note-copy-btn').addEventListener('click', (e) => {
         e.stopPropagation();

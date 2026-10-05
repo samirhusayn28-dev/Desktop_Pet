@@ -5,10 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Desktop Pet</title>
   
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <!-- Bundled Offline Fonts (Nunito, Fredoka, JetBrains Mono) -->
+  <link rel="stylesheet" href="../assets/fonts/fonts.css">
   
   <!-- Stylesheets -->
   <link rel="stylesheet" href="../themes/themes.css">
@@ -193,11 +191,11 @@
           <div class="timer-card-glass">
             <!-- Mode Pills -->
             <div class="timer-mode-pills">
-              <button class="timer-mode-btn active" data-mode="pomodoro">Pomodoro</button>
-              <button class="timer-mode-btn" data-mode="short-break">Short Break</button>
-              <button class="timer-mode-btn" data-mode="long-break">Long Break</button>
-              <button class="timer-mode-btn" data-mode="countdown">Countdown</button>
-              <button class="timer-mode-btn" data-mode="stopwatch">Stopwatch</button>
+              <button class="timer-mode-btn active" data-mode="pomodoro"><i data-lucide="clock"></i><span>Pomodoro</span></button>
+              <button class="timer-mode-btn" data-mode="short-break"><i data-lucide="coffee"></i><span>Short Break</span></button>
+              <button class="timer-mode-btn" data-mode="long-break"><i data-lucide="sun"></i><span>Long Break</span></button>
+              <button class="timer-mode-btn" data-mode="countdown"><i data-lucide="hourglass"></i><span>Countdown</span></button>
+              <button class="timer-mode-btn" data-mode="stopwatch"><i data-lucide="timer"></i><span>Stopwatch</span></button>
             </div>
 
             <!-- Circular SVG Ring + Clock Display -->
@@ -235,10 +233,18 @@
               </button>
             </div>
 
-            <!-- Session Stats -->
-            <div class="timer-stats-pill" id="timer-pet-status">
-              <i data-lucide="award"></i>
-              <span>Completed Sessions: <strong class="mono" id="pomodoro-count">0</strong></span>
+            <!-- Session Stats & Progress Dots -->
+            <div class="timer-session-row">
+              <div class="timer-stats-pill" id="timer-pet-status">
+                <i data-lucide="award"></i>
+                <span>Completed: <strong class="mono" id="pomodoro-count">0</strong></span>
+              </div>
+              <div class="timer-session-dots" id="timer-session-dots" title="Pomodoro 4-session cycle">
+                <span class="session-dot"></span>
+                <span class="session-dot"></span>
+                <span class="session-dot"></span>
+                <span class="session-dot"></span>
+              </div>
             </div>
           </div>
 
@@ -511,18 +517,30 @@
               <span>Create Reminder</span>
             </div>
             <div class="reminder-fields-grid">
-              <input type="text" id="reminder-text-input" class="terminal-input" placeholder="Reminder title (e.g. Code Review)">
+              <div class="form-field-group">
+                <label class="form-field-label" for="reminder-text-input"><i data-lucide="type"></i> Reminder Title</label>
+                <input type="text" id="reminder-text-input" class="terminal-input" placeholder="e.g. Standup Meeting, Drink water">
+              </div>
               <div class="reminder-time-row">
-                <input type="time" id="reminder-time-input" class="terminal-input mono" value="16:00">
-                <select id="reminder-repeat-select" class="terminal-select">
-                  <option value="once">Once</option>
-                  <option value="daily">Daily</option>
-                  <option value="every-hour">Every Hour</option>
-                </select>
-                <button class="theme-btn-primary" id="btn-save-reminder">
-                  <i data-lucide="plus"></i>
-                  <span>Set</span>
-                </button>
+                <div class="form-field-group" style="flex: 1;">
+                  <label class="form-field-label" for="reminder-time-input"><i data-lucide="clock"></i> Time</label>
+                  <input type="time" id="reminder-time-input" class="terminal-input mono" value="16:00">
+                </div>
+                <div class="form-field-group" style="flex: 1;">
+                  <label class="form-field-label" for="reminder-repeat-select"><i data-lucide="repeat"></i> Repeat</label>
+                  <select id="reminder-repeat-select" class="terminal-select">
+                    <option value="once">Once</option>
+                    <option value="daily">Daily</option>
+                    <option value="every-hour">Every Hour</option>
+                  </select>
+                </div>
+                <div class="form-field-group btn-field-group">
+                  <label class="form-field-label" style="visibility: hidden;">Set</label>
+                  <button class="theme-btn-primary" id="btn-save-reminder">
+                    <i data-lucide="plus"></i>
+                    <span>Set</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1499,6 +1517,34 @@
                   <i data-lucide="sparkles"></i>
                   <span>Show welcome again</span>
                 </button>
+              </div>
+
+              <div class="about-licenses-box" id="about-licenses-box">
+                <button type="button" class="about-licenses-toggle" id="btn-toggle-licenses">
+                  <div class="licenses-toggle-left">
+                    <i data-lucide="scale"></i>
+                    <span>Open-source licenses</span>
+                  </div>
+                  <i data-lucide="chevron-down" id="licenses-chevron"></i>
+                </button>
+                <div class="about-licenses-list hidden" id="about-licenses-list">
+                  <div class="license-entry">
+                    <span class="license-name">Nunito (SIL Open Font License 1.1)</span>
+                    <span class="license-author">Vernon Adams • Bundled offline Latin &amp; Latin-Ext</span>
+                  </div>
+                  <div class="license-entry">
+                    <span class="license-name">Fredoka (SIL Open Font License 1.1)</span>
+                    <span class="license-author">The Fredoka Project Authors • Tabular digits &amp; titles</span>
+                  </div>
+                  <div class="license-entry">
+                    <span class="license-name">JetBrains Mono (SIL Open Font License 1.1)</span>
+                    <span class="license-author">JetBrains • Code monospace font</span>
+                  </div>
+                  <div class="license-entry">
+                    <span class="license-name">Lucide Icons (ISC License)</span>
+                    <span class="license-author">Lucide Contributors • UI vector icons</span>
+                  </div>
+                </div>
               </div>
 
               <div class="about-update-status hidden" id="about-update-status"></div>

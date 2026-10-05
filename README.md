@@ -128,5 +128,9 @@ Desktop Pet is an independent open-source project and is not signed with an expe
 
 ---
 
-## 📄 License
-MIT License. Created by [Samir Husayn](https://github.com/samirhusayn28-dev).
+## 📄 License & Open-Source Fonts
+- Code is licensed under the MIT License. Created by [Samir Husayn](https://github.com/samirhusayn28-dev).
+- **Nunito Font**: Licensed under the SIL Open Font License 1.1 (Copyright (c) 2014, Vernon Adams).
+- **Fredoka Font**: Licensed under the SIL Open Font License 1.1 (Copyright (c) 2021, The Fredoka Project Authors).
+- **JetBrains Mono Font**: Licensed under the SIL Open Font License 1.1 (Copyright (c) 2020, JetBrains).
+- **Lucide Icons**: Licensed under the ISC License (Copyright (c) Lucide Contributors).

@@ -1452,6 +1452,18 @@ class SettingsTab {
       });
     }
 
+    const toggleLicensesBtn = document.getElementById('btn-toggle-licenses');
+    const licensesList = document.getElementById('about-licenses-list');
+    const licensesChevron = document.getElementById('licenses-chevron');
+    if (toggleLicensesBtn && licensesList) {
+      toggleLicensesBtn.addEventListener('click', () => {
+        const isHidden = licensesList.classList.toggle('hidden');
+        if (licensesChevron) {
+          licensesChevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+      });
+    }
+
     if (this.aboutCheckUpdatesBtn) {
       this.aboutCheckUpdatesBtn.addEventListener('click', () => {
         if (window.panelController && window.panelController.ipcRenderer) {

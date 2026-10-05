@@ -890,16 +890,24 @@ ipcMain.on('pet:drag-move', (e, { screenX, screenY }) => {
     }
   }
 
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+  const display = (petWindow && !petWindow.isDestroyed() && screen.getDisplayMatching(petWindow.getBounds())) ||
+    screen.getDisplayNearestPoint({ x: screenX, y: screenY }) ||
+    screen.getPrimaryDisplay();
+  const bounds = display.bounds;
   const [petW, petH] = petWindow.getSize();
+  const { bodyX, bodyY, bodyW, bodyH } = getPetBodyRect(petW, petH);
 
   let newPetX = Math.round(screenX - dragStartPos.offsetX);
   let newPetY = Math.round(screenY - dragStartPos.offsetY);
 
-  // Constrain pet within screen
-  newPetX = Math.max(10, Math.min(screenW - petW - 10, newPetX));
-  newPetY = Math.max(20, Math.min(screenH - petH - 20, newPetY));
+  // Constrain pet body rect within screen display bounds (can reach screen corners and edges without invisible wall)
+  const minPetX = bounds.x - bodyX;
+  const maxPetX = bounds.x + bounds.width - bodyX - bodyW;
+  const minPetY = bounds.y - bodyY;
+  const maxPetY = bounds.y + bounds.height - bodyY - bodyH;
+
+  newPetX = Math.round(Math.max(minPetX, Math.min(maxPetX, newPetX)));
+  newPetY = Math.round(Math.max(minPetY, Math.min(maxPetY, newPetY)));
 
   petWindow.setPosition(newPetX, newPetY);
   bubble.syncPosition();
@@ -910,8 +918,8 @@ ipcMain.on('pet:drag-move', (e, { screenX, screenY }) => {
     let newPanX = newPetX + panelDragOffset.diffX;
     let newPanY = newPetY + panelDragOffset.diffY;
 
-    newPanX = Math.max(10, Math.min(screenW - panW - 10, newPanX));
-    newPanY = Math.max(30, Math.min(screenH - panH - 30, newPanY));
+    newPanX = Math.max(bounds.x, Math.min(bounds.x + bounds.width - panW, newPanX));
+    newPanY = Math.max(bounds.y, Math.min(bounds.y + bounds.height - panH, newPanY));
 
     panelWindow.setPosition(newPanX, newPanY);
   }

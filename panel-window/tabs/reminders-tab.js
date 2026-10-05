@@ -325,7 +325,14 @@ class RemindersTab {
       const empty = document.createElement('div');
       empty.className = 'tab-empty-state';
       empty.innerHTML = `
-        <i data-lucide="bell-off"></i>
+        <div class="empty-pet-face-wrap">
+          <svg class="empty-pet-face-svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect x="4" y="6" width="40" height="36" rx="14" fill="var(--accent-soft)" stroke="var(--accent-border)" stroke-width="1.5"/>
+            <circle cx="17" cy="22" r="3" fill="var(--accent)"/>
+            <circle cx="31" cy="22" r="3" fill="var(--accent)"/>
+            <path d="M20 28 Q24 32 28 28" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
         <span class="empty-title">No reminders set</span>
         <span class="empty-subtitle">Create a reminder above to stay on track!</span>
       `;
@@ -336,7 +343,9 @@ class RemindersTab {
       return;
     }
 
-    this.reminders.forEach(r => {
+    const snoozeMins = (window.panelController?.store?.get('settings.behavior.snoozeMinutes')) || 5;
+
+    const renderCard = (r) => {
       const item = document.createElement('div');
       const isEditing = this.editingId === r.id;
 
@@ -370,17 +379,22 @@ class RemindersTab {
         item.className = `reminder-item ${r.enabled ? 'active' : 'disabled'}`;
         item.dataset.id = r.id;
         item.innerHTML = `
-          <div class="reminder-info">
-            <div class="reminder-title">${r.title}</div>
-            <div class="reminder-meta">
-              <span class="reminder-time-badge mono"><i data-lucide="clock"></i> ${r.time}</span>
-              <span class="reminder-repeat-badge">${r.repeat}</span>
+          <div class="reminder-left">
+            <div class="reminder-bell-icon">
+              <i data-lucide="${r.enabled ? 'bell' : 'check'}"></i>
+            </div>
+            <div class="reminder-info">
+              <div class="reminder-title">${r.title}</div>
+              <div class="reminder-meta">
+                <span class="reminder-time-badge mono"><i data-lucide="clock"></i> ${r.time}</span>
+                <span class="reminder-repeat-badge">${r.repeat}</span>
+              </div>
             </div>
           </div>
           <div class="reminder-item-actions">
-            <button class="reminder-snooze-btn" data-id="${r.id}" title="Snooze ${(window.panelController?.store?.get('settings.behavior.snoozeMinutes')) || 5} minutes">
+            <button class="reminder-snooze-btn" data-id="${r.id}" title="Snooze ${snoozeMins} minutes">
               <i data-lucide="alarm-clock"></i>
-              <span>+${(window.panelController?.store?.get('settings.behavior.snoozeMinutes')) || 5}m</span>
+              <span>+${snoozeMins}m</span>
             </button>
             <button class="reminder-edit-btn" data-id="${r.id}" title="Edit reminder">
               <i data-lucide="edit-3"></i>
@@ -390,9 +404,27 @@ class RemindersTab {
           </div>
         `;
       }
+      return item;
+    };
 
-      this.listContainer.appendChild(item);
-    });
+    const upcoming = this.reminders.filter(r => r.enabled);
+    const done = this.reminders.filter(r => !r.enabled);
+
+    if (upcoming.length > 0) {
+      const upHeader = document.createElement('div');
+      upHeader.className = 'reminders-group-heading';
+      upHeader.innerHTML = `<i data-lucide="calendar"></i><span>Upcoming</span><span class="group-count-pill">${upcoming.length}</span>`;
+      this.listContainer.appendChild(upHeader);
+      upcoming.forEach(r => this.listContainer.appendChild(renderCard(r)));
+    }
+
+    if (done.length > 0) {
+      const doneHeader = document.createElement('div');
+      doneHeader.className = 'reminders-group-heading done';
+      doneHeader.innerHTML = `<i data-lucide="check-check"></i><span>Done</span><span class="group-count-pill">${done.length}</span>`;
+      this.listContainer.appendChild(doneHeader);
+      done.forEach(r => this.listContainer.appendChild(renderCard(r)));
+    }
 
     if (window.panelController && typeof window.panelController.refreshIcons === 'function') {
       window.panelController.refreshIcons();

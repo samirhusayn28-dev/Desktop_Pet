@@ -5,11 +5,14 @@
 
 :root {
   --accent: #FF7A2F;
+  --theme-on-accent: #FFFFFF;
+  --accent-contrast: #FFFFFF;
   --accent-glow: color-mix(in srgb, var(--accent) 75%, transparent);
   --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
   --accent-strong: color-mix(in srgb, var(--accent) 32%, transparent);
   --accent-light: color-mix(in srgb, var(--accent) 70%, white);
   --accent-border: color-mix(in srgb, var(--accent) 32%, transparent);
+  --accent-card-tint: color-mix(in srgb, var(--accent) 7%, #1B1B22);
 
   /* Legacy mappings */
   --theme-primary: var(--accent);
@@ -19,48 +22,96 @@
   --theme-accent-light: var(--accent-light);
   --theme-card-border: var(--accent-border);
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Bundled App-wide Fonts (Item UI4) */
+  --font-sans: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-title: 'Fredoka', 'Nunito', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
 
-  --transition-theme: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                      border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                      color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                      box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --radius-pill: 9999px;
+
+  --transition-fast: transform 140ms ease, opacity 140ms ease, background-color 140ms ease, border-color 140ms ease;
+  --transition-theme: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .theme-glow-border {
   border: 1px solid var(--accent-border);
-  box-shadow: 0 0 16px var(--accent-soft);
   transition: var(--transition-theme);
 }
 
 .theme-glow-border:hover {
   border-color: var(--accent);
-  box-shadow: 0 0 20px var(--accent-strong);
 }
 
 .theme-btn-primary {
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-glow) 100%);
-  color: #FFFFFF;
+  background: var(--accent);
+  color: var(--theme-on-accent, #FFFFFF) !important;
   border: none;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px var(--accent-strong);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: var(--radius-control, 12px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition-fast);
 }
 
 .theme-btn-primary:hover {
-  filter: brightness(1.12);
+  opacity: 0.92;
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px var(--accent-strong);
+}
+
+.theme-btn-primary:active {
+  opacity: 0.85;
+  transform: translateY(0);
+}
+
+.theme-btn-secondary {
+  background: rgba(255, 255, 255, 0.07);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: var(--radius-control, 12px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition-fast);
+}
+
+.theme-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.theme-btn-secondary:active {
+  transform: translateY(0);
 }
 
 .theme-pill-badge {
   background: var(--accent-soft);
   color: var(--accent);
   border: 1px solid var(--accent-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill, 9999px);
+  font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.6px;
-  padding: 3px 8px;
+  letter-spacing: 0.5px;
+  padding: 3px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }

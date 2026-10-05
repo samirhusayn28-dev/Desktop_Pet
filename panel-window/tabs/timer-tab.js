@@ -149,9 +149,22 @@ class TimerTab {
     // 5. Update Toggle Button Text & Icon
     this.updateToggleBtn();
 
-    // 6. Update Sessions Count
+    // 6. Update Sessions Count & Progress Dots
     if (this.pomodoroCountEl) {
       this.pomodoroCountEl.textContent = this.completedSessions;
+    }
+    const dotsContainer = document.getElementById('timer-session-dots');
+    if (dotsContainer) {
+      const dots = dotsContainer.querySelectorAll('.session-dot');
+      const targetCycles = this.settings?.pomodoro?.sessionsBeforeLongBreak || 4;
+      const currentInCycle = this.completedSessions % targetCycles;
+      dots.forEach((dot, idx) => {
+        if (idx < currentInCycle) {
+          dot.classList.add('filled');
+        } else {
+          dot.classList.remove('filled');
+        }
+      });
     }
 
     // 7. Populate Inputs from Settings
