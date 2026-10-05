@@ -182,6 +182,7 @@ function createPetWindow() {
     hasShadow: false,
     resizable: false,
     skipTaskbar: true,
+    enableLargerThanScreen: true,
     icon: getAppIconPath(),
     alwaysOnTop: store.get('settings.general.alwaysOnTop') !== false,
     webPreferences: {
@@ -901,12 +902,12 @@ ipcMain.on('pet:drag-move', (e, { screenX, screenY }) => {
   let newPetX = Math.round(screenX - dragStartPos.offsetX);
   let newPetY = Math.round(screenY - dragStartPos.offsetY);
 
-  // Constrain pet body rect within usable screen workArea (can reach screen corners and edges
-  // without hiding behind Windows taskbar, macOS menu bar, or dock on any platform)
-  const minPetX = workArea.x - bodyX;
-  const maxPetX = workArea.x + workArea.width - bodyX - bodyW;
-  const minPetY = workArea.y - bodyY;
-  const maxPetY = workArea.y + workArea.height - bodyY - bodyH;
+  // Constrain pet body rect within screen display bounds (can reach screen corners and edges without invisible wall)
+  // Across all display types and operating systems (Windows, macOS, Linux, multi-monitor)
+  const minPetX = bounds.x - bodyX;
+  const maxPetX = bounds.x + bounds.width - bodyX - bodyW;
+  const minPetY = bounds.y - bodyY;
+  const maxPetY = bounds.y + bounds.height - bodyY - bodyH;
 
   newPetX = Math.round(Math.max(minPetX, Math.min(maxPetX, newPetX)));
   newPetY = Math.round(Math.max(minPetY, Math.min(maxPetY, newPetY)));
