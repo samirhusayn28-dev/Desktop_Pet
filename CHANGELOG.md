@@ -2,6 +2,17 @@
 
 All notable changes to Pixie are documented in this file.
 
+## [1.0.4] - 2026-10-05 — **Windows System Functions & Hardware Parity Update**
+
+### Fixed
+- **Windows System Reactions Parity**: Pet now reacts on Windows exactly as it does on macOS to all system functions and hardware events:
+  - **Volume & Mute**: Real-time Windows Core Audio endpoint tracking (`IAudioEndpointVolume` COM integration via persistent background helper) detecting MAX volume, LOW volume, MUTE/SHH, and NORMAL volume without polling lag.
+  - **Screen Brightness**: WMI and CIM monitor brightness detection (`WmiMonitorBrightness`) reacting to MAX brightness and DIM screen settings.
+  - **Headphone Connect & Disconnect**: Real-time detection of headphones, headsets, AirPods, and Bluetooth earbuds plugging in (focus mode engaged) and unplugging (restoring room audio).
+  - **Charger Plugged In & Unplugged**: Instant hardware-level `on-ac` and `on-battery` power monitoring so pet immediately celebrates when plugged in and alerts when on battery.
+  - **System Audio Vibing**: Hardware peak meter audio detection (`IAudioMeterInformation`) enabling the pet to groove and vibe when music or media is actively playing through Windows audio.
+  - **Network Online & Offline**: Domain DNS verification alerting when Wi-Fi disconnects and celebrating when reconnected.
+
 ## [1.0.3] - 2026-10-05 — **"Pixie" Release**
 
 ### Changed

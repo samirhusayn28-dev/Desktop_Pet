@@ -15,7 +15,7 @@
  * - Late night (midnight - 5 AM)
  */
 
-const { exec } = require('child_process');
+const { exec, execFile, spawn } = require('child_process');
 const dns = require('dns');
 const os = require('os');
 const path = require('path');
@@ -23,6 +23,196 @@ const fs = require('fs');
 const { app, powerMonitor } = require('electron');
 const store = require('./secure-store');
 const bubble = require('./bubble-window');
+
+// ---------------------------------------------------------------------------
+// Windows: Persistent PowerShell process for low-overhead audio polling.
+// We spawn powershell.exe ONCE, compile C# types once, then query volume/
+// device name via stdin/stdout — no per-poll process-spawn overhead.
+// ---------------------------------------------------------------------------
+const WIN_PS_AUDIO_INIT = `
+Add-Type -Language CSharp -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+[Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioEndpointVolume {
+    int r0(); int r1(); int r2(); int r3();
+    int SetMasterVolumeLevelScalar(float f, Guid g);
+    int r5();
+    int GetMasterVolumeLevelScalar(out float f);
+    int r7(); int r8(); int r9(); int r10();
+    int SetMute([MarshalAs(UnmanagedType.Bool)] bool b, Guid g);
+    int GetMute(out bool b);
+}
+
+[Guid("C02216F6-0388-4E45-9275-14B0440F4BD1"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioMeterInformation {
+    int GetPeakValue(out float pfPeak);
+}
+
+[Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDevice {
+    int Activate(ref Guid id, int ctx, IntPtr p, [MarshalAs(UnmanagedType.IUnknown)] out object target);
+    int OpenPropertyStore(int stgmAccess, out IntPtr ppProperties);
+    int GetId([MarshalAs(UnmanagedType.LPWStr)] out string str);
+    int GetState(out int pdwState);
+}
+
+[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceEnumerator {
+    int r0();
+    int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice ep);
+}
+
+[ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+class MMDeviceEnumeratorCOM {}
+
+public class PixieAudio {
+    static IMMDevice GetDevice() {
+        var e = (IMMDeviceEnumerator)(new MMDeviceEnumeratorCOM());
+        IMMDevice dev;
+        e.GetDefaultAudioEndpoint(0, 1, out dev);
+        return dev;
+    }
+
+    public static string AudioState() {
+        int vol = 50;
+        bool mute = false;
+        float peak = 0f;
+        string devId = "";
+        try {
+            var dev = GetDevice();
+            if (dev != null) {
+                try {
+                    object o;
+                    var aevGuid = typeof(IAudioEndpointVolume).GUID;
+                    dev.Activate(ref aevGuid, 23, IntPtr.Zero, out o);
+                    var aev = (IAudioEndpointVolume)o;
+                    float v = 0f;
+                    aev.GetMasterVolumeLevelScalar(out v);
+                    aev.GetMute(out mute);
+                    vol = (int)Math.Round(v * 100);
+                } catch {}
+
+                try {
+                    object o2;
+                    var amiGuid = typeof(IAudioMeterInformation).GUID;
+                    dev.Activate(ref amiGuid, 23, IntPtr.Zero, out o2);
+                    var ami = (IAudioMeterInformation)o2;
+                    ami.GetPeakValue(out peak);
+                } catch {}
+
+                try {
+                    dev.GetId(out devId);
+                } catch {}
+            }
+        } catch {}
+        return vol + "," + (mute ? "true" : "false") + "," + ((int)Math.Round(peak * 1000)) + "," + (devId ?? "");
+    }
+}
+'@ -ErrorAction SilentlyContinue 2>$null
+
+function Get-PixieAll {
+    $audio = [PixieAudio]::AudioState()
+    $isHp = "false"
+    try {
+        $parts = $audio.Split(',')
+        $devId = if ($parts.Length -ge 4) { $parts[3] } else { "" }
+        if ($devId) {
+            $reg = "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render\\$devId\\Properties"
+            $p = Get-ItemProperty -Path $reg -ErrorAction SilentlyContinue
+            if ($p) {
+                $desc = "" + $p.'{a45c254e-df1c-4efd-8020-67d146a850e0},2' + " " + $p.'{b3f8fa53-0004-438e-9002-d4c46f370a0f},6'
+                if ($desc -match 'headphone|headset|earphone|airpod|bud|earbud|airpods|beats|bose|sony|jbl|wh-|wf-|sennheiser|plantronics|razer|hyperx|steelseries|wireless stereo|bluetooth audio') {
+                    $isHp = "true"
+                }
+            }
+        }
+    } catch {}
+
+    $br = "NA"
+    try {
+        $b = (Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBrightness -ErrorAction SilentlyContinue).CurrentBrightness
+        if ($b -ne $null) { $br = "$b" }
+    } catch {
+        try {
+            $b = (Get-WmiObject -Namespace root/wmi -Class WmiMonitorBrightness -ErrorAction SilentlyContinue).CurrentBrightness
+            if ($b -ne $null) { $br = "$b" }
+        } catch {}
+    }
+
+    $batt = "NA"
+    try {
+        $b = Get-CimInstance -ClassName Win32_Battery -ErrorAction SilentlyContinue
+        if ($b) {
+            $chg = ($b.BatteryStatus -eq 2 -or $b.BatteryStatus -eq 4 -or $b.BatteryStatus -eq 6)
+            $batt = "$($b.EstimatedChargeRemaining),$chg"
+        }
+    } catch {
+        try {
+            $b = Get-WmiObject -Class Win32_Battery -ErrorAction SilentlyContinue
+            if ($b) {
+                $chg = ($b.BatteryStatus -eq 2 -or $b.BatteryStatus -eq 4 -or $b.BatteryStatus -eq 6)
+                $batt = "$($b.EstimatedChargeRemaining),$chg"
+            }
+        } catch {}
+    }
+
+    return "$audio;$isHp;$br;$batt"
+}
+
+Write-Output "PIXIE_READY"
+`;
+
+let _winPsProc = null;
+let _winPsBuffer = '';
+let _winPsCbs = [];
+let _winPsReady = false;
+
+function ensureWinPs() {
+  if (_winPsProc && !_winPsProc.killed) return;
+  try {
+    _winPsProc = spawn('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', '-'
+    ], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+
+    _winPsProc.stdout.on('data', (chunk) => {
+      _winPsBuffer += chunk.toString();
+      const lines = _winPsBuffer.split('\n');
+      _winPsBuffer = lines.pop();
+      for (const raw of lines) {
+        const line = raw.replace(/\r/g, '').trim();
+        if (!line) continue;
+        if (line === 'PIXIE_READY') { _winPsReady = true; continue; }
+        if (_winPsCbs.length) _winPsCbs.shift()(line);
+      }
+    });
+    _winPsProc.on('exit', () => { _winPsProc = null; _winPsReady = false; });
+    _winPsProc.on('error', () => { _winPsProc = null; _winPsReady = false; });
+
+    // Write initialiser — compiles C# once
+    _winPsProc.stdin.write(WIN_PS_AUDIO_INIT + '\n');
+  } catch (e) {
+    _winPsProc = null;
+  }
+}
+
+function winPsQuery(cmd, timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    if (!_winPsReady || !_winPsProc || _winPsProc.killed) {
+      return resolve(null);
+    }
+    const timer = setTimeout(() => {
+      // Remove stale callback on timeout
+      const idx = _winPsCbs.indexOf(cb);
+      if (idx !== -1) _winPsCbs.splice(idx, 1);
+      resolve(null);
+    }, timeoutMs);
+    const cb = (line) => { clearTimeout(timer); resolve(line); };
+    _winPsCbs.push(cb);
+    try { _winPsProc.stdin.write(cmd + '\n'); } catch { resolve(null); }
+  });
+}
 
 // Debug volume logging flag (set to true during testing, false in production)
 const DEBUG_VOLUME_LOG = false;
@@ -110,6 +300,16 @@ class SystemSense {
             this.handleWakeEvent();
           });
         } catch (e) {}
+
+        // Instant charger connect / disconnect reactions on both macOS and Windows
+        try {
+          powerMonitor.on('on-ac', () => {
+            this.processBatteryState(this.state.batteryPercent !== null ? this.state.batteryPercent : 100, true);
+          });
+          powerMonitor.on('on-battery', () => {
+            this.processBatteryState(this.state.batteryPercent !== null ? this.state.batteryPercent : 80, false);
+          });
+        } catch (e) {}
       }
     } catch (e) {
       console.warn('[SystemSense] PowerMonitor hook error:', e.message);
@@ -130,6 +330,12 @@ class SystemSense {
 
   start() {
     this.stop();
+
+    // On Windows: warm up the persistent PowerShell process immediately
+    // so volume is available from first poll (PS compilation takes ~1-2s)
+    if (process.platform === 'win32') {
+      ensureWinPs();
+    }
 
     this.startVolumeWatcher();
 
@@ -288,7 +494,62 @@ class SystemSense {
 
   checkVolume() {
     return new Promise((resolve) => {
-      if (process.platform !== 'darwin' || this.isPaused) return resolve();
+      if (this.isPaused) return resolve();
+
+      // ── Windows branch ──────────────────────────────────────────────────
+      if (process.platform === 'win32') {
+        ensureWinPs();
+        if (!_winPsReady) return resolve();
+        winPsQuery('Get-PixieAll').then((result) => {
+          if (!result) return resolve();
+          // Format: vol,mute,peak,devId;isHp;br;batt
+          const sections = result.split(';');
+          const audioParts = (sections[0] || '').split(',');
+          const vol = parseInt(audioParts[0], 10);
+          const muted = (audioParts[1] || '').trim() === 'true';
+          const peak = parseInt(audioParts[2], 10) || 0;
+
+          if (!isNaN(vol)) {
+            this._applyVolumeBandLogic(vol, muted);
+          }
+
+          // Real-time headphone detection from Core Audio
+          if (sections.length > 1) {
+            const isHp = sections[1].trim() === 'true';
+            this._applyHeadphoneState(isHp);
+          }
+
+          // Real-time audio activity detection (peak > 5 means audio is actively outputting)
+          const isAudioActive = peak >= 5;
+          this.processAudioPlayingState(isAudioActive).catch(() => {});
+
+          // Brightness telemetry update
+          if (sections.length > 2 && sections[2].trim() !== 'NA') {
+            const br = parseInt(sections[2].trim(), 10);
+            if (!isNaN(br)) {
+              this.state.brightnessAvailable = true;
+              this.state.brightnessLevel = br;
+              this._applyBrightnessBandLogic(br);
+            }
+          }
+
+          // Battery telemetry update
+          if (sections.length > 3 && sections[3].trim() !== 'NA') {
+            const battParts = sections[3].trim().split(',');
+            const bPct = parseInt(battParts[0], 10);
+            const bChg = (battParts[1] || '').toLowerCase() === 'true';
+            if (!isNaN(bPct)) {
+              this.processBatteryState(bPct, bChg);
+            }
+          }
+
+          resolve();
+        }).catch(() => resolve());
+        return;
+      }
+
+      // ── macOS branch ─────────────────────────────────────────────────────
+      if (process.platform !== 'darwin') return resolve();
 
       // Combined osascript: fetches volume and mute in a single string
       exec(`osascript -e 'set o to (get volume settings)' -e '(output volume of o as string) & "," & (output muted of o as string)' 2>/dev/null`, (err, stdout) => {
@@ -300,132 +561,104 @@ class SystemSense {
 
         if (isNaN(vol)) return resolve();
 
-        let idle = 0;
-        try {
-          if (powerMonitor) idle = powerMonitor.getSystemIdleTime();
-        } catch (e) {}
-
-        const isMuteOrZero = muted || vol === 0;
-
-        // Band determination with hysteresis
-        let newBand;
-        if (this.currentVolumeBand === null) {
-          if (isMuteOrZero) newBand = 'MUTED';
-          else if (vol >= 98) newBand = 'MAX';
-          else if (vol <= 15) newBand = 'LOW';
-          else newBand = 'NORMAL';
-
-          this.currentVolumeBand = newBand;
-          this.state.volumeLevel = vol;
-          this.state.isMuted = muted;
-
-          if (DEBUG_VOLUME_LOG) {
-            try {
-              const logPath = path.join(app.getPath('userData'), 'volume-debug.log');
-              fs.appendFileSync(logPath, `[${new Date().toISOString()}] INIT vol=${vol}, muted=${muted}, band=${newBand}, idle=${idle}\n`);
-            } catch (e) {}
-          }
-          return resolve();
-        }
-
-        // Hysteresis calculation against current band
-        if (isMuteOrZero) {
-          newBand = 'MUTED';
-        } else if (this.currentVolumeBand === 'MAX') {
-          // Exit MAX threshold has hysteresis (vol < 92)
-          if (vol <= 15) newBand = 'LOW';
-          else if (vol < 92) newBand = 'NORMAL';
-          else newBand = 'MAX';
-        } else if (this.currentVolumeBand === 'LOW') {
-          // Exit LOW threshold has hysteresis (vol >= 20)
-          if (vol >= 98) newBand = 'MAX';
-          else if (vol >= 20) newBand = 'NORMAL';
-          else newBand = 'LOW';
-        } else if (this.currentVolumeBand === 'MUTED') {
-          // Leaving muted
-          if (vol >= 98) newBand = 'MAX';
-          else if (vol <= 15) newBand = 'LOW';
-          else newBand = 'NORMAL';
-        } else {
-          // Currently NORMAL
-          if (vol >= 98) newBand = 'MAX';
-          else if (vol <= 15) newBand = 'LOW';
-          else newBand = 'NORMAL';
-        }
-
-        const isEnabled = store.get('settings.reactions.volume') !== false;
-
-        if (DEBUG_VOLUME_LOG) {
-          try {
-            const logPath = path.join(app.getPath('userData'), 'volume-debug.log');
-            fs.appendFileSync(logPath, `[${new Date().toISOString()}] vol=${vol}, muted=${muted}, prevBand=${this.currentVolumeBand}, newBand=${newBand}, isEnabled=${isEnabled}, idle=${idle}\n`);
-          } catch (e) {}
-        }
-
-        // Threshold crossing reaction
-        if (newBand !== this.currentVolumeBand) {
-          const prevBand = this.currentVolumeBand;
-          this.currentVolumeBand = newBand;
-
-          if (isEnabled && !this.isSleeping) {
-            const name = this.getUserName();
-            if (newBand === 'MAX') {
-              this.sendPetEmotion('irritated', 4000);
-              bubble.show({
-                badge: 'MAX VOLUME',
-                text: name ? `Whoa ${name}, too loud! Protecting my little ears!` : 'Whoa, too loud! Protecting my little ears!',
-                sound: 'tap',
-                emotion: 'irritated',
-                duration: 3000
-              });
-            } else if (newBand === 'MUTED') {
-              // "shh" face: 'dim' emotion
-              this.sendPetEmotion('dim', 3500);
-              bubble.show({
-                badge: 'SHH...',
-                text: 'Whisper quiet mode.',
-                sound: 'tap',
-                emotion: 'dim',
-                duration: 3000
-              });
-            } else if (newBand === 'LOW') {
-              this.sendPetEmotion('sad', 3500);
-              bubble.show({
-                badge: 'LOW VOLUME',
-                text: 'Can barely hear anything down here...',
-                sound: 'tap',
-                emotion: 'sad',
-                duration: 3000
-              });
-            } else if (newBand === 'NORMAL') {
-              // Returned to normal from MAX, LOW, or MUTED: relieved!
-              this.sendPetEmotion('relieved', 3000);
-              bubble.show({
-                badge: 'VOLUME OK',
-                text: 'Ah, that is much better.',
-                sound: 'happy',
-                emotion: 'relieved',
-                duration: 2500
-              });
-            }
-          }
-        }
-
         this.state.volumeLevel = vol;
         this.state.isMuted = muted;
+        this._applyVolumeBandLogic(vol, muted);
         resolve();
       });
     });
   }
 
+  // Shared volume-band logic (macOS + Windows)
+  _applyVolumeBandLogic(vol, muted) {
+    const isMuteOrZero = muted || vol === 0;
+    let newBand;
+
+    if (this.currentVolumeBand === null) {
+      if (isMuteOrZero) newBand = 'MUTED';
+      else if (vol >= 98) newBand = 'MAX';
+      else if (vol <= 15) newBand = 'LOW';
+      else newBand = 'NORMAL';
+      this.currentVolumeBand = newBand;
+      this.state.volumeLevel = vol;
+      this.state.isMuted = muted;
+      return;
+    }
+
+    if (isMuteOrZero) {
+      newBand = 'MUTED';
+    } else if (this.currentVolumeBand === 'MAX') {
+      newBand = vol < 92 ? (vol <= 15 ? 'LOW' : 'NORMAL') : 'MAX';
+    } else if (this.currentVolumeBand === 'LOW') {
+      newBand = vol >= 98 ? 'MAX' : (vol >= 20 ? 'NORMAL' : 'LOW');
+    } else if (this.currentVolumeBand === 'MUTED') {
+      newBand = vol >= 98 ? 'MAX' : (vol <= 15 ? 'LOW' : 'NORMAL');
+    } else {
+      newBand = vol >= 98 ? 'MAX' : (vol <= 15 ? 'LOW' : 'NORMAL');
+    }
+
+    const isEnabled = store.get('settings.reactions.volume') !== false;
+    if (newBand !== this.currentVolumeBand) {
+      const prevBand = this.currentVolumeBand;
+      this.currentVolumeBand = newBand;
+      if (isEnabled && !this.isSleeping) {
+        const name = this.getUserName();
+        if (newBand === 'MAX') {
+          this.sendPetEmotion('irritated', 4000);
+          bubble.show({ badge: 'MAX VOLUME', text: name ? `Whoa ${name}, too loud! Protecting my little ears!` : 'Whoa, too loud! Protecting my little ears!', sound: 'tap', emotion: 'irritated', duration: 3000 });
+        } else if (newBand === 'MUTED') {
+          this.sendPetEmotion('dim', 3500);
+          bubble.show({ badge: 'SHH...', text: 'Whisper quiet mode.', sound: 'tap', emotion: 'dim', duration: 3000 });
+        } else if (newBand === 'LOW') {
+          this.sendPetEmotion('sad', 3500);
+          bubble.show({ badge: 'LOW VOLUME', text: 'Can barely hear anything down here...', sound: 'tap', emotion: 'sad', duration: 3000 });
+        } else if (newBand === 'NORMAL') {
+          this.sendPetEmotion('relieved', 3000);
+          bubble.show({ badge: 'VOLUME OK', text: 'Ah, that is much better.', sound: 'happy', emotion: 'relieved', duration: 2500 });
+        }
+      }
+    }
+    this.state.volumeLevel = vol;
+    this.state.isMuted = muted;
+  }
+
   // --- 2. BRIGHTNESS SENSOR ---
   checkBrightness() {
     return new Promise((resolve) => {
+      // ── Windows branch ──────────────────────────────────────────────────
+      if (process.platform === 'win32') {
+        // WMI WmiMonitorBrightness — works on laptops with internal display
+        execFile('wmic', [
+          '/namespace:\\\\root\\wmi',
+          'path', 'WmiMonitorBrightness',
+          'get', 'CurrentBrightness',
+          '/format:value'
+        ], { timeout: 3000, windowsHide: true }, (err, stdout) => {
+          if (err || !stdout) {
+            this.state.brightnessAvailable = false;
+            return resolve();
+          }
+          const match = stdout.match(/CurrentBrightness=(\d+)/i);
+          if (!match) {
+            this.state.brightnessAvailable = false;
+            return resolve();
+          }
+          this.state.brightnessAvailable = true;
+          const pct = parseInt(match[1], 10);
+          this.state.brightnessLevel = pct;
+          this._applyBrightnessBandLogic(pct);
+          resolve();
+        });
+        return;
+      }
+
+      // ── Not macOS or Windows — skip ──────────────────────────────────────
       if (process.platform !== 'darwin') {
         this.state.brightnessAvailable = false;
         return resolve();
       }
 
+      // ── macOS branch ─────────────────────────────────────────────────────
       // Read AppleBacklightDisplay on macOS
       exec(`ioreg -c AppleBacklightDisplay | grep -E "brightness" 2>/dev/null`, (err, stdout) => {
         if (err || !stdout || !stdout.includes('brightness')) {
@@ -443,48 +676,39 @@ class SystemSense {
         const pct = Math.round((val / max) * 100);
 
         this.state.brightnessLevel = pct;
-
-        // USER REQUEST:
-        // squint: display brightness at or above 95% (hysteresis down to 90%).
-        // dull: display brightness at or below 25% (hysteresis up to 30%).
-        let newBand = this.currentBrightnessBand;
-        if (pct >= 95) {
-          newBand = 'HIGH';
-        } else if (pct <= 25) {
-          newBand = 'LOW';
-        } else if (this.currentBrightnessBand === 'HIGH' && pct < 90) {
-          newBand = 'NORMAL';
-        } else if (this.currentBrightnessBand === 'LOW' && pct > 30) {
-          newBand = 'NORMAL';
-        } else if (!this.currentBrightnessBand) {
-          newBand = (pct >= 90) ? 'HIGH' : ((pct <= 30) ? 'LOW' : 'NORMAL');
-        }
-
-        if (newBand !== this.currentBrightnessBand) {
-          const oldBand = this.currentBrightnessBand;
-          this.currentBrightnessBand = newBand;
-          if (newBand === 'HIGH') {
-            this.sendPetEmotion('squint', 4000);
-            bubble.show({
-              badge: 'MAX BRIGHTNESS',
-              text: 'So bright! Sunglasses recommended!',
-              emotion: 'squint'
-            });
-          } else if (newBand === 'LOW') {
-            this.sendPetEmotion('dull', 4000);
-            bubble.show({
-              badge: 'DIM SCREEN',
-              text: 'Screen is dim and cozy...',
-              emotion: 'dull'
-            });
-          } else if (oldBand) {
-            this.sendPetEmotion('relieved', 2000);
-          }
-        }
-
+        this._applyBrightnessBandLogic(pct);
         resolve();
       });
     });
+  }
+
+  // Shared brightness-band logic (macOS + Windows)
+  _applyBrightnessBandLogic(pct) {
+    let newBand = this.currentBrightnessBand;
+    if (pct >= 95) {
+      newBand = 'HIGH';
+    } else if (pct <= 25) {
+      newBand = 'LOW';
+    } else if (this.currentBrightnessBand === 'HIGH' && pct < 90) {
+      newBand = 'NORMAL';
+    } else if (this.currentBrightnessBand === 'LOW' && pct > 30) {
+      newBand = 'NORMAL';
+    } else if (!this.currentBrightnessBand) {
+      newBand = (pct >= 90) ? 'HIGH' : ((pct <= 30) ? 'LOW' : 'NORMAL');
+    }
+    if (newBand !== this.currentBrightnessBand) {
+      const oldBand = this.currentBrightnessBand;
+      this.currentBrightnessBand = newBand;
+      if (newBand === 'HIGH') {
+        this.sendPetEmotion('squint', 4000);
+        bubble.show({ badge: 'MAX BRIGHTNESS', text: 'So bright! Sunglasses recommended!', emotion: 'squint' });
+      } else if (newBand === 'LOW') {
+        this.sendPetEmotion('dull', 4000);
+        bubble.show({ badge: 'DIM SCREEN', text: 'Screen is dim and cozy...', emotion: 'dull' });
+      } else if (oldBand) {
+        this.sendPetEmotion('relieved', 2000);
+      }
+    }
   }
 
   // --- 3. BATTERY SENSOR ---
@@ -506,13 +730,38 @@ class SystemSense {
           this.processBatteryState(pct, isCharging);
           resolve();
         });
-      } else {
-        si.battery().then(b => {
-          if (b && b.hasBattery) {
-            this.processBatteryState(b.percent || 100, b.isCharging);
+      } else if (process.platform === 'win32') {
+        // Windows: use wmic to get battery status
+        execFile('wmic', ['path', 'Win32_Battery', 'get', 'BatteryStatus,EstimatedChargeRemaining', '/format:csv'],
+          { timeout: 4000, windowsHide: true },
+          (err, stdout) => {
+            if (err || !stdout || !stdout.includes(',')) return resolve();
+            // CSV: Node,BatteryStatus,EstimatedChargeRemaining
+            // BatteryStatus: 1=Discharging, 2=AC/Charging, 4=Charging, 6=Charging&High
+            const lines = stdout.trim().split('\n').filter(l => l.includes(',') && !l.toLowerCase().includes('batterystatus'));
+            if (!lines.length) return resolve();
+            const parts = lines[0].trim().split(',');
+            // parts: [node, BatteryStatus, EstimatedChargeRemaining]
+            const statusCode = parseInt(parts[1], 10);
+            const pct = parseInt(parts[2], 10);
+            if (isNaN(pct)) return resolve();
+            // BatteryStatus 2 = On AC Power (no battery or full), 6 = Charging and High
+            const isCharging = (statusCode === 2 || statusCode === 4 || statusCode === 6);
+            this.processBatteryState(pct, isCharging);
+            resolve();
           }
-          resolve();
-        }).catch(() => resolve());
+        );
+      } else {
+        // Fallback: try systeminformation
+        try {
+          const si = require('systeminformation');
+          si.battery().then(b => {
+            if (b && b.hasBattery) {
+              this.processBatteryState(b.percent || 100, b.isCharging);
+            }
+            resolve();
+          }).catch(() => resolve());
+        } catch { resolve(); }
       }
     });
   }
@@ -615,8 +864,31 @@ class SystemSense {
     });
   }
 
+  // Windows: detect if any media/audio process is actively playing audio.
+  // Strategy: check for known media player processes + browser processes
+  // which are the most common sources of audio on Windows.
   async checkWindowsAudioState() {
-    return false;
+    return new Promise((resolve) => {
+      // Query running process names via wmic (lightweight)
+      execFile('wmic', ['process', 'get', 'name', '/format:csv'],
+        { timeout: 3000, windowsHide: true },
+        (err, stdout) => {
+          if (err || !stdout) return resolve(false);
+          const lower = stdout.toLowerCase();
+          // Media players and browsers that commonly play audio
+          const mediaApps = [
+            'spotify.exe', 'vlc.exe', 'wmplayer.exe', 'groove.exe',
+            'musicapp.exe', 'itunes.exe', 'foobar2000.exe', 'aimp.exe',
+            'winamp.exe', 'mpc-hc64.exe', 'mpc-hc.exe', 'potplayer64.exe',
+            'potplayer.exe', 'mplayerc.exe', 'windowsmediaplayer.exe',
+            'chrome.exe', 'firefox.exe', 'msedge.exe', 'opera.exe',
+            'brave.exe', 'vivaldi.exe', 'iexplore.exe'
+          ];
+          const isPlaying = mediaApps.some(app => lower.includes(app));
+          resolve(isPlaying);
+        }
+      );
+    });
   }
 
   getJxaTrackTitle() {
@@ -699,7 +971,7 @@ class SystemSense {
   // --- 5. NETWORK / INTERNET SENSOR ---
   checkNetwork() {
     return new Promise((resolve) => {
-      dns.lookup('1.1.1.1', (err) => {
+      dns.lookup('cloudflare.com', (err) => {
         const online = !err;
 
         if (!this.state.hasCheckedOnline) {
@@ -709,16 +981,22 @@ class SystemSense {
         }
 
         if (!online && this.state.isOnline) {
-          this.state.isOnline = false;
-          if (this.canReact('network', 60000)) {
-            this.sendPetEmotion('irritated', 4000);
-            bubble.show({
-              badge: 'OFFLINE',
-              text: 'Internet disconnected. Working in offline mode.',
-              sound: 'tap',
-              emotion: 'irritated'
-            });
-          }
+          // Double check with google.com before declaring offline to avoid transient DNS glitch
+          dns.lookup('google.com', (err2) => {
+            if (!err2) return resolve();
+            this.state.isOnline = false;
+            if (this.canReact('network', 60000)) {
+              this.sendPetEmotion('irritated', 4000);
+              bubble.show({
+                badge: 'OFFLINE',
+                text: 'Internet disconnected. Working in offline mode.',
+                sound: 'tap',
+                emotion: 'irritated'
+              });
+            }
+            resolve();
+          });
+          return;
         } else if (online && !this.state.isOnline) {
           this.state.isOnline = true;
           if (this.canReact('network', 60000)) {
@@ -740,46 +1018,70 @@ class SystemSense {
   // --- 6. HEADPHONES SENSOR ---
   checkHeadphones(force = false) {
     return new Promise((resolve) => {
-      if (process.platform !== 'darwin') return resolve();
-
       const now = Date.now();
-      // Throttle heavy system_profiler to once every 45s unless forced (e.g. on volume change or initial run)
-      if (!force && this.state.headphonesConnected !== null && (now - this.lastHeadphonesCheck < 45000)) {
+      const throttleMs = process.platform === 'win32' ? 5000 : 45000;
+      if (!force && this.state.headphonesConnected !== null && (now - this.lastHeadphonesCheck < throttleMs)) {
         return resolve();
       }
       this.lastHeadphonesCheck = now;
 
+      // ── Windows branch ──────────────────────────────────────────────────
+      if (process.platform === 'win32') {
+        if (_winPsReady) {
+          winPsQuery('Get-PixieAll').then((res) => {
+            if (res && res.includes(';')) {
+              const isHp = res.split(';')[1].trim() === 'true';
+              this._applyHeadphoneState(isHp);
+            }
+            resolve();
+          }).catch(() => resolve());
+          return;
+        }
+        return resolve();
+      }
+
+      // ── macOS branch ─────────────────────────────────────────────────────
+      if (process.platform !== 'darwin') return resolve();
+
       exec(`system_profiler SPAudioDataType 2>/dev/null`, (err, stdout) => {
         if (err || !stdout) return resolve();
-
-        // Check if Default Output Device contains Headphones, AirPods, or Headset
         const isHeadphones = /Default Output Device: Yes[\s\S]*?(Output Source: (Headphones|AirPods|Bluetooth)|Transport: (Bluetooth))/i.test(stdout) ||
                              /(AirPods|Headphones|EarPods|Buds)/i.test(stdout.split('Default Output Device: Yes')[0] || '');
-
-        if (this.state.headphonesConnected === null) {
-          this.state.headphonesConnected = isHeadphones;
-          return resolve();
-        }
-
-        if (isHeadphones && !this.state.headphonesConnected) {
-          this.state.headphonesConnected = true;
-          if (this.canReact('headphones', 60000)) {
-            this.sendPetEmotion('focus', 4000);
-            const name = this.getUserName();
-            bubble.show({
-              badge: 'HEADPHONES DETECTED',
-              text: name ? `Headphones on, ${name}. Focus mode engaged!` : 'Headphones connected. Focus mode engaged!',
-              sound: 'chirp',
-              emotion: 'focus'
-            });
-          }
-        } else if (!isHeadphones && this.state.headphonesConnected) {
-          this.state.headphonesConnected = false;
-        }
-
+        this._applyHeadphoneState(isHeadphones);
         resolve();
       });
     });
+  }
+
+  _applyHeadphoneState(isHeadphones) {
+    if (this.state.headphonesConnected === null) {
+      this.state.headphonesConnected = isHeadphones;
+      return;
+    }
+    if (isHeadphones && !this.state.headphonesConnected) {
+      this.state.headphonesConnected = true;
+      if (this.canReact('headphones', 60000)) {
+        this.sendPetEmotion('focus', 4000);
+        const name = this.getUserName();
+        bubble.show({
+          badge: 'HEADPHONES DETECTED',
+          text: name ? `Headphones on, ${name}. Focus mode engaged!` : 'Headphones connected. Focus mode engaged!',
+          sound: 'chirp',
+          emotion: 'focus'
+        });
+      }
+    } else if (!isHeadphones && this.state.headphonesConnected) {
+      this.state.headphonesConnected = false;
+      if (this.canReact('headphones', 60000)) {
+        this.sendPetEmotion('neutral', 2500);
+        bubble.show({
+          badge: 'HEADPHONES DISCONNECTED',
+          text: 'Headphones disconnected. Back to room audio!',
+          sound: 'tap',
+          emotion: 'neutral'
+        });
+      }
+    }
   }
 
   calculateRealSystemCpu() {
