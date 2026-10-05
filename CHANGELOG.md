@@ -1,6 +1,18 @@
 # Changelog
 
-All notable changes to Desktop Pet are documented in this file.
+All notable changes to Pixie are documented in this file.
+
+## [1.0.3] - 2026-10-05 — **"Pixie" Release**
+
+### Changed
+- **App renamed to Pixie** — product name updated to "Pixie" across macOS (.dmg) and Windows (.exe) installers
+- **Default pet name is now Pixie** — fresh installs greet users with the name "Pixie" pre-filled in the welcome screen
+
+### Fixed
+- **Bubble too far from pet (all scales)** — speech bubble tail now anchors exactly 8px above the pet's head using precise body geometry; the old ~91px gap is eliminated
+- **Bubble updates on resize/flip** — bubble re-anchors correctly when the pet's appearance scale changes or the bubble flips below the pet
+- **Top-edge dragging (macOS & Windows)** — pet window uses `enableLargerThanScreen: true` + full display `bounds` clamping so the pet can reach the very top pixel of every display on both platforms
+
 
 ## [1.0.2] - 2026-10-05
 

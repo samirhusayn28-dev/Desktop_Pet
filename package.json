@@ -1,8 +1,8 @@
 {
   "name": "desktop-pet",
-  "productName": "Desktop Pet",
-  "version": "1.0.2",
-  "description": "Desktop Pet – Minimal 3D Face-Bot Companion",
+  "productName": "Pixie",
+  "version": "1.0.3",
+  "description": "Pixie – Your adorable desktop companion",
   "main": "main/index.js",
   "scripts": {
     "start": "electron .",
@@ -18,14 +18,14 @@
   },
   "build": {
     "appId": "com.antigravity.desktoppet",
-    "productName": "Desktop Pet",
+    "productName": "Pixie",
     "mac": {
       "icon": "assets/icon.icns",
       "category": "public.app-category.developer-tools",
       "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
-      "artifactName": "Desktop-Pet-${version}-mac-x64.${ext}",
+      "artifactName": "Pixie-${version}-mac-x64.${ext}",
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
@@ -49,8 +49,8 @@
       ]
     },
     "dmg": {
-      "title": "Desktop Pet",
-      "artifactName": "Desktop-Pet-${version}-mac-x64.dmg",
+      "title": "Pixie",
+      "artifactName": "Pixie-${version}-mac-x64.dmg",
       "contents": [
         {
           "x": 130,
@@ -66,7 +66,7 @@
     },
     "win": {
       "icon": "assets/icon.png",
-      "artifactName": "Desktop-Pet-${version}-win-x64.${ext}",
+      "artifactName": "Pixie-${version}-win-x64.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -82,7 +82,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "Desktop-Pet-${version}-win-x64.exe"
+      "artifactName": "Pixie-${version}-win-x64.exe"
     },
     "asarUnpack": [
       "audio/**/*"
