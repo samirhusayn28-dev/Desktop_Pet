@@ -57,7 +57,8 @@ html, body {
 /* Solid Cute Material Speech Bubble (Item B2: max-width 280px, overflow-wrap, line-clamp 4) */
 .pet-speech-bubble {
   position: absolute;
-  top: 10px;
+  top: auto;
+  bottom: var(--bubble-bottom, 155px);
   left: 50%;
   transform: translateX(-50%);
   width: max-content;
@@ -78,8 +79,8 @@ html, body {
 }
 
 .pet-speech-bubble.flipped-below {
-  top: auto;
-  bottom: 10px;
+  top: var(--bubble-top, 155px);
+  bottom: auto;
 }
 
 .pet-speech-bubble.flipped-below .bubble-tail {

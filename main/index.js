@@ -984,6 +984,10 @@ ipcMain.on('pet:bubble-shown', (e, { width, height, isClamped }) => {
   const bW = Math.max(120, Math.min(280, width || 220));
   const bH = Math.max(40, height || 60);
 
+  // Compute exact pet body top (in base window coords) so bubble tail sits 8px above pet head
+  const { bodyY } = getPetBodyRect(baseW, baseH);
+  const TAIL_GAP = 8; // px gap between bubble tail tip and pet body top
+
   const display = screen.getDisplayNearestPoint({
     x: unexpandedPetBounds.x + baseW / 2,
     y: unexpandedPetBounds.y + baseH / 2
@@ -994,13 +998,16 @@ ipcMain.on('pet:bubble-shown', (e, { width, height, isClamped }) => {
   const spaceBelow = (workArea.y + workArea.height) - (unexpandedPetBounds.y + baseH);
 
   // Flip below if not enough room above and more room below
-  const neededBubbleSpace = bH + 20;
+  const neededBubbleSpace = bH + TAIL_GAP + 6; // 6 = tail height
   const shouldFlipBelow = (spaceAbove < neededBubbleSpace) && (spaceBelow >= spaceAbove);
 
   petWindow.webContents.send('pet:bubble-position', { flipped: shouldFlipBelow });
 
   const totalW = Math.max(baseW, bW + 24);
-  const totalH = baseH + bH + 16;
+
+  // Exact height: base window + bubble height + gap so tail is TAIL_GAP above pet body top
+  const extraH = bH + TAIL_GAP + 6; // 6px for tail diamond half-height
+  const totalH = baseH + extraH;
 
   let newX = unexpandedPetBounds.x - Math.round((totalW - baseW) / 2);
   let newY;

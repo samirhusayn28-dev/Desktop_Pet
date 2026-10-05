@@ -112,6 +112,7 @@ class FaceBotController {
   init() {
     this.loadSavedAppearance();
     this.render();
+    this.updateBubblePosition();
     this.setupEvents();
     this.setupIPC();
     this.startBlinkLoop();
@@ -257,11 +258,35 @@ class FaceBotController {
     }
   }
 
+  updateBubblePosition(flipped = false) {
+    if (!this.bubbleEl) return;
+    const cfg = this.pet?.config || {};
+    const scale = cfg.scale || 1.0;
+    const size = Math.round(180 * scale);
+    const k = size / 220;
+    const cfgH = Math.max(60, Math.min(200, cfg.height !== undefined ? cfg.height : 120));
+    const petBodyTopInViewport = (110 - cfgH / 2) * k;
+    const petBodyBottomInViewport = (110 + cfgH / 2) * k;
+
+    // Normal (bubble above pet): tail tip is ~6px above pet body
+    const petTopFromBottom = 10 + (size - petBodyTopInViewport);
+    const bubbleBottom = Math.round(petTopFromBottom + 12);
+
+    // Flipped (bubble below pet): tail tip is ~6px below pet body
+    const petBodyBottomFromTop = 10 + petBodyBottomInViewport;
+    const bubbleTop = Math.round(petBodyBottomFromTop + 12);
+
+    this.bubbleEl.style.setProperty('--bubble-bottom', `${bubbleBottom}px`);
+    this.bubbleEl.style.setProperty('--bubble-top', `${bubbleTop}px`);
+  }
+
   // --- Solid Cute Material Speech Bubble ---
   showBubble({ text, badge = '', duration = 5000, sound = '', category = '', emotion = '', bounce = false }) {
     if (!this.bubbleEl || !text) return;
 
     this.lastBubbleData = { text, badge, duration, sound, category, emotion };
+    const isFlipped = this.bubbleEl.classList.contains('flipped-below');
+    this.updateBubblePosition(isFlipped);
 
     if (bounce && this.container) {
       this.container.classList.remove('bounce-drop');
@@ -839,6 +864,8 @@ class FaceBotController {
           this.bubbleEl.classList.remove('flipped-below');
           if (root) root.classList.remove('bubble-flipped');
         }
+        // Recalculate bubble distance after flip so it's always snug against the pet
+        this.updateBubblePosition(flipped);
       }
     });
 
@@ -846,6 +873,9 @@ class FaceBotController {
     ipcRenderer.on('pet:apply-appearance', (event, config) => {
       this.pet.updateConfig(config);
       this.render();
+      // Recalculate bubble anchor when scale/height changes so bubble stays snug
+      const flipped = this.bubbleEl ? this.bubbleEl.classList.contains('flipped-below') : false;
+      this.updateBubblePosition(flipped);
     });
 
     ipcRenderer.on('pet:update-accent', (event, color) => {
