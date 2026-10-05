@@ -1272,10 +1272,55 @@
               <!-- Glasses Toggle (Item G1) -->
               <div class="setting-toggle-row full-width-item" style="margin-top: 4px;">
                 <div class="setting-toggle-text">
-                  <div class="toggle-title">Round Glasses</div>
+                  <div class="toggle-title">Pet Glasses</div>
                   <div class="toggle-desc">Cute spectacles centered on eyes</div>
                 </div>
                 <input type="checkbox" id="setting-pet-glasses" class="toggle-checkbox">
+              </div>
+
+              <!-- Glasses Frame Shape -->
+              <div class="setting-item full-width-item" id="setting-glasses-shape-row">
+                <label class="setting-label" for="setting-pet-glasses-shape">Glasses Frame Shape</label>
+                <select id="setting-pet-glasses-shape" class="terminal-select full-width">
+                  <option value="round" selected>Round (Classic Circular)</option>
+                  <option value="square">Square (Retro Geek)</option>
+                  <option value="cateye">Cat-Eye (Chic & Winged)</option>
+                  <option value="oval">Oval (Soft & Friendly)</option>
+                  <option value="aviator">Aviator (Double-Bridge)</option>
+                </select>
+              </div>
+
+              <!-- Glasses Frame Color -->
+              <div class="setting-item full-width-item" id="setting-glasses-color-row">
+                <label class="setting-label" for="setting-pet-glasses-color">Glasses Frame Color</label>
+                <div class="color-picker-row">
+                  <input type="color" id="setting-pet-glasses-color" value="#181820">
+                  <input type="text" id="disp-pet-glasses-color" class="terminal-input mono" value="#181820" readonly>
+                  <button type="button" class="theme-btn-secondary" id="btn-glasses-color-dark" title="Classic Dark">Classic Dark</button>
+                  <button type="button" class="theme-btn-secondary" id="btn-glasses-color-accent" title="Match Accent Color">Accent Color</button>
+                </div>
+              </div>
+
+              <!-- Eyes Color Picker -->
+              <div class="setting-item full-width-item">
+                <label class="setting-label" for="setting-pet-eyescolor">Eyes Color</label>
+                <div class="color-picker-row">
+                  <input type="color" id="setting-pet-eyescolor" value="#181820">
+                  <input type="text" id="disp-pet-eyescolor" class="terminal-input mono" value="#181820" readonly>
+                  <button type="button" class="theme-btn-secondary" id="btn-eyescolor-dark" title="Classic Dark">Classic Dark</button>
+                  <button type="button" class="theme-btn-secondary" id="btn-eyescolor-accent" title="Match Accent">Accent</button>
+                </div>
+              </div>
+
+              <!-- Mouth Color Picker -->
+              <div class="setting-item full-width-item">
+                <label class="setting-label" for="setting-pet-mouthcolor">Mouth Color</label>
+                <div class="color-picker-row">
+                  <input type="color" id="setting-pet-mouthcolor" value="#181820">
+                  <input type="text" id="disp-pet-mouthcolor" class="terminal-input mono" value="#181820" readonly>
+                  <button type="button" class="theme-btn-secondary" id="btn-mouthcolor-dark" title="Classic Dark">Classic Dark</button>
+                  <button type="button" class="theme-btn-secondary" id="btn-mouthcolor-accent" title="Match Accent">Accent</button>
+                </div>
               </div>
             </div>
           </div>

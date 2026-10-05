@@ -41,7 +41,12 @@
     depth: 80,            // 0 - 100 (3D puffy intensity)
     bodyColor: '#FFFFFF', // Hex
     primaryColor: '#FF7A2F',
-    primaryGlow: '#FF5A1F'
+    primaryGlow: '#FF5A1F',
+    glassesEnabled: false,
+    glassesShape: 'round',    // 'round', 'square', 'cateye', 'oval', 'aviator'
+    glassesColor: '#181820',   // frame color hex
+    eyesColor: '#181820',      // eyes color hex
+    mouthColor: '#181820'      // mouth color hex
   };
 
   class PetRenderer {
@@ -166,6 +171,9 @@
       const rx = cx + spacing / 2;
       const ey = cy - 6;
 
+      const frameColor = cfg.glassesColor || '#181820';
+      const shape = cfg.glassesShape || 'round';
+
       // Lens radius derived from eyeScale & spacing, clamped to body
       let r = Math.round(11 * eyeScale + 3);
       const maxAllowedR = Math.min((spacing / 2 - 2), (w / 2 - 6), (h / 2 - 8));
@@ -174,21 +182,58 @@
       const leftArmX = Math.max(x + 2, lx - r - 8);
       const rightArmX = Math.min(x + w - 2, rx + r + 8);
 
+      let leftLens = '';
+      let rightLens = '';
+      let bridge = '';
+
+      switch (shape) {
+        case 'square':
+          leftLens = `<rect x="${(lx - r).toFixed(1)}" y="${(ey - r).toFixed(1)}" width="${(r * 2).toFixed(1)}" height="${(r * 2).toFixed(1)}" rx="4" ry="4" fill="none" stroke="${frameColor}" stroke-width="2.6" />`;
+          rightLens = `<rect x="${(rx - r).toFixed(1)}" y="${(ey - r).toFixed(1)}" width="${(r * 2).toFixed(1)}" height="${(r * 2).toFixed(1)}" rx="4" ry="4" fill="none" stroke="${frameColor}" stroke-width="2.6" />`;
+          bridge = `<line x1="${(lx + r).toFixed(1)}" y1="${(ey - r*0.2).toFixed(1)}" x2="${(rx - r).toFixed(1)}" y2="${(ey - r*0.2).toFixed(1)}" stroke="${frameColor}" stroke-width="2.4" stroke-linecap="round" />`;
+          break;
+
+        case 'cateye':
+          leftLens = `<path d="M ${(lx - r - 3).toFixed(1)} ${(ey - r - 2).toFixed(1)} Q ${(lx + r).toFixed(1)} ${(ey - r + 1).toFixed(1)}, ${(lx + r).toFixed(1)} ${(ey + 1).toFixed(1)} Q ${(lx + r * 0.5).toFixed(1)} ${(ey + r).toFixed(1)}, ${(lx - r * 0.5).toFixed(1)} ${(ey + r).toFixed(1)} Q ${(lx - r).toFixed(1)} ${(ey + r * 0.5).toFixed(1)}, ${(lx - r - 3).toFixed(1)} ${(ey - r - 2).toFixed(1)} Z" fill="none" stroke="${frameColor}" stroke-width="2.6" stroke-linejoin="round" />`;
+          rightLens = `<path d="M ${(rx + r + 3).toFixed(1)} ${(ey - r - 2).toFixed(1)} Q ${(rx - r).toFixed(1)} ${(ey - r + 1).toFixed(1)}, ${(rx - r).toFixed(1)} ${(ey + 1).toFixed(1)} Q ${(rx - r * 0.5).toFixed(1)} ${(ey + r).toFixed(1)}, ${(rx + r * 0.5).toFixed(1)} ${(ey + r).toFixed(1)} Q ${(rx + r).toFixed(1)} ${(ey + r * 0.5).toFixed(1)}, ${(rx + r + 3).toFixed(1)} ${(ey - r - 2).toFixed(1)} Z" fill="none" stroke="${frameColor}" stroke-width="2.6" stroke-linejoin="round" />`;
+          bridge = `<path d="M ${(lx + r).toFixed(1)} ${ey} Q ${cx} ${(ey - 3.5).toFixed(1)}, ${(rx - r).toFixed(1)} ${ey}" stroke="${frameColor}" stroke-width="2.4" stroke-linecap="round" fill="none" />`;
+          break;
+
+        case 'oval':
+          leftLens = `<ellipse cx="${lx}" cy="${ey}" rx="${(r * 1.15).toFixed(1)}" ry="${(r * 0.85).toFixed(1)}" fill="none" stroke="${frameColor}" stroke-width="2.6" />`;
+          rightLens = `<ellipse cx="${rx}" cy="${ey}" rx="${(r * 1.15).toFixed(1)}" ry="${(r * 0.85).toFixed(1)}" fill="none" stroke="${frameColor}" stroke-width="2.6" />`;
+          bridge = `<path d="M ${(lx + r * 1.15).toFixed(1)} ${ey} Q ${cx} ${(ey - 3).toFixed(1)}, ${(rx - r * 1.15).toFixed(1)} ${ey}" stroke="${frameColor}" stroke-width="2.4" stroke-linecap="round" fill="none" />`;
+          break;
+
+        case 'aviator':
+          leftLens = `<path d="M ${(lx - r).toFixed(1)} ${(ey - r*0.7).toFixed(1)} Q ${(lx + r*0.8).toFixed(1)} ${(ey - r*0.9).toFixed(1)}, ${(lx + r).toFixed(1)} ${(ey - r*0.2).toFixed(1)} Q ${(lx + r*1.05).toFixed(1)} ${(ey + r*0.8).toFixed(1)}, ${(lx).toFixed(1)} ${(ey + r*1.1).toFixed(1)} Q ${(lx - r*1.05).toFixed(1)} ${(ey + r*0.6).toFixed(1)}, ${(lx - r).toFixed(1)} ${(ey - r*0.7).toFixed(1)} Z" fill="none" stroke="${frameColor}" stroke-width="2.4" stroke-linejoin="round" />`;
+          rightLens = `<path d="M ${(rx + r).toFixed(1)} ${(ey - r*0.7).toFixed(1)} Q ${(rx - r*0.8).toFixed(1)} ${(ey - r*0.9).toFixed(1)}, ${(rx - r).toFixed(1)} ${(ey - r*0.2).toFixed(1)} Q ${(rx - r*1.05).toFixed(1)} ${(ey + r*0.8).toFixed(1)}, ${(rx).toFixed(1)} ${(ey + r*1.1).toFixed(1)} Q ${(rx + r*1.05).toFixed(1)} ${(ey + r*0.6).toFixed(1)}, ${(rx + r).toFixed(1)} ${(ey - r*0.7).toFixed(1)} Z" fill="none" stroke="${frameColor}" stroke-width="2.4" stroke-linejoin="round" />`;
+          bridge = `
+            <line x1="${(lx + r*0.7).toFixed(1)}" y1="${(ey - r*0.75).toFixed(1)}" x2="${(rx - r*0.7).toFixed(1)}" y2="${(ey - r*0.75).toFixed(1)}" stroke="${frameColor}" stroke-width="2.0" />
+            <path d="M ${(lx + r*0.9).toFixed(1)} ${ey} Q ${cx} ${(ey - 2).toFixed(1)}, ${(rx - r*0.9).toFixed(1)} ${ey}" stroke="${frameColor}" stroke-width="2.0" stroke-linecap="round" fill="none" />
+          `;
+          break;
+
+        case 'round':
+        default:
+          leftLens = `<circle cx="${lx}" cy="${ey}" r="${r}" fill="none" stroke="${frameColor}" stroke-width="2.6" />`;
+          rightLens = `<circle cx="${rx}" cy="${ey}" r="${r}" fill="none" stroke="${frameColor}" stroke-width="2.6" />`;
+          bridge = `<path d="M ${(lx + r).toFixed(1)} ${ey} Q ${cx} ${(ey - 3.5).toFixed(1)}, ${(rx - r).toFixed(1)} ${ey}" stroke="${frameColor}" stroke-width="2.4" stroke-linecap="round" fill="none" />`;
+          break;
+      }
+
       return `
-        <g class="facebot-glasses" id="facebot-glasses">
-          <!-- Left Lens Frame -->
-          <circle cx="${lx}" cy="${ey}" r="${r}" fill="none" stroke="#111111" stroke-width="2.6" />
-          <!-- Right Lens Frame -->
-          <circle cx="${rx}" cy="${ey}" r="${r}" fill="none" stroke="#111111" stroke-width="2.6" />
-          <!-- Center Bridge Arch -->
-          <path d="M ${(lx + r).toFixed(1)} ${ey} Q ${cx} ${(ey - 3.5).toFixed(1)}, ${(rx - r).toFixed(1)} ${ey}" stroke="#111111" stroke-width="2.4" stroke-linecap="round" fill="none" />
+        <g class="facebot-glasses shape-${shape}" id="facebot-glasses">
+          ${leftLens}
+          ${rightLens}
+          ${bridge}
           <!-- Left Temple Arm -->
-          <line x1="${(lx - r).toFixed(1)}" y1="${ey}" x2="${leftArmX.toFixed(1)}" y2="${(ey - 1.5).toFixed(1)}" stroke="#111111" stroke-width="2.2" stroke-linecap="round" />
+          <line x1="${(lx - r).toFixed(1)}" y1="${ey}" x2="${leftArmX.toFixed(1)}" y2="${(ey - 1.5).toFixed(1)}" stroke="${frameColor}" stroke-width="2.2" stroke-linecap="round" />
           <!-- Right Temple Arm -->
-          <line x1="${(rx + r).toFixed(1)}" y1="${ey}" x2="${rightArmX.toFixed(1)}" y2="${(ey - 1.5).toFixed(1)}" stroke="#111111" stroke-width="2.2" stroke-linecap="round" />
+          <line x1="${(rx + r).toFixed(1)}" y1="${ey}" x2="${rightArmX.toFixed(1)}" y2="${(ey - 1.5).toFixed(1)}" stroke="${frameColor}" stroke-width="2.2" stroke-linecap="round" />
           <!-- Subtle specular reflection glint on upper lenses -->
-          <line x1="${(lx - r*0.5).toFixed(1)}" y1="${(ey - r*0.5).toFixed(1)}" x2="${(lx - r*0.1).toFixed(1)}" y2="${(ey - r*0.8).toFixed(1)}" stroke="rgba(255,255,255,0.45)" stroke-width="1.2" stroke-linecap="round" />
-          <line x1="${(rx - r*0.5).toFixed(1)}" y1="${(ey - r*0.5).toFixed(1)}" x2="${(rx - r*0.1).toFixed(1)}" y2="${(ey - r*0.8).toFixed(1)}" stroke="rgba(255,255,255,0.45)" stroke-width="1.2" stroke-linecap="round" />
+          <line x1="${(lx - r*0.5).toFixed(1)}" y1="${(ey - r*0.5).toFixed(1)}" x2="${(lx - r*0.1).toFixed(1)}" y2="${(ey - r*0.8).toFixed(1)}" stroke="rgba(255,255,255,0.55)" stroke-width="1.3" stroke-linecap="round" />
+          <line x1="${(rx - r*0.5).toFixed(1)}" y1="${(ey - r*0.5).toFixed(1)}" x2="${(rx - r*0.1).toFixed(1)}" y2="${(ey - r*0.8).toFixed(1)}" stroke="rgba(255,255,255,0.55)" stroke-width="1.3" stroke-linecap="round" />
         </g>
       `;
     }
@@ -267,7 +312,8 @@
      * Renders eyes and mouth for the requested emotion using dynamic geometry
      */
     getEmotionFace(emotion, p, cfg, { eyeX, eyeY, isBlinking, cx, cy, d }) {
-      const c = this.featureColor;
+      const c = cfg.eyesColor || this.featureColor;
+      const mc = cfg.mouthColor || this.featureColor;
       const themeCol = cfg.primaryColor || '#FF7A2F';
 
       // Dynamic Eye Geometry
@@ -312,7 +358,7 @@
               ${rim(rx, ey, baseRx, baseRy)}
               <ellipse class="eye-left" cx="${lx}" cy="${ey}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
               <ellipse class="eye-right" cx="${rx}" cy="${ey}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
-              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${my}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" />
+              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${my}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" />
             </g>
           `;
 
@@ -323,7 +369,7 @@
             <g ${filterAttr}>
               <path class="eye-left" d="M ${(lx - arcW)} ${(ey + 2)} Q ${lx} ${(ey - 10)}, ${(lx + +arcW)} ${(ey + 2)}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <path class="eye-right" d="M ${(rx - arcW)} ${(ey + 2)} Q ${rx} ${(ey - 10)}, ${(rx + +arcW)} ${(ey + 2)}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 3)} Q ${cx} ${(my + 7)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 3)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 3)} Q ${cx} ${(my + 7)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 3)}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
               <ellipse cx="${(lx - baseRx * 1.8).toFixed(1)}" cy="${(ey + 12)}" rx="${(6 * eyeScale).toFixed(1)}" ry="${(3.5 * eyeScale).toFixed(1)}" fill="${themeCol}" opacity="0.25" />
               <ellipse cx="${(rx + baseRx * 1.8).toFixed(1)}" cy="${(ey + 12)}" rx="${(6 * eyeScale).toFixed(1)}" ry="${(3.5 * eyeScale).toFixed(1)}" fill="${themeCol}" opacity="0.25" />
             </g>
@@ -338,7 +384,7 @@
               <ellipse class="eye-right" cx="${rx}" cy="${(ey + 2)}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
               <path d="M ${(lx - 8)} ${(ey - 7)} Q ${lx} ${(ey - 5)}, ${(lx + 8)} ${(ey - 9)}" stroke="${c}" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.6" />
               <path d="M ${(rx - 8)} ${(ey - 9)} Q ${rx} ${(ey - 5)}, ${(rx + 8)} ${(ey - 7)}" stroke="${c}" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.6" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my + 3)} Q ${cx} ${(my - 5)}, ${(cx + mWidth/2).toFixed(1)} ${(my + 3)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my + 3)} Q ${cx} ${(my - 5)}, ${(cx + mWidth/2).toFixed(1)} ${(my + 3)}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
             </g>
           `;
 
@@ -351,7 +397,7 @@
               <circle cx="${(lx + 3).toFixed(1)}" cy="${(ey - 3).toFixed(1)}" r="${(bigR * 0.3).toFixed(1)}" fill="#FFFFFF" />
               <circle class="eye-right" cx="${rx}" cy="${ey}" r="${bigR}" fill="${c}" />
               <circle cx="${(rx + 3).toFixed(1)}" cy="${(ey - 3).toFixed(1)}" r="${(bigR * 0.3).toFixed(1)}" fill="#FFFFFF" />
-              <ellipse class="mouth" cx="${cx}" cy="${(my + 1)}" rx="${(mWidth * 0.3).toFixed(1)}" ry="${(mWidth * 0.42).toFixed(1)}" stroke="${c}" stroke-width="2.2" fill="none" />
+              <ellipse class="mouth" cx="${cx}" cy="${(my + 1)}" rx="${(mWidth * 0.3).toFixed(1)}" ry="${(mWidth * 0.42).toFixed(1)}" stroke="${mc}" stroke-width="2.2" fill="none" />
             </g>
           `;
         }
@@ -363,7 +409,7 @@
             <g ${filterAttr}>
               <path class="eye-left" d="M ${(lx - slitW)} ${(ey + 1)} Q ${lx} ${(ey - 1)}, ${(lx + +slitW)} ${(ey + 1)}" stroke="${c}" stroke-width="${(2.6 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <path class="eye-right" d="M ${(rx - slitW)} ${(ey + 1)} Q ${rx} ${(ey - 1)}, ${(rx + +slitW)} ${(ey + 1)}" stroke="${c}" stroke-width="${(2.6 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
-              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${my}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" />
+              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${my}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" />
               <g class="sleep-z-drift">
                 <text x="${(rx + 12)}" y="${(ey - 18)}" font-family="'Outfit', sans-serif" font-size="12" font-weight="700" fill="${themeCol}" opacity="0.8">z</text>
                 <text x="${(rx + 22)}" y="${(ey - 30)}" font-family="'Outfit', sans-serif" font-size="15" font-weight="800" fill="${themeCol}">Z</text>
@@ -379,7 +425,7 @@
             <g ${filterAttr}>
               <path class="eye-left" d="M ${(lx - arcW)} ${(ey)} Q ${lx} ${(ey + 5)}, ${(lx + +arcW)} ${(ey)}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <path class="eye-right" d="M ${(rx - arcW)} ${(ey)} Q ${rx} ${(ey + 5)}, ${(rx + +arcW)} ${(ey)}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
-              <line class="mouth" x1="${(cx - mWidth/2.5).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2.5).toFixed(1)}" y2="${my}" stroke="${c}" stroke-width="2" stroke-linecap="round" />
+              <line class="mouth" x1="${(cx - mWidth/2.5).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2.5).toFixed(1)}" y2="${my}" stroke="${mc}" stroke-width="2" stroke-linecap="round" />
               <g class="sleep-z-drift">
                 <text x="${(rx + 10)}" y="${(ey - 16)}" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="${themeCol}" opacity="0.6">z</text>
                 <text x="${(rx + 20)}" y="${(ey - 30)}" font-family="'Outfit', sans-serif" font-size="15" font-weight="800" fill="${themeCol}" opacity="0.8">z</text>
@@ -397,7 +443,7 @@
               <line x1="${(rx + 9)}" y1="${(ey - 10)}" x2="${(rx - 8)}" y2="${(ey - 4)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round" />
               <ellipse class="eye-left" cx="${lx}" cy="${(ey + 2)}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
               <ellipse class="eye-right" cx="${rx}" cy="${(ey + 2)}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
-              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${my}" stroke="${c}" stroke-width="2.4" stroke-linecap="round" />
+              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${my}" stroke="${mc}" stroke-width="2.4" stroke-linecap="round" />
             </g>
           `;
 
@@ -410,7 +456,7 @@
                     fill="${themeCol}" filter="url(#${p}-accent-glow)" />
               <path class="eye-right" d="M ${rx} ${(ey + 3)} C ${rx} ${(ey + 3)}, ${(rx - hw)} ${(ey - 4)}, ${(rx - hw)} ${(ey - 9)} C ${(rx - hw)} ${(ey - 13)}, ${(rx - hw/2)} ${(ey - 15)}, ${rx} ${(ey - 12)} C ${(rx + hw/2)} ${(ey - 15)}, ${(rx + +hw)} ${(ey - 13)}, ${(rx + +hw)} ${(ey - 9)} C ${(rx + +hw)} ${(ey - 4)}, ${rx} ${(ey + 3)}, ${rx} ${(ey + 3)} Z" 
                     fill="${themeCol}" filter="url(#${p}-accent-glow)" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 2)} Q ${cx} ${(my + 6)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 2)} Q ${cx} ${(my + 6)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
               <polygon points="${(rx + 18)},${(ey - 26)} ${(rx + 20)},${(ey - 22)} ${(rx + 24)},${(ey - 20)} ${(rx + 20)},${(ey - 18)} ${(rx + 18)},${(ey - 14)} ${(rx + 16)},${(ey - 18)} ${(rx + 12)},${(ey - 20)} ${(rx + 16)},${(ey - 22)}" fill="${themeCol}" opacity="0.8" />
             </g>
           `;
@@ -424,7 +470,7 @@
               <path class="eye-left" d="M ${(lx - arcW)} ${(ey + 2)} Q ${lx} ${(ey - 10)}, ${(lx + +arcW)} ${(ey + 2)}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <ellipse class="eye-right" cx="${rx}" cy="${ey}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
               <circle cx="${(rx + 2).toFixed(1)}" cy="${(ey - 3).toFixed(1)}" r="${(baseRx * 0.35).toFixed(1)}" fill="#FFFFFF" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 1)} Q ${(cx + 2)} ${(my + 5)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 4)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 1)} Q ${(cx + 2)} ${(my + 5)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 4)}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
             </g>
           `;
         }
@@ -436,7 +482,7 @@
             <g ${filterAttr}>
               <path class="eye-left" d="M ${(lx - arcW)} ${(ey + 2)} Q ${lx} ${(ey - 12)}, ${(lx + +arcW)} ${(ey + 2)}" stroke="${c}" stroke-width="${(3 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <path class="eye-right" d="M ${(rx - arcW)} ${(ey + 2)} Q ${rx} ${(ey - 12)}, ${(rx + +arcW)} ${(ey + 2)}" stroke="${c}" stroke-width="${(3 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
-              <path class="mouth" d="M ${(cx - mWidth * 0.7).toFixed(1)} ${(my - 4)} Q ${cx} ${(my + 13)}, ${(cx + mWidth * 0.7).toFixed(1)} ${(my - 4)} Z" fill="${c}" />
+              <path class="mouth" d="M ${(cx - mWidth * 0.7).toFixed(1)} ${(my - 4)} Q ${cx} ${(my + 13)}, ${(cx + mWidth * 0.7).toFixed(1)} ${(my - 4)} Z" fill="${mc}" />
               <ellipse cx="${(lx - baseRx * 1.8).toFixed(1)}" cy="${(ey + 12)}" rx="${(6.5 * eyeScale).toFixed(1)}" ry="${(4 * eyeScale).toFixed(1)}" fill="${themeCol}" opacity="0.3" />
               <ellipse cx="${(rx + baseRx * 1.8).toFixed(1)}" cy="${(ey + 12)}" rx="${(6.5 * eyeScale).toFixed(1)}" ry="${(4 * eyeScale).toFixed(1)}" fill="${themeCol}" opacity="0.3" />
             </g>
@@ -449,7 +495,7 @@
             <g ${filterAttr}>
               <ellipse class="eye-left thinking-eye" cx="${(lx - 5)}" cy="${(ey - 6)}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
               <ellipse class="eye-right thinking-eye" cx="${(rx - 5)}" cy="${(ey - 6)}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} Q ${(cx - mWidth/4).toFixed(1)} ${(my - 3)}, ${cx} ${my} Q ${(cx + mWidth/4).toFixed(1)} ${(my + 3)}, ${(cx + mWidth/2).toFixed(1)} ${my}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} Q ${(cx - mWidth/4).toFixed(1)} ${(my - 3)}, ${cx} ${my} Q ${(cx + mWidth/4).toFixed(1)} ${(my + 3)}, ${(cx + mWidth/2).toFixed(1)} ${my}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
               <g class="thought-dots-bubble" transform="translate(${(rx + 8)}, ${(ey - 62)})">
                 <rect x="0" y="0" width="30" height="20" rx="10" ry="10" fill="#FFFFFF" stroke="${themeCol}" stroke-width="1.6" filter="url(#${p}-soft-shadow)" />
                 <circle cx="8" cy="10" r="2.2" fill="${themeCol}" />
@@ -482,7 +528,7 @@
             <g ${filterAttr}>
               <ellipse class="eye-left" cx="${lx}" cy="${ey}" rx="${fRx}" ry="${fRy}" fill="${c}" />
               <ellipse class="eye-right" cx="${rx}" cy="${ey}" rx="${fRx}" ry="${fRy}" fill="${c}" />
-              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${my}" stroke="${c}" stroke-width="2.4" stroke-linecap="round" />
+              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${my}" stroke="${mc}" stroke-width="2.4" stroke-linecap="round" />
             </g>
           `;
         }
@@ -495,7 +541,7 @@
             <g ${filterAttr} opacity="0.85">
               <path class="eye-left" d="M ${(lx - slitW)} ${(ey + 1)} Q ${lx} ${(ey - 2)}, ${(lx + +slitW)} ${(ey + 1)}" stroke="${c}" stroke-width="${(2.4 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <path class="eye-right" d="M ${(rx - slitW)} ${(ey + 1)} Q ${rx} ${(ey - 2)}, ${(rx + +slitW)} ${(ey + 1)}" stroke="${c}" stroke-width="${(2.4 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
-              <path class="mouth" d="M ${(cx - mWidth/2.5).toFixed(1)} ${(my + 2)} Q ${cx} ${(my - 2)}, ${(cx + mWidth/2.5).toFixed(1)} ${(my + 2)}" stroke="${c}" stroke-width="2.0" stroke-linecap="round" fill="none" opacity="0.8" />
+              <path class="mouth" d="M ${(cx - mWidth/2.5).toFixed(1)} ${(my + 2)} Q ${cx} ${(my - 2)}, ${(cx + mWidth/2.5).toFixed(1)} ${(my + 2)}" stroke="${mc}" stroke-width="2.0" stroke-linecap="round" fill="none" opacity="0.8" />
             </g>
           `;
         }
@@ -508,7 +554,7 @@
               <line x1="${(rx + 10)}" y1="${(ey - 9)}" x2="${(rx - 8)}" y2="${(ey - 3)}" stroke="${c}" stroke-width="2.6" stroke-linecap="round" />
               <ellipse class="eye-left" cx="${lx}" cy="${(ey + 2)}" rx="${baseRx}" ry="${(baseRy * 0.85).toFixed(1)}" fill="${c}" />
               <ellipse class="eye-right" cx="${rx}" cy="${(ey + 2)}" rx="${baseRx}" ry="${(baseRy * 0.85).toFixed(1)}" fill="${c}" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} L ${(cx - mWidth/6).toFixed(1)} ${(my + 3)} L ${(cx + mWidth/6).toFixed(1)} ${(my - 3)} L ${(cx + mWidth/2).toFixed(1)} ${my}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} L ${(cx - mWidth/6).toFixed(1)} ${(my + 3)} L ${(cx + mWidth/6).toFixed(1)} ${(my - 3)} L ${(cx + mWidth/2).toFixed(1)} ${my}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
             </g>
           `;
         }
@@ -521,7 +567,7 @@
               <ellipse class="eye-right" cx="${rx}" cy="${(ey + 3)}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
               <path d="M ${(lx - 8)} ${(ey - 6)} Q ${lx} ${(ey - 4)}, ${(lx + 8)} ${(ey - 8)}" stroke="${c}" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.6" />
               <path d="M ${(rx - 8)} ${(ey - 8)} Q ${rx} ${(ey - 4)}, ${(rx + 8)} ${(ey - 6)}" stroke="${c}" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.6" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my + 2)} Q ${cx} ${(my - 4)}, ${(cx + mWidth/2).toFixed(1)} ${(my + 2)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my + 2)} Q ${cx} ${(my - 4)}, ${(cx + mWidth/2).toFixed(1)} ${(my + 2)}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
               <!-- Battery Badge -->
               <g transform="translate(${(rx + 16)}, ${(ey - 28)})">
                 <rect x="0" y="0" width="18" height="10" rx="2" ry="2" fill="none" stroke="#EF4444" stroke-width="1.5" />
@@ -540,7 +586,7 @@
               <!-- Sparkle / Lightning Eyes -->
               <polygon points="${lx},${(ey - 9)} ${(lx + 4)},${(ey - 1)} ${lx},${(ey - 1)} ${(lx + 3)},${(ey + 7)} ${(lx - 4)},${(ey + 1)} ${(lx - 1)},${(ey + 1)}" fill="${themeCol}" filter="url(#${p}-accent-glow)" />
               <polygon points="${rx},${(ey - 9)} ${(rx + 4)},${(ey - 1)} ${rx},${(ey - 1)} ${(rx + 3)},${(ey + 7)} ${(rx - 4)},${(ey + 1)} ${(rx - 1)},${(ey + 1)}" fill="${themeCol}" filter="url(#${p}-accent-glow)" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 2)} Q ${cx} ${(my + 7)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 2)} Q ${cx} ${(my + 7)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${mc}" stroke-width="2.4" stroke-linecap="round" fill="none" />
             </g>
           `;
         }
@@ -553,7 +599,7 @@
             <g ${filterAttr}>
               <path class="eye-left" d="M ${(lx - arcW)} ${(ey + 2)} Q ${lx} ${(ey - 11)}, ${(lx + +arcW)} ${(ey + 2)}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <path class="eye-right" d="M ${(rx - arcW)} ${(ey + 2)} Q ${rx} ${(ey - 11)}, ${(rx + +arcW)} ${(ey + 2)}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 2)} Q ${cx} ${(my + 8)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 2)} Q ${cx} ${(my + 8)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${mc}" stroke-width="2.4" stroke-linecap="round" fill="none" />
               <!-- Floating Musical Notes -->
               <g class="vibing-notes" transform="translate(${(rx + 16)}, ${(ey - 28)})">
                 <path d="M 0 10 L 0 2 C 0 2 6 0 9 4 L 9 12 M 0 5 L 9 7" stroke="${themeCol}" stroke-width="1.6" fill="none" stroke-linecap="round" />
@@ -577,7 +623,7 @@
               <circle cx="${(lx + 2).toFixed(1)}" cy="${(ey - 2).toFixed(1)}" r="${(bigR * 0.28).toFixed(1)}" fill="#FFFFFF" />
               <circle class="eye-right" cx="${rx}" cy="${ey}" r="${bigR}" fill="${c}" />
               <circle cx="${(rx + 2).toFixed(1)}" cy="${(ey - 2).toFixed(1)}" r="${(bigR * 0.28).toFixed(1)}" fill="#FFFFFF" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} Q ${(cx - mWidth/4).toFixed(1)} ${(my - 4)}, ${cx} ${my} Q ${(cx + mWidth/4).toFixed(1)} ${(my + 4)}, ${(cx + mWidth/2).toFixed(1)} ${my}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} Q ${(cx - mWidth/4).toFixed(1)} ${(my - 4)}, ${cx} ${my} Q ${(cx + mWidth/4).toFixed(1)} ${(my + 4)}, ${(cx + mWidth/2).toFixed(1)} ${my}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
               <!-- Blue Sweat Drop SVG -->
               <path d="M ${(rx + 18)} ${(ey - 16)} C ${(rx + 18)} ${(ey - 16)}, ${(rx + 12)} ${(ey - 8)}, ${(rx + 12)} ${(ey - 4)} C ${(rx + 12)} ${(ey - 1)}, ${(rx + 15)} ${(ey + 1)}, ${(rx + 18)} ${(ey + 1)} C ${(rx + 21)} ${(ey + 1)}, ${(rx + 24)} ${(ey - 1)}, ${(rx + 24)} ${(ey - 4)} C ${(rx + 24)} ${(ey - 8)}, ${(rx + 18)} ${(ey - 16)}, ${(rx + 18)} ${(ey - 16)} Z" fill="#38BDF8" opacity="0.9" />
             </g>
@@ -592,7 +638,7 @@
               <ellipse class="eye-left" cx="${lx}" cy="${(ey - 2)}" rx="${(baseRx * 1.25).toFixed(1)}" ry="${(baseRy * 1.25).toFixed(1)}" fill="${c}" />
               <line x1="${(rx - 7)}" y1="${ey}" x2="${(rx + 7)}" y2="${ey}" stroke="${c}" stroke-width="2.8" stroke-linecap="round" />
               <!-- Wavy Mouth -->
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my + 2)} Q ${(cx - mWidth/6).toFixed(1)} ${(my - 3)}, ${cx} ${(my + 1)} Q ${(cx + mWidth/4).toFixed(1)} ${(my + 5)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my + 2)} Q ${(cx - mWidth/6).toFixed(1)} ${(my - 3)}, ${cx} ${(my + 1)} Q ${(cx + mWidth/4).toFixed(1)} ${(my + 5)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
               <!-- Question Mark -->
               <text x="${(rx + 14)}" y="${(ey - 16)}" font-family="'Outfit', sans-serif" font-size="16" font-weight="800" fill="${themeCol}">?</text>
             </g>
@@ -607,7 +653,7 @@
             <g ${filterAttr}>
               <path class="eye-left" d="M ${(lx - arcW)} ${(ey + 1)} Q ${lx} ${(ey - 7)}, ${(lx + +arcW)} ${(ey + 1)}" stroke="${c}" stroke-width="${(2.6 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <path class="eye-right" d="M ${(rx - arcW)} ${(ey + 1)} Q ${rx} ${(ey - 7)}, ${(rx + +arcW)} ${(ey + 1)}" stroke="${c}" stroke-width="${(2.6 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 1)} Q ${cx} ${(my + 4)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 1)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 1)} Q ${cx} ${(my + 4)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 1)}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
             </g>
           `;
         }
@@ -619,7 +665,7 @@
             <g ${filterAttr}>
               <line x1="${(lx - slitW/2).toFixed(1)}" y1="${ey}" x2="${(lx + slitW/2).toFixed(1)}" y2="${ey}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" />
               <line x1="${(rx - slitW/2).toFixed(1)}" y1="${ey}" x2="${(rx + slitW/2).toFixed(1)}" y2="${ey}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" />
-              <path class="mouth" d="M ${(cx - mWidth/2.5).toFixed(1)} ${(my - 1)} Q ${cx} ${(my + 4)}, ${(cx + mWidth/2.5).toFixed(1)} ${(my - 1)}" stroke="${c}" stroke-width="2.0" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2.5).toFixed(1)} ${(my - 1)} Q ${cx} ${(my + 4)}, ${(cx + mWidth/2.5).toFixed(1)} ${(my - 1)}" stroke="${mc}" stroke-width="2.0" stroke-linecap="round" fill="none" />
             </g>
           `;
         }
@@ -634,7 +680,7 @@
               <!-- Yawn Tear Drop on eye -->
               <path d="M ${(lx - arcW - 4)} ${(ey + 3)} C ${(lx - arcW - 4)} ${(ey + 3)}, ${(lx - arcW - 6)} ${(ey + 7)}, ${(lx - arcW - 4)} ${(ey + 8)} A 2 2 0 0 0 ${(lx - arcW - 2)} ${(ey + 7)} Z" fill="#38BDF8" opacity="0.85" />
               <!-- Open Yawn Mouth -->
-              <ellipse class="mouth" cx="${cx}" cy="${(my + 3)}" rx="${(mWidth * 0.35).toFixed(1)}" ry="${(mWidth * 0.55).toFixed(1)}" fill="${c}" />
+              <ellipse class="mouth" cx="${cx}" cy="${(my + 3)}" rx="${(mWidth * 0.35).toFixed(1)}" ry="${(mWidth * 0.55).toFixed(1)}" fill="${mc}" />
             </g>
           `;
         }
@@ -650,7 +696,7 @@
               <line x1="${(rx - xSize)}" y1="${(ey - xSize)}" x2="${(rx + +xSize)}" y2="${(ey + +xSize)}" stroke="${c}" stroke-width="${(2.6 * eyeScale).toFixed(1)}" stroke-linecap="round" />
               <line x1="${(rx + +xSize)}" y1="${(ey - xSize)}" x2="${(rx - xSize)}" y2="${(ey + +xSize)}" stroke="${c}" stroke-width="${(2.6 * eyeScale).toFixed(1)}" stroke-linecap="round" />
               <!-- Wavy spiral mouth -->
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} Q ${(cx - mWidth/4).toFixed(1)} ${(my - 4)}, ${cx} ${my} Q ${(cx + mWidth/4).toFixed(1)} ${(my + 4)}, ${(cx + mWidth/2).toFixed(1)} ${my}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} Q ${(cx - mWidth/4).toFixed(1)} ${(my - 4)}, ${cx} ${my} Q ${(cx + mWidth/4).toFixed(1)} ${(my + 4)}, ${(cx + mWidth/2).toFixed(1)} ${my}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
               <!-- Dizzy spiral above head -->
               <path d="M ${(rx + 8)} ${(ey - 22)} A 4 4 0 0 1 ${(rx + 14)} ${(ey - 26)} A 6 6 0 0 1 ${(rx + 20)} ${(ey - 20)} A 8 8 0 0 1 ${(rx + 12)} ${(ey - 12)}" fill="none" stroke="${themeCol}" stroke-width="1.8" stroke-linecap="round" />
             </g>
@@ -666,7 +712,7 @@
               <circle cx="${(lx + 2).toFixed(1)}" cy="${(ey - 1).toFixed(1)}" r="${(shyW * 0.35).toFixed(1)}" fill="#FFFFFF" />
               <ellipse class="eye-right" cx="${rx}" cy="${(ey + 1)}" rx="${shyW}" ry="${(baseRy * 0.85).toFixed(1)}" fill="${c}" />
               <circle cx="${(rx + 2).toFixed(1)}" cy="${(ey - 1).toFixed(1)}" r="${(shyW * 0.35).toFixed(1)}" fill="#FFFFFF" />
-              <path class="mouth" d="M ${(cx - mWidth/3).toFixed(1)} ${(my - 1)} Q ${cx} ${(my + 4)}, ${(cx + mWidth/3).toFixed(1)} ${(my - 1)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/3).toFixed(1)} ${(my - 1)} Q ${cx} ${(my + 4)}, ${(cx + mWidth/3).toFixed(1)} ${(my - 1)}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
               <!-- Vibrant Pink Blush with hatch marks -->
               <ellipse cx="${(lx - baseRx * 1.6).toFixed(1)}" cy="${(ey + 11)}" rx="${(7 * eyeScale).toFixed(1)}" ry="${(4 * eyeScale).toFixed(1)}" fill="#F43F5E" opacity="0.45" />
               <ellipse cx="${(rx + baseRx * 1.6).toFixed(1)}" cy="${(ey + 11)}" rx="${(7 * eyeScale).toFixed(1)}" ry="${(4 * eyeScale).toFixed(1)}" fill="#F43F5E" opacity="0.45" />
@@ -686,7 +732,7 @@
               <polygon points="${lx},${(ey - 9)} ${(lx + 3)},${(ey - 3)} ${(lx + 9)},${ey} ${(lx + 3)},${(ey + 3)} ${lx},${(ey + 9)} ${(lx - 3)},${(ey + 3)} ${(lx - 9)},${ey} ${(lx - 3)},${(ey - 3)}" fill="${themeCol}" filter="url(#${p}-accent-glow)" />
               <polygon points="${rx},${(ey - 9)} ${(rx + 3)},${(ey - 3)} ${(rx + 9)},${ey} ${(rx + 3)},${(ey + 3)} ${rx},${(ey + 9)} ${(rx - 3)},${(ey + 3)} ${(rx - 9)},${ey} ${(rx - 3)},${(ey - 3)}" fill="${themeCol}" filter="url(#${p}-accent-glow)" />
               <!-- Wide excited open smile -->
-              <path class="mouth" d="M ${(cx - mWidth*0.65).toFixed(1)} ${(my - 3)} Q ${cx} ${(my + 12)}, ${(cx + mWidth*0.65).toFixed(1)} ${(my - 3)} Z" fill="${c}" />
+              <path class="mouth" d="M ${(cx - mWidth*0.65).toFixed(1)} ${(my - 3)} Q ${cx} ${(my + 12)}, ${(cx + mWidth*0.65).toFixed(1)} ${(my - 3)} Z" fill="${mc}" />
               <!-- Sparkle Bursts -->
               <polygon points="${(rx + 18)},${(ey - 18)} ${(rx + 20)},${(ey - 16)} ${(rx + 22)},${(ey - 18)} ${(rx + 20)},${(ey - 20)}" fill="${themeCol}" opacity="0.9" />
               <polygon points="${(lx - 20)},${(ey - 14)} ${(lx - 18)},${(ey - 12)} ${(lx - 16)},${(ey - 14)} ${(lx - 18)},${(ey - 16)}" fill="${themeCol}" opacity="0.9" />
@@ -704,7 +750,7 @@
               <circle cx="${rx}" cy="${ey}" r="${bigR}" fill="none" stroke="${c}" stroke-width="2" />
               <circle cx="${rx}" cy="${ey}" r="${(baseRx * 0.35).toFixed(1)}" fill="${c}" />
               <!-- Chatter mouth -->
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} Q ${(cx - mWidth/4).toFixed(1)} ${(my - 3)}, ${cx} ${my} Q ${(cx + mWidth/4).toFixed(1)} ${(my + 3)}, ${(cx + mWidth/2).toFixed(1)} ${my}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} Q ${(cx - mWidth/4).toFixed(1)} ${(my - 3)}, ${cx} ${my} Q ${(cx + mWidth/4).toFixed(1)} ${(my + 3)}, ${(cx + mWidth/2).toFixed(1)} ${my}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
               <!-- Vertical purple stress lines on brow -->
               <line x1="${(cx - 8)}" y1="${(ey - 22)}" x2="${(cx - 8)}" y2="${(ey - 13)}" stroke="#818CF8" stroke-width="1.6" stroke-linecap="round" opacity="0.8" />
               <line x1="${cx}" y1="${(ey - 24)}" x2="${cx}" y2="${(ey - 13)}" stroke="#818CF8" stroke-width="1.6" stroke-linecap="round" opacity="0.8" />
@@ -720,7 +766,7 @@
             <g ${filterAttr}>
               <line x1="${(lx - slitW)}" y1="${ey}" x2="${(lx + +slitW)}" y2="${ey}" stroke="${c}" stroke-width="${(3.2 * eyeScale).toFixed(1)}" stroke-linecap="round" />
               <line x1="${(rx - slitW)}" y1="${ey}" x2="${(rx + +slitW)}" y2="${ey}" stroke="${c}" stroke-width="${(3.2 * eyeScale).toFixed(1)}" stroke-linecap="round" />
-              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${(my - 1)}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${(my + 3)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round" />
+              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${(my - 1)}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${(my + 3)}" stroke="${mc}" stroke-width="2.4" stroke-linecap="round" />
               <!-- Annoyance cross mark -->
               <path d="M ${(rx + 12)} ${(ey - 20)} L ${(rx + 20)} ${(ey - 20)} M ${(rx + 16)} ${(ey - 24)} L ${(rx + 16)} ${(ey - 16)}" stroke="#EF4444" stroke-width="2" stroke-linecap="round" />
             </g>
@@ -735,7 +781,7 @@
               <!-- Droopy half-lids -->
               <path class="eye-left" d="M ${(lx - bW)} ${ey} L ${(lx + +bW)} ${ey} A ${bW} ${(bW * 0.9)} 0 0 1 ${(lx - bW)} ${ey} Z" fill="${c}" />
               <path class="eye-right" d="M ${(rx - bW)} ${ey} L ${(rx + +bW)} ${ey} A ${bW} ${(bW * 0.9)} 0 0 1 ${(rx - bW)} ${ey} Z" fill="${c}" />
-              <line class="mouth" x1="${(cx - mWidth/3).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/3).toFixed(1)}" y2="${my}" stroke="${c}" stroke-width="2.0" stroke-linecap="round" />
+              <line class="mouth" x1="${(cx - mWidth/3).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/3).toFixed(1)}" y2="${my}" stroke="${mc}" stroke-width="2.0" stroke-linecap="round" />
             </g>
           `;
         }
@@ -749,7 +795,7 @@
               <path class="eye-left" d="M ${(lx - arcW)} ${(ey + 1)} Q ${lx} ${(ey - 9)}, ${(lx + +arcW)} ${(ey + 1)}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <path class="eye-right" d="M ${(rx - arcW)} ${(ey + 1)} Q ${rx} ${(ey - 9)}, ${(rx + +arcW)} ${(ey + 1)}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <!-- Smug smirk -->
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} Q ${cx} ${(my + 2)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 4)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${my} Q ${cx} ${(my + 2)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 4)}" stroke="${mc}" stroke-width="2.4" stroke-linecap="round" fill="none" />
               <!-- Sparkle shine -->
               <polygon points="${(rx + 16)},${(ey - 6)} ${(rx + 18)},${(ey - 4)} ${(rx + 20)},${(ey - 6)} ${(rx + 18)},${(ey - 8)}" fill="${themeCol}" />
             </g>
@@ -766,7 +812,7 @@
               <ellipse class="eye-left" cx="${lx}" cy="${(ey + 2)}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
               <ellipse class="eye-right" cx="${rx}" cy="${(ey + 2)}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
               <!-- Quivering frown mouth -->
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my + 3)} Q ${cx} ${(my - 4)}, ${(cx + mWidth/2).toFixed(1)} ${(my + 3)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my + 3)} Q ${cx} ${(my - 4)}, ${(cx + mWidth/2).toFixed(1)} ${(my + 3)}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
             </g>
           `;
         }
@@ -778,7 +824,7 @@
             <g ${filterAttr}>
               <path class="eye-left" d="M ${(lx - arcW)} ${ey} Q ${lx} ${(ey - 8)}, ${(lx + +arcW)} ${ey}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <path class="eye-right" d="M ${(rx - arcW)} ${ey} Q ${rx} ${(ey - 8)}, ${(rx + +arcW)} ${ey}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 2)} Q ${cx} ${(my + 6)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 2)} Q ${cx} ${(my + 6)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
               <!-- Pink blush -->
               <ellipse cx="${(lx - baseRx * 1.5).toFixed(1)}" cy="${(ey + 10)}" rx="${(6 * eyeScale).toFixed(1)}" ry="${(3.5 * eyeScale).toFixed(1)}" fill="#F43F5E" opacity="0.4" />
               <ellipse cx="${(rx + baseRx * 1.5).toFixed(1)}" cy="${(ey + 10)}" rx="${(6 * eyeScale).toFixed(1)}" ry="${(3.5 * eyeScale).toFixed(1)}" fill="#F43F5E" opacity="0.4" />
@@ -795,7 +841,7 @@
             <g ${filterAttr}>
               <path class="eye-left" d="M ${(lx - arcW)} ${(ey + 1)} Q ${lx} ${(ey - 9)}, ${(lx + +arcW)} ${(ey + 1)}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
               <path class="eye-right" d="M ${(rx - arcW)} ${(ey + 1)} Q ${rx} ${(ey - 9)}, ${(rx + +arcW)} ${(ey + 1)}" stroke="${c}" stroke-width="${(2.8 * eyeScale).toFixed(1)}" stroke-linecap="round" fill="none" />
-              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 2)} Q ${cx} ${(my + 6)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" fill="none" />
+              <path class="mouth" d="M ${(cx - mWidth/2).toFixed(1)} ${(my - 2)} Q ${cx} ${(my + 6)}, ${(cx + mWidth/2).toFixed(1)} ${(my - 2)}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" fill="none" />
               <!-- Cute waving little robot hand -->
               <g class="waving-hand" transform="translate(${(rx + 18)}, ${(ey - 6)})">
                 <path d="M 0 6 C 0 6, 6 2, 8 -4 C 9 -7, 6 -9, 4 -7 C 2 -5, 0 0, 0 0" stroke="${c}" stroke-width="2.4" stroke-linecap="round" fill="none" />
@@ -811,7 +857,7 @@
             <g ${filterAttr}>
               <ellipse class="eye-left" cx="${lx}" cy="${ey}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
               <ellipse class="eye-right" cx="${rx}" cy="${ey}" rx="${baseRx}" ry="${baseRy}" fill="${c}" />
-              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${my}" stroke="${c}" stroke-width="2.2" stroke-linecap="round" />
+              <line class="mouth" x1="${(cx - mWidth/2).toFixed(1)}" y1="${my}" x2="${(cx + mWidth/2).toFixed(1)}" y2="${my}" stroke="${mc}" stroke-width="2.2" stroke-linecap="round" />
             </g>
           `;
       }

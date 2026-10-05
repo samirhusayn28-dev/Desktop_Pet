@@ -110,15 +110,13 @@ function createTray() {
       {
         label: 'Open Chat & Assistant',
         click: () => {
-          showPanel();
-          if (panelWindow) panelWindow.webContents.send('panel:switch-tab', 'chat');
+          showPanel('chat');
         }
       },
       {
         label: 'Settings...',
         click: () => {
-          showPanel();
-          if (panelWindow) panelWindow.webContents.send('panel:switch-tab', 'settings');
+          showPanel('settings');
         }
       },
       { type: 'separator' },
@@ -220,6 +218,15 @@ function createPetWindow() {
   petWindow.setIgnoreMouseEvents(true, { forward: true });
   isPetHoveredOrInside = false;
 
+  petWindow.on('blur', () => {
+    if (isQuickMenuOpen) {
+      isQuickMenuOpen = false;
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:close-menu');
+      }
+    }
+  });
+
   petWindow.on('moved', () => {
     if (petWindow && store.get('settings.general.rememberPosition') !== false) {
       const [x, y] = petWindow.getPosition();
@@ -247,6 +254,7 @@ function createPetWindow() {
  * Includes 2px hysteresis to prevent edge jitter.
  */
 let isPetHoveredOrInside = false;
+let isQuickMenuOpen = false;
 let unexpandedPetBounds = null;
 let activeBubbleMetrics = null;
 
@@ -298,6 +306,11 @@ function isCursorInPetHitArea(screenX, screenY) {
   // Quick bounds reject outside pet window
   if (screenX < winX || screenX > winX + winW || screenY < winY || screenY > winY + winH) {
     return false;
+  }
+
+  // When quick context menu is open, the window must remain fully interactive
+  if (isQuickMenuOpen) {
+    return true;
   }
 
   const relX = screenX - winX;
@@ -362,7 +375,7 @@ function isCursorInPetHitArea(screenX, screenY) {
 let stillCount = 0;
 
 function pollCursorTick() {
-  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || petIdleState === 'sleeping') {
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || petIdleState === 'sleeping' || isQuickMenuOpen) {
     return;
   }
 
@@ -617,14 +630,22 @@ function createPanelWindow() {
   });
 
   panelWindow.webContents.on('did-finish-load', () => {
-    if (updateChecker && updateChecker.getLatestResult() && panelWindow && !panelWindow.isDestroyed()) {
-      // Send cached update status to panel (shows banner)
+    if (!panelWindow || panelWindow.isDestroyed()) return;
+
+    // Send cached update status to panel (shows banner)
+    if (updateChecker && updateChecker.getLatestResult()) {
       panelWindow.webContents.send('update:status', {
         result: updateChecker.getLatestResult(),
         isManual: false
       });
-      // Also re-trigger pet bubble so user notices the update (not just a silent banner)
+      // Also re-trigger pet bubble so user notices the update
       updateChecker.notifyPetOfCachedUpdate();
+    }
+
+    // Deliver any queued tab switch (e.g. "Settings" from right-click menu)
+    if (pendingPanelTab) {
+      panelWindow.webContents.send('panel:switch-tab', pendingPanelTab);
+      pendingPanelTab = null;
     }
   });
 
@@ -639,12 +660,21 @@ function createPanelWindow() {
   });
 }
 
-function showPanel() {
+// Tab queued to switch to after the panel window finishes loading
+let pendingPanelTab = null;
+
+function showPanel(tab) {
+  if (tab) pendingPanelTab = tab;
   if (!panelWindow || panelWindow.isDestroyed()) {
     createPanelWindow();
   } else {
     panelWindow.show();
     panelWindow.focus();
+    // If panel was already open, switch tab immediately
+    if (pendingPanelTab && !panelWindow.isDestroyed()) {
+      panelWindow.webContents.send('panel:switch-tab', pendingPanelTab);
+      pendingPanelTab = null;
+    }
   }
 }
 
@@ -861,10 +891,8 @@ ipcMain.on('panel:toggle', () => {
 });
 
 ipcMain.on('panel:open', (e, opts) => {
-  showPanel();
-  if (opts && opts.tab && panelWindow && !panelWindow.isDestroyed()) {
-    panelWindow.webContents.send('panel:switch-tab', opts.tab);
-  }
+  const tab = opts && opts.tab ? opts.tab : null;
+  showPanel(tab);
 });
 
 ipcMain.on('panel:close', () => {
@@ -967,9 +995,19 @@ ipcMain.on('pet:drag-end', () => {
 
 ipcMain.on('pet:set-ignore-mouse-events', (e, ignore) => {
   if (dragStartPos) return; // Keep accepting events while dragging
+  if (isQuickMenuOpen && ignore) return; // Never ignore mouse while quick menu is open
   if (petWindow && !petWindow.isDestroyed()) {
     isPetHoveredOrInside = !ignore;
     petWindow.setIgnoreMouseEvents(ignore, { forward: true });
+  }
+});
+
+ipcMain.on('pet:menu-state', (e, isOpen) => {
+  isQuickMenuOpen = !!isOpen;
+  if (petWindow && !petWindow.isDestroyed()) {
+    isPetHoveredOrInside = isQuickMenuOpen;
+    petWindow.setIgnoreMouseEvents(!isQuickMenuOpen, { forward: true });
+    petWindow.webContents.send('pet:inside-change', isPetHoveredOrInside);
   }
 });
 
@@ -1207,9 +1245,9 @@ ipcMain.on('reminders:reschedule', (e, id) => {
   scheduler.reschedule(id);
 });
 
-ipcMain.on('reminders:updated', () => {
-  // Check if any reminder is due right now or was due in the last 2 minutes
-  scheduler.evaluateNow();
+ipcMain.on('reminders:updated', (e, freshReminders) => {
+  // Pass fresh data directly so evaluateNow avoids re-reading potentially stale store
+  scheduler.evaluateNow(Array.isArray(freshReminders) ? freshReminders : undefined);
 });
 
 ipcMain.on('window:set-always-on-top', (e, val) => {

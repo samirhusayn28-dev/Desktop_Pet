@@ -135,34 +135,31 @@ class Scheduler {
 
       if (rem.repeat === 'every-hour') {
         triggerKey = `${todayDateStr}-${currentHours}`;
-        if (rMins === currentMins && rem.lastTriggered !== triggerKey) {
-          isDue = true;
-          rem.lastTriggered = triggerKey;
-          updated = true;
-        }
+        isDue = (rMins === currentMins);
       } else if (rem.repeat === 'daily') {
         triggerKey = todayDateStr;
-        if (isTimeMatch && rem.lastTriggered !== triggerKey) {
-          isDue = true;
-          rem.lastTriggered = triggerKey;
-          updated = true;
-        }
+        isDue = isTimeMatch;
       } else {
         // repeat: 'once'
         triggerKey = todayDateStr;
-        if (isTimeMatch && rem.lastTriggered !== triggerKey) {
-          isDue = true;
-          rem.lastTriggered = triggerKey;
-          rem.enabled = false;
-          updated = true;
-        }
+        isDue = isTimeMatch;
       }
 
-      const sessionKey = `${rem.id}:${triggerKey || todayDateStr}`;
-      if (isDue && !this.firedThisSession.has(sessionKey)) {
-        this.firedThisSession.add(sessionKey);
-        this.triggerReminder(rem, false);
-      }
+      if (!isDue) continue;
+
+      // Already fired today (persisted)?
+      if (rem.lastTriggered === triggerKey) continue;
+
+      // Already fired in this session?
+      const sessionKey = `${rem.id}:${triggerKey}`;
+      if (this.firedThisSession.has(sessionKey)) continue;
+
+      // Mark as fired
+      this.firedThisSession.add(sessionKey);
+      rem.lastTriggered = triggerKey;
+      if (rem.repeat === 'once') rem.enabled = false;
+      updated = true;
+      this.triggerReminder(rem, false);
     }
 
     if (updated) {
@@ -172,14 +169,32 @@ class Scheduler {
 
   /**
    * Called immediately when reminders:updated IPC is received (user added/edited a reminder).
-   * Checks if any enabled reminder is due RIGHT NOW or was due within the last 2 minutes.
+   * Accepts fresh reminder data directly from the panel so we never hit the store
+   * read-after-write race condition (renderer store.set → IPC → main store.get).
+   *
+   * Only fires if a reminder is due RIGHT NOW or was due within the last 2 minutes.
    */
-  evaluateNow() {
+  evaluateNow(freshReminders) {
     const now = new Date();
-    const reminders = store.get('reminders') || [];
+    // Use provided fresh data; fall back to store if not provided
+    const reminders = Array.isArray(freshReminders) ? freshReminders : (store.get('reminders') || []);
     let updated = false;
     const todayDateStr = now.toDateString();
     const nowTotalMins = now.getHours() * 60 + now.getMinutes();
+
+    if (Array.isArray(freshReminders)) {
+      // Clear session locks for reminders that are enabled and have no lastTriggered
+      for (const rem of reminders) {
+        if (rem.enabled && !rem.lastTriggered) {
+          for (const key of [...this.firedThisSession]) {
+            if (key.startsWith(`${rem.id}:`)) {
+              this.firedThisSession.delete(key);
+            }
+          }
+        }
+      }
+      store.set('reminders', reminders);
+    }
 
     for (const rem of reminders) {
       if (!rem.enabled) continue;
@@ -191,7 +206,8 @@ class Scheduler {
 
       const remTotalMins = rHours * 60 + rMins;
       // Fire if reminder is within [now - 2min, now]
-      const isCurrentOrJustPast = (nowTotalMins - remTotalMins) >= 0 && (nowTotalMins - remTotalMins) <= 2;
+      const diff = nowTotalMins - remTotalMins;
+      const isCurrentOrJustPast = diff >= 0 && diff <= 2;
 
       if (!isCurrentOrJustPast) continue;
 
@@ -215,7 +231,13 @@ class Scheduler {
     }
 
     if (updated) {
-      this._saveAndNotify(reminders);
+      // Write merged state back to store using fresh data
+      store.set('reminders', reminders);
+      try {
+        if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
+          this.panelWindowRef.webContents.send('reminders:changed', reminders);
+        }
+      } catch (e) {}
     }
   }
 

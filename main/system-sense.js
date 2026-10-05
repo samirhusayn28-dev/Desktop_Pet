@@ -68,6 +68,31 @@ interface IMMDeviceEnumerator {
 class MMDeviceEnumeratorCOM {}
 
 public class PixieAudio {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SYSTEM_POWER_STATUS {
+        public byte ACLineStatus;
+        public byte BatteryFlag;
+        public byte BatteryLifePercent;
+        public byte SystemStatusFlag;
+        public int BatteryLifeTime;
+        public int BatteryFullLifeTime;
+    }
+
+    [DllImport("kernel32.dll")]
+    public static extern bool GetSystemPowerStatus(out SYSTEM_POWER_STATUS sps);
+
+    public static string BatteryState() {
+        try {
+            SYSTEM_POWER_STATUS sps;
+            if (GetSystemPowerStatus(out sps)) {
+                int pct = (int)sps.BatteryLifePercent;
+                bool chg = (sps.ACLineStatus == 1);
+                if (pct <= 100) return pct + "," + (chg ? "true" : "false");
+            }
+        } catch {}
+        return "NA";
+    }
+
     static IMMDevice GetDevice() {
         var e = (IMMDeviceEnumerator)(new MMDeviceEnumeratorCOM());
         IMMDevice dev;
@@ -112,14 +137,20 @@ public class PixieAudio {
 }
 '@ -ErrorAction SilentlyContinue 2>$null
 
+$script:lastDevId = ""
+$script:lastIsHp = "false"
+
 function Get-PixieFastAudio {
     $audio = [PixieAudio]::AudioState()
     $isHp = "false"
     try {
         $parts = $audio.Split(',')
         $devId = if ($parts.Length -ge 4) { $parts[3] } else { "" }
-        if ($devId) {
-            $reg = "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render\\$devId\\Properties"
+        if ($devId -and $devId -eq $script:lastDevId) {
+            $isHp = $script:lastIsHp
+        } elseif ($devId) {
+            $script:lastDevId = $devId
+            $reg = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\$devId\Properties"
             $p = Get-ItemProperty -Path $reg -ErrorAction SilentlyContinue
             if ($p) {
                 $desc = "" + $p.'{a45c254e-df1c-4efd-8020-67d146a850e0},2' + " " + $p.'{b3f8fa53-0004-438e-9002-d4c46f370a0f},6'
@@ -127,6 +158,7 @@ function Get-PixieFastAudio {
                     $isHp = "true"
                 }
             }
+            $script:lastIsHp = $isHp
         }
     } catch {}
     return "$audio;$isHp"
@@ -193,6 +225,15 @@ let _winPsBuffer = '';
 let _winPsSeq = 0;
 const _winPsPending = new Map();
 let _winPsReady = false;
+const _onWinPsReadyCallbacks = [];
+
+function onWinPsReady(cb) {
+  if (_winPsReady) {
+    try { cb(); } catch (e) {}
+  } else {
+    _onWinPsReadyCallbacks.push(cb);
+  }
+}
 
 function ensureWinPs() {
   if (_winPsProc && !_winPsProc.killed) return;
@@ -208,7 +249,14 @@ function ensureWinPs() {
       for (const raw of lines) {
         const line = raw.replace(/\r/g, '').trim();
         if (!line) continue;
-        if (line === 'PIXIE_READY') { _winPsReady = true; continue; }
+        if (line === 'PIXIE_READY') {
+          _winPsReady = true;
+          while (_onWinPsReadyCallbacks.length) {
+            const cb = _onWinPsReadyCallbacks.shift();
+            try { cb(); } catch (e) {}
+          }
+          continue;
+        }
         const match = line.match(/^PX_RES:(\d+):(.*)$/);
         if (match) {
           const id = parseInt(match[1], 10);
@@ -376,6 +424,9 @@ class SystemSense {
     // so volume is available from first poll (PS compilation takes ~1-2s)
     if (process.platform === 'win32') {
       ensureWinPs();
+      onWinPsReady(() => {
+        this.checkVolume();
+      });
     }
 
     this.startVolumeWatcher();
@@ -495,9 +546,9 @@ class SystemSense {
         if (powerMonitor) idle = powerMonitor.getSystemIdleTime();
       } catch (e) {}
 
-      // Poll 400ms while active (<30s idle) or in test mode, 1200ms otherwise (instant reactions, near zero CPU)
+      // Poll 300ms while active (<30s idle) or in test mode, 800ms otherwise (instant reactions, near zero CPU)
       const isTestMode = process.argv.includes('--test-hooks');
-      const delay = (isTestMode || (idle < 30 && !this.isSleeping && !this.isScreenLocked && !this.isSuspended)) ? 400 : 1200;
+      const delay = (isTestMode || (idle < 30 && !this.isSleeping && !this.isScreenLocked && !this.isSuspended)) ? 300 : 800;
 
       this.volumeTimer = setTimeout(async () => {
         if (this.isCheckingVolume) return;
@@ -550,6 +601,7 @@ class SystemSense {
           const vol = parseInt(audioParts[0], 10);
           const muted = (audioParts[1] || '').trim() === 'true';
           const peak = parseInt(audioParts[2], 10) || 0;
+          this.lastAudioPeak = peak;
 
           if (!isNaN(vol)) {
             this._applyVolumeBandLogic(vol, muted);
@@ -649,32 +701,8 @@ class SystemSense {
     return new Promise((resolve) => {
       // ── Windows branch ──────────────────────────────────────────────────
       if (process.platform === 'win32') {
-        const doWmic = () => {
-          execFile('wmic', [
-            '/namespace:\\\\root\\wmi',
-            'path', 'WmiMonitorBrightness',
-            'get', 'CurrentBrightness',
-            '/format:value'
-          ], { timeout: 3000, windowsHide: true }, (err, stdout) => {
-            if (err || !stdout) {
-              this.state.brightnessAvailable = false;
-              return resolve();
-            }
-            const match = stdout.match(/CurrentBrightness=(\d+)/i);
-            if (!match) {
-              this.state.brightnessAvailable = false;
-              return resolve();
-            }
-            this.state.brightnessAvailable = true;
-            const pct = parseInt(match[1], 10);
-            this.state.brightnessLevel = pct;
-            this._applyBrightnessBandLogic(pct);
-            resolve();
-          });
-        };
-
         if (_winPsReady) {
-          winPsQuery('Get-PixieBrightness', 2000).then((res) => {
+          winPsQuery('Get-PixieBrightness', 1500).then((res) => {
             if (res && res !== 'NA') {
               const pct = parseInt(res.trim(), 10);
               if (!isNaN(pct)) {
@@ -684,13 +712,15 @@ class SystemSense {
                 return resolve();
               }
             }
-            doWmic();
-          }).catch(() => doWmic());
+            this.state.brightnessAvailable = false;
+            resolve();
+          }).catch(() => {
+            this.state.brightnessAvailable = false;
+            resolve();
+          });
           return;
         }
-
-        doWmic();
-        return;
+        return resolve();
       }
 
       // ── Not macOS or Windows — skip ──────────────────────────────────────
@@ -772,39 +802,38 @@ class SystemSense {
           resolve();
         });
       } else if (process.platform === 'win32') {
-        // Windows: use wmic to get battery status
-        execFile('wmic', ['path', 'Win32_Battery', 'get', 'BatteryStatus,EstimatedChargeRemaining', '/format:csv'],
-          { timeout: 4000, windowsHide: true },
-          (err, stdout) => {
-            if (err || !stdout || !stdout.includes(',')) return resolve();
-            // CSV: Node,BatteryStatus,EstimatedChargeRemaining
-            // BatteryStatus: 1=Discharging, 2=AC/Charging, 4=Charging, 6=Charging&High
-            const lines = stdout.trim().split('\n').filter(l => l.includes(',') && !l.toLowerCase().includes('batterystatus'));
-            if (!lines.length) return resolve();
-            const parts = lines[0].trim().split(',');
-            // parts: [node, BatteryStatus, EstimatedChargeRemaining]
-            const statusCode = parseInt(parts[1], 10);
-            const pct = parseInt(parts[2], 10);
-            if (isNaN(pct)) return resolve();
-            // BatteryStatus 2 = On AC Power (no battery or full), 6 = Charging and High
-            const isCharging = (statusCode === 2 || statusCode === 4 || statusCode === 6);
-            this.processBatteryState(pct, isCharging);
-            resolve();
-          }
-        );
-      } else {
-        // Fallback: try systeminformation
-        try {
-          const si = require('systeminformation');
-          si.battery().then(b => {
-            if (b && b.hasBattery) {
-              this.processBatteryState(b.percent || 100, b.isCharging);
+        if (_winPsReady) {
+          winPsQuery('[PixieAudio]::BatteryState()', 1200).then((res) => {
+            if (res && res !== 'NA' && res.includes(',')) {
+              const [pctStr, chgStr] = res.trim().split(',');
+              const pct = parseInt(pctStr, 10);
+              const isCharging = chgStr.toLowerCase() === 'true';
+              if (!isNaN(pct)) {
+                this.processBatteryState(pct, isCharging);
+                return resolve();
+              }
             }
-            resolve();
-          }).catch(() => resolve());
-        } catch { resolve(); }
+            this._fallbackBattery(resolve);
+          }).catch(() => this._fallbackBattery(resolve));
+        } else {
+          this._fallbackBattery(resolve);
+        }
+      } else {
+        this._fallbackBattery(resolve);
       }
     });
+  }
+
+  _fallbackBattery(resolve) {
+    try {
+      const si = require('systeminformation');
+      si.battery().then(b => {
+        if (b && b.hasBattery) {
+          this.processBatteryState(b.percent || 100, b.isCharging);
+        }
+        resolve();
+      }).catch(() => resolve());
+    } catch { resolve(); }
   }
 
   processBatteryState(pct, isCharging) {
@@ -907,29 +936,11 @@ class SystemSense {
 
   // Windows: detect if any media/audio process is actively playing audio.
   // Strategy: check for known media player processes + browser processes
-  // which are the most common sources of audio on Windows.
   async checkWindowsAudioState() {
-    return new Promise((resolve) => {
-      // Query running process names via wmic (lightweight)
-      execFile('wmic', ['process', 'get', 'name', '/format:csv'],
-        { timeout: 3000, windowsHide: true },
-        (err, stdout) => {
-          if (err || !stdout) return resolve(false);
-          const lower = stdout.toLowerCase();
-          // Media players and browsers that commonly play audio
-          const mediaApps = [
-            'spotify.exe', 'vlc.exe', 'wmplayer.exe', 'groove.exe',
-            'musicapp.exe', 'itunes.exe', 'foobar2000.exe', 'aimp.exe',
-            'winamp.exe', 'mpc-hc64.exe', 'mpc-hc.exe', 'potplayer64.exe',
-            'potplayer.exe', 'mplayerc.exe', 'windowsmediaplayer.exe',
-            'chrome.exe', 'firefox.exe', 'msedge.exe', 'opera.exe',
-            'brave.exe', 'vivaldi.exe', 'iexplore.exe'
-          ];
-          const isPlaying = mediaApps.some(app => lower.includes(app));
-          resolve(isPlaying);
-        }
-      );
-    });
+    if (typeof this.lastAudioPeak === 'number') {
+      return this.lastAudioPeak >= 5;
+    }
+    return false;
   }
 
   getJxaTrackTitle() {

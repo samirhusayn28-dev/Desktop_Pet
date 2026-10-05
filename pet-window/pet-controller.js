@@ -280,9 +280,26 @@ class FaceBotController {
     this.bubbleEl.style.setProperty('--bubble-top', `${bubbleTop}px`);
   }
 
+  setBulbActive(active) {
+    const root = document.getElementById('pet-root-container');
+    const viewport = document.getElementById('pet-viewport');
+    if (active) {
+      if (root) root.classList.add('pet-bulb-active');
+      if (viewport) viewport.classList.add('pet-bulb-active');
+    } else {
+      const isBubbleVisible = this.bubbleEl && this.bubbleEl.style.display !== 'none' && !this.bubbleEl.classList.contains('fade-out');
+      const isMenuVisible = this.menuEl && !this.menuEl.classList.contains('hidden');
+      if (!isBubbleVisible && !isMenuVisible) {
+        if (root) root.classList.remove('pet-bulb-active');
+        if (viewport) viewport.classList.remove('pet-bulb-active');
+      }
+    }
+  }
+
   // --- Solid Cute Material Speech Bubble ---
   showBubble({ text, badge = '', duration = 5000, sound = '', category = '', emotion = '', bounce = false }) {
     if (!this.bubbleEl || !text) return;
+    this.setBulbActive(true);
 
     this.lastBubbleData = { text, badge, duration, sound, category, emotion };
     const isFlipped = this.bubbleEl.classList.contains('flipped-below');
@@ -385,6 +402,7 @@ class FaceBotController {
       if (ipcRenderer) {
         ipcRenderer.send('pet:bubble-hidden');
       }
+      this.setBulbActive(false);
       this.bubbleHideTimeout = null;
     }, 200);
 
@@ -675,29 +693,65 @@ class FaceBotController {
     // Right Click Context Menu: only inside pet shape
     window.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      if (this.isInsidePet && this.menuEl) {
-        if (ipcRenderer) ipcRenderer.send('pet:set-ignore-mouse-events', false);
-        this.menuEl.classList.remove('hidden');
+      if ((this.isInsidePet || (this.menuEl && !this.menuEl.classList.contains('hidden'))) && this.menuEl) {
+        this.openQuickMenu(e);
       }
     });
 
     window.addEventListener('mousedown', (e) => {
-      if (this.menuEl && !this.menuEl.contains(e.target) && !this.menuEl.classList.contains('hidden')) {
-        this.menuEl.classList.add('hidden');
-        if (!this.isDragging && !this.isInsidePet && ipcRenderer) {
-          ipcRenderer.send('pet:set-ignore-mouse-events', true);
+      if (this.menuEl && !this.menuEl.classList.contains('hidden')) {
+        if (!this.menuEl.contains(e.target)) {
+          this.closeQuickMenu();
         }
       }
     });
 
     if (this.menuEl) {
       this.menuEl.querySelectorAll('.menu-item').forEach(item => {
-        item.addEventListener('click', () => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
           const action = item.dataset.action;
-          this.menuEl.classList.add('hidden');
+          this.closeQuickMenu();
           this.handleMenuAction(action);
         });
       });
+    }
+  }
+
+  openQuickMenu(e) {
+    if (!this.menuEl) return;
+    const menuW = 180;
+    const menuH = 175;
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+
+    let posX = e && typeof e.clientX === 'number' ? e.clientX - 10 : 25;
+    let posY = e && typeof e.clientY === 'number' ? e.clientY - 10 : 25;
+
+    // Clamp neatly inside pet window bounds
+    posX = Math.max(6, Math.min(winW - menuW - 6, posX));
+    posY = Math.max(6, Math.min(winH - menuH - 6, posY));
+
+    this.menuEl.style.left = `${posX}px`;
+    this.menuEl.style.top = `${posY}px`;
+    this.menuEl.classList.remove('hidden');
+    this.setBulbActive(true);
+
+    if (ipcRenderer) {
+      ipcRenderer.send('pet:menu-state', true);
+      ipcRenderer.send('pet:set-ignore-mouse-events', false);
+    }
+  }
+
+  closeQuickMenu() {
+    if (!this.menuEl || this.menuEl.classList.contains('hidden')) return;
+    this.menuEl.classList.add('hidden');
+    this.setBulbActive(false);
+    if (ipcRenderer) {
+      ipcRenderer.send('pet:menu-state', false);
+      if (!this.isInsidePet && !this.isDragging) {
+        ipcRenderer.send('pet:set-ignore-mouse-events', true);
+      }
     }
   }
 
@@ -852,6 +906,14 @@ class FaceBotController {
 
     ipcRenderer.on('pet:hide-bubble', () => {
       this.hideBubble();
+    });
+
+    ipcRenderer.on('pet:close-menu', () => {
+      this.closeQuickMenu();
+    });
+
+    ipcRenderer.on('pet:bulb-glow', (event, active) => {
+      this.setBulbActive(!!active);
     });
 
     ipcRenderer.on('pet:bubble-position', (event, { flipped }) => {

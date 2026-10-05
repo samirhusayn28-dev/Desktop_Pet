@@ -151,7 +151,7 @@ class RemindersTab {
 
     if (window.soundEffects) window.soundEffects.playTap();
     if (window.panelController?.ipcRenderer) {
-      window.panelController.ipcRenderer.send('reminders:updated');
+      window.panelController.ipcRenderer.send('reminders:updated', this.reminders);
     }
   }
 
@@ -203,7 +203,7 @@ class RemindersTab {
 
     if (window.panelController?.ipcRenderer) {
       window.panelController.ipcRenderer.send('reminders:reschedule', id);
-      window.panelController.ipcRenderer.send('reminders:updated');
+      window.panelController.ipcRenderer.send('reminders:updated', this.reminders);
     }
   }
 
@@ -225,7 +225,10 @@ class RemindersTab {
       if (window.soundEffects) window.soundEffects.playTap();
 
       if (window.panelController?.ipcRenderer) {
-        window.panelController.ipcRenderer.send('reminders:updated');
+        if (item.enabled) {
+          window.panelController.ipcRenderer.send('reminders:reschedule', id);
+        }
+        window.panelController.ipcRenderer.send('reminders:updated', this.reminders);
       }
     }
   }
@@ -299,7 +302,7 @@ class RemindersTab {
     if (window.soundEffects) window.soundEffects.playTap();
 
     if (window.panelController?.ipcRenderer) {
-      window.panelController.ipcRenderer.send('reminders:updated');
+      window.panelController.ipcRenderer.send('reminders:updated', this.reminders);
     }
   }
 

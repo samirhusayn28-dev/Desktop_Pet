@@ -15,6 +15,10 @@ const DEFAULT_PET_APPEARANCE = {
   depth: 80,            // 0 - 100 (3D intensity)
   bodyColor: '#FFFFFF', // Hex
   glassesEnabled: false,
+  glassesShape: 'round',
+  glassesColor: '#181820',
+  eyesColor: '#181820',
+  mouthColor: '#181820',
   theme: 'default'
 };
 
@@ -62,7 +66,11 @@ const CENTRAL_DEFAULTS = {
     depth: 80,
     bodyColor: '#FFFFFF',
     accentColor: '#FF7A2F',
-    glassesEnabled: false
+    glassesEnabled: false,
+    glassesShape: 'round',
+    glassesColor: '#181820',
+    eyesColor: '#181820',
+    mouthColor: '#181820'
   },
   ai: {
     activeProvider: 'gemini',
@@ -184,6 +192,25 @@ class SettingsTab {
     this.bodyColorInput = document.getElementById('setting-pet-bodycolor');
     this.dispBodyColor = document.getElementById('disp-pet-bodycolor');
     this.btnPureWhite = document.getElementById('btn-bodycolor-white');
+
+    // Glasses Frame Shape & Colors
+    this.glassesShapeSelect = document.getElementById('setting-pet-glasses-shape');
+    this.glassesColorInput = document.getElementById('setting-pet-glasses-color');
+    this.dispGlassesColor = document.getElementById('disp-pet-glasses-color');
+    this.btnGlassesDark = document.getElementById('btn-glasses-color-dark');
+    this.btnGlassesAccent = document.getElementById('btn-glasses-color-accent');
+
+    // Eyes Color
+    this.eyesColorInput = document.getElementById('setting-pet-eyescolor');
+    this.dispEyesColor = document.getElementById('disp-pet-eyescolor');
+    this.btnEyesDark = document.getElementById('btn-eyescolor-dark');
+    this.btnEyesAccent = document.getElementById('btn-eyescolor-accent');
+
+    // Mouth Color
+    this.mouthColorInput = document.getElementById('setting-pet-mouthcolor');
+    this.dispMouthColor = document.getElementById('disp-pet-mouthcolor');
+    this.btnMouthDark = document.getElementById('btn-mouthcolor-dark');
+    this.btnMouthAccent = document.getElementById('btn-mouthcolor-accent');
 
     // 5. AI Providers
     this.providerSelect = document.getElementById('setting-ai-provider');
@@ -706,6 +733,16 @@ class SettingsTab {
     if (this.bodyColorInput) this.bodyColorInput.value = a.bodyColor || '#FFFFFF';
     if (this.dispBodyColor) this.dispBodyColor.value = (a.bodyColor || '#FFFFFF').toUpperCase();
     if (this.glassesToggle) this.glassesToggle.checked = !!a.glassesEnabled;
+
+    if (this.glassesShapeSelect) this.glassesShapeSelect.value = a.glassesShape || 'round';
+    if (this.glassesColorInput) this.glassesColorInput.value = a.glassesColor || '#181820';
+    if (this.dispGlassesColor) this.dispGlassesColor.value = (a.glassesColor || '#181820').toUpperCase();
+
+    if (this.eyesColorInput) this.eyesColorInput.value = a.eyesColor || '#181820';
+    if (this.dispEyesColor) this.dispEyesColor.value = (a.eyesColor || '#181820').toUpperCase();
+
+    if (this.mouthColorInput) this.mouthColorInput.value = a.mouthColor || '#181820';
+    if (this.dispMouthColor) this.dispMouthColor.value = (a.mouthColor || '#181820').toUpperCase();
   }
 
   renderLivePreview() {
@@ -1159,6 +1196,101 @@ class SettingsTab {
         if (window.panelController && window.panelController.store) {
           window.panelController.store.set('settings.appearance.glassesEnabled', val);
         }
+      });
+    }
+
+    // Glasses Frame Shape
+    if (this.glassesShapeSelect) {
+      this.glassesShapeSelect.addEventListener('change', (e) => {
+        this.appearance.glassesShape = e.target.value;
+        this.broadcastAppearance();
+      });
+    }
+
+    // Glasses Frame Color
+    if (this.glassesColorInput) {
+      this.glassesColorInput.addEventListener('input', (e) => {
+        const col = e.target.value;
+        this.appearance.glassesColor = col;
+        if (this.dispGlassesColor) this.dispGlassesColor.value = col.toUpperCase();
+        this.broadcastAppearance();
+      });
+    }
+    if (this.btnGlassesDark) {
+      this.btnGlassesDark.addEventListener('click', () => {
+        this.appearance.glassesColor = '#181820';
+        if (this.glassesColorInput) this.glassesColorInput.value = '#181820';
+        if (this.dispGlassesColor) this.dispGlassesColor.value = '#181820';
+        this.broadcastAppearance();
+        if (window.soundEffects) window.soundEffects.playTap();
+      });
+    }
+    if (this.btnGlassesAccent) {
+      this.btnGlassesAccent.addEventListener('click', () => {
+        const accent = this.appearance.primaryColor || this.accentColorInput?.value || DEFAULT_ACCENT_COLOR;
+        this.appearance.glassesColor = accent;
+        if (this.glassesColorInput) this.glassesColorInput.value = accent;
+        if (this.dispGlassesColor) this.dispGlassesColor.value = accent.toUpperCase();
+        this.broadcastAppearance();
+        if (window.soundEffects) window.soundEffects.playTap();
+      });
+    }
+
+    // Eyes Color
+    if (this.eyesColorInput) {
+      this.eyesColorInput.addEventListener('input', (e) => {
+        const col = e.target.value;
+        this.appearance.eyesColor = col;
+        if (this.dispEyesColor) this.dispEyesColor.value = col.toUpperCase();
+        this.broadcastAppearance();
+      });
+    }
+    if (this.btnEyesDark) {
+      this.btnEyesDark.addEventListener('click', () => {
+        this.appearance.eyesColor = '#181820';
+        if (this.eyesColorInput) this.eyesColorInput.value = '#181820';
+        if (this.dispEyesColor) this.dispEyesColor.value = '#181820';
+        this.broadcastAppearance();
+        if (window.soundEffects) window.soundEffects.playTap();
+      });
+    }
+    if (this.btnEyesAccent) {
+      this.btnEyesAccent.addEventListener('click', () => {
+        const accent = this.appearance.primaryColor || this.accentColorInput?.value || DEFAULT_ACCENT_COLOR;
+        this.appearance.eyesColor = accent;
+        if (this.eyesColorInput) this.eyesColorInput.value = accent;
+        if (this.dispEyesColor) this.dispEyesColor.value = accent.toUpperCase();
+        this.broadcastAppearance();
+        if (window.soundEffects) window.soundEffects.playTap();
+      });
+    }
+
+    // Mouth Color
+    if (this.mouthColorInput) {
+      this.mouthColorInput.addEventListener('input', (e) => {
+        const col = e.target.value;
+        this.appearance.mouthColor = col;
+        if (this.dispMouthColor) this.dispMouthColor.value = col.toUpperCase();
+        this.broadcastAppearance();
+      });
+    }
+    if (this.btnMouthDark) {
+      this.btnMouthDark.addEventListener('click', () => {
+        this.appearance.mouthColor = '#181820';
+        if (this.mouthColorInput) this.mouthColorInput.value = '#181820';
+        if (this.dispMouthColor) this.dispMouthColor.value = '#181820';
+        this.broadcastAppearance();
+        if (window.soundEffects) window.soundEffects.playTap();
+      });
+    }
+    if (this.btnMouthAccent) {
+      this.btnMouthAccent.addEventListener('click', () => {
+        const accent = this.appearance.primaryColor || this.accentColorInput?.value || DEFAULT_ACCENT_COLOR;
+        this.appearance.mouthColor = accent;
+        if (this.mouthColorInput) this.mouthColorInput.value = accent;
+        if (this.dispMouthColor) this.dispMouthColor.value = accent.toUpperCase();
+        this.broadcastAppearance();
+        if (window.soundEffects) window.soundEffects.playTap();
       });
     }
 
@@ -1646,6 +1778,10 @@ class SettingsTab {
       { id: 'setting-accent-color', section: 'appearance', prop: 'accentColor', type: 'accentColor', defaultVal: CENTRAL_DEFAULTS.appearance.accentColor },
       { id: 'setting-pet-bodycolor', section: 'appearance', prop: 'bodyColor', type: 'bodyColor', defaultVal: CENTRAL_DEFAULTS.appearance.bodyColor },
       { id: 'setting-pet-glasses', section: 'appearance', prop: 'glassesEnabled', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.appearance.glassesEnabled },
+      { id: 'setting-pet-glasses-shape', section: 'appearance', prop: 'glassesShape', type: 'select', defaultVal: CENTRAL_DEFAULTS.appearance.glassesShape },
+      { id: 'setting-pet-glasses-color', section: 'appearance', prop: 'glassesColor', type: 'color', defaultVal: CENTRAL_DEFAULTS.appearance.glassesColor, dispId: 'disp-pet-glasses-color' },
+      { id: 'setting-pet-eyescolor', section: 'appearance', prop: 'eyesColor', type: 'color', defaultVal: CENTRAL_DEFAULTS.appearance.eyesColor, dispId: 'disp-pet-eyescolor' },
+      { id: 'setting-pet-mouthcolor', section: 'appearance', prop: 'mouthColor', type: 'color', defaultVal: CENTRAL_DEFAULTS.appearance.mouthColor, dispId: 'disp-pet-mouthcolor' },
 
       // 5. AI Configuration (Provider and Custom Base URL only; API Keys are NEVER reset)
       { id: 'setting-ai-provider', section: 'ai', key: 'settings.ai.activeProvider', type: 'select', defaultVal: CENTRAL_DEFAULTS.ai.activeProvider },
@@ -1782,6 +1918,18 @@ class SettingsTab {
       if (this.bodyColorInput) this.bodyColorInput.value = ctrl.defaultVal;
       if (this.dispBodyColor) this.dispBodyColor.value = ctrl.defaultVal.toUpperCase();
       this.broadcastAppearance();
+    } else if (ctrl.type === 'color') {
+      el.value = ctrl.defaultVal;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      if (ctrl.prop) {
+        this.appearance[ctrl.prop] = ctrl.defaultVal;
+        this.broadcastAppearance();
+      }
+      if (ctrl.dispId) {
+        const disp = document.getElementById(ctrl.dispId);
+        if (disp) disp.value = (ctrl.defaultVal || '').toUpperCase();
+      }
     } else if (ctrl.type === 'select') {
       el.value = ctrl.defaultVal;
       el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1860,6 +2008,9 @@ class SettingsTab {
         isDiff = (cur !== ctrl.defaultVal.toUpperCase());
       } else if (ctrl.type === 'bodyColor') {
         const cur = (this.appearance.bodyColor || el.value || '').toUpperCase();
+        isDiff = (cur !== ctrl.defaultVal.toUpperCase());
+      } else if (ctrl.type === 'color') {
+        const cur = (this.appearance[ctrl.prop] || el.value || '').toUpperCase();
         isDiff = (cur !== ctrl.defaultVal.toUpperCase());
       } else if (ctrl.type === 'select') {
         isDiff = (el.value !== ctrl.defaultVal);

@@ -89,6 +89,10 @@ class SecureStore {
           bodyColor: '#FFFFFF',
           accentColor: '#FF7A2F',
           glassesEnabled: false,
+          glassesShape: 'round',
+          glassesColor: '#181820',
+          eyesColor: '#181820',
+          mouthColor: '#181820',
           panelTransparency: 0.30,
           panelBlur: 24,
           theme: 'default'
