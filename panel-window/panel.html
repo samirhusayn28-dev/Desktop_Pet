@@ -225,6 +225,10 @@
                 <i data-lucide="play" id="icon-timer-toggle"></i>
                 <span id="text-timer-toggle">Start Focus</span>
               </button>
+              <button class="timer-ctl-btn secondary hidden" id="btn-timer-lap">
+                <i data-lucide="flag"></i>
+                <span>Lap</span>
+              </button>
               <button class="timer-ctl-btn secondary" id="btn-timer-reset">
                 <i data-lucide="rotate-ccw"></i>
                 <span>Reset</span>
@@ -235,6 +239,243 @@
             <div class="timer-stats-pill" id="timer-pet-status">
               <i data-lucide="award"></i>
               <span>Completed Sessions: <strong class="mono" id="pomodoro-count">0</strong></span>
+            </div>
+          </div>
+
+          <!-- Pomodoro Customization Card -->
+          <div class="timer-custom-card" id="timer-config-pomodoro">
+            <div class="timer-custom-card-header">
+              <div class="timer-custom-card-title">
+                <i data-lucide="sliders"></i>
+                <span>Pomodoro Settings</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="pomodoro" id="btn-reset-pomodoro" title="Reset Pomodoro settings to default">Reset section</button>
+            </div>
+            <div class="timer-custom-grid">
+              <!-- Focus Minutes -->
+              <div class="timer-custom-row">
+                <div class="timer-custom-label-wrap">
+                  <span class="timer-custom-label">Focus Duration</span>
+                  <span class="timer-custom-sub">1 – 180 min</span>
+                </div>
+                <div class="timer-stepper-wrap">
+                  <button type="button" class="timer-step-btn" data-action="dec" data-target="pomodoro-focus">−</button>
+                  <input type="number" id="pomodoro-focus-input" class="timer-step-input mono" min="1" max="180" value="25">
+                  <button type="button" class="timer-step-btn" data-action="inc" data-target="pomodoro-focus">+</button>
+                  <span class="timer-step-unit">min</span>
+                  <button type="button" class="btn-ctrl-reset" data-ctrl="pomodoro-focus" title="Reset to 25 min"><i data-lucide="rotate-ccw"></i></button>
+                </div>
+              </div>
+              <!-- Short Break Minutes -->
+              <div class="timer-custom-row">
+                <div class="timer-custom-label-wrap">
+                  <span class="timer-custom-label">Short Break</span>
+                  <span class="timer-custom-sub">1 – 180 min</span>
+                </div>
+                <div class="timer-stepper-wrap">
+                  <button type="button" class="timer-step-btn" data-action="dec" data-target="pomodoro-short-break">−</button>
+                  <input type="number" id="pomodoro-short-break-input" class="timer-step-input mono" min="1" max="180" value="5">
+                  <button type="button" class="timer-step-btn" data-action="inc" data-target="pomodoro-short-break">+</button>
+                  <span class="timer-step-unit">min</span>
+                  <button type="button" class="btn-ctrl-reset" data-ctrl="pomodoro-short-break" title="Reset to 5 min"><i data-lucide="rotate-ccw"></i></button>
+                </div>
+              </div>
+              <!-- Long Break Minutes -->
+              <div class="timer-custom-row">
+                <div class="timer-custom-label-wrap">
+                  <span class="timer-custom-label">Long Break</span>
+                  <span class="timer-custom-sub">1 – 180 min</span>
+                </div>
+                <div class="timer-stepper-wrap">
+                  <button type="button" class="timer-step-btn" data-action="dec" data-target="pomodoro-long-break">−</button>
+                  <input type="number" id="pomodoro-long-break-input" class="timer-step-input mono" min="1" max="180" value="15">
+                  <button type="button" class="timer-step-btn" data-action="inc" data-target="pomodoro-long-break">+</button>
+                  <span class="timer-step-unit">min</span>
+                  <button type="button" class="btn-ctrl-reset" data-ctrl="pomodoro-long-break" title="Reset to 15 min"><i data-lucide="rotate-ccw"></i></button>
+                </div>
+              </div>
+              <!-- Sessions Before Long Break -->
+              <div class="timer-custom-row">
+                <div class="timer-custom-label-wrap">
+                  <span class="timer-custom-label">Sessions Before Long Break</span>
+                  <span class="timer-custom-sub">1 – 20 cycles</span>
+                </div>
+                <div class="timer-stepper-wrap">
+                  <button type="button" class="timer-step-btn" data-action="dec" data-target="pomodoro-sessions">−</button>
+                  <input type="number" id="pomodoro-sessions-input" class="timer-step-input mono" min="1" max="20" value="4">
+                  <button type="button" class="timer-step-btn" data-action="inc" data-target="pomodoro-sessions">+</button>
+                  <span class="timer-step-unit"></span>
+                  <button type="button" class="btn-ctrl-reset" data-ctrl="pomodoro-sessions" title="Reset to 4"><i data-lucide="rotate-ccw"></i></button>
+                </div>
+              </div>
+              <!-- Auto-Start Next Phase -->
+              <div class="timer-custom-row">
+                <div class="timer-custom-label-wrap">
+                  <span class="timer-custom-label">Auto-start Next Phase</span>
+                  <span class="timer-custom-sub">Automatically transition focus and break</span>
+                </div>
+                <div class="timer-switch-wrap">
+                  <label class="terminal-switch">
+                    <input type="checkbox" id="pomodoro-autostart-toggle">
+                    <span class="slider round"></span>
+                  </label>
+                  <button type="button" class="btn-ctrl-reset" data-ctrl="pomodoro-autostart" title="Reset to OFF"><i data-lucide="rotate-ccw"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Standalone Short Break Card -->
+          <div class="timer-custom-card hidden" id="timer-config-short-break">
+            <div class="timer-custom-card-header">
+              <div class="timer-custom-card-title">
+                <i data-lucide="coffee"></i>
+                <span>Short Break Duration</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="short-break" id="btn-reset-short-break" title="Reset to default">Reset section</button>
+            </div>
+            <div class="timer-custom-grid">
+              <div class="timer-custom-row">
+                <div class="timer-custom-label-wrap">
+                  <span class="timer-custom-label">Duration</span>
+                  <span class="timer-custom-sub">1 – 180 min</span>
+                </div>
+                <div class="timer-stepper-wrap">
+                  <button type="button" class="timer-step-btn" data-action="dec" data-target="standalone-short-break">−</button>
+                  <input type="number" id="standalone-short-break-input" class="timer-step-input mono" min="1" max="180" value="5">
+                  <button type="button" class="timer-step-btn" data-action="inc" data-target="standalone-short-break">+</button>
+                  <span class="timer-step-unit">min</span>
+                  <button type="button" class="btn-ctrl-reset" data-ctrl="standalone-short-break" title="Reset to 5 min"><i data-lucide="rotate-ccw"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Standalone Long Break Card -->
+          <div class="timer-custom-card hidden" id="timer-config-long-break">
+            <div class="timer-custom-card-header">
+              <div class="timer-custom-card-title">
+                <i data-lucide="sun"></i>
+                <span>Long Break Duration</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="long-break" id="btn-reset-long-break" title="Reset to default">Reset section</button>
+            </div>
+            <div class="timer-custom-grid">
+              <div class="timer-custom-row">
+                <div class="timer-custom-label-wrap">
+                  <span class="timer-custom-label">Duration</span>
+                  <span class="timer-custom-sub">1 – 180 min</span>
+                </div>
+                <div class="timer-stepper-wrap">
+                  <button type="button" class="timer-step-btn" data-action="dec" data-target="standalone-long-break">−</button>
+                  <input type="number" id="standalone-long-break-input" class="timer-step-input mono" min="1" max="180" value="15">
+                  <button type="button" class="timer-step-btn" data-action="inc" data-target="standalone-long-break">+</button>
+                  <span class="timer-step-unit">min</span>
+                  <button type="button" class="btn-ctrl-reset" data-ctrl="standalone-long-break" title="Reset to 15 min"><i data-lucide="rotate-ccw"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Countdown Customization Card -->
+          <div class="timer-custom-card hidden" id="timer-config-countdown">
+            <div class="timer-custom-card-header">
+              <div class="timer-custom-card-title">
+                <i data-lucide="hourglass"></i>
+                <span>Countdown Configuration</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="countdown" id="btn-reset-countdown" title="Reset countdown to default">Reset section</button>
+            </div>
+            <div class="timer-custom-grid">
+              <!-- Steppers for Hours, Minutes, Seconds (no native pickers) -->
+              <div class="timer-custom-row countdown-stepper-triple-row">
+                <div class="timer-custom-label-wrap">
+                  <span class="timer-custom-label">Set Duration</span>
+                  <span class="timer-custom-sub">1s to 99:59:59</span>
+                </div>
+                <div class="countdown-steppers-group">
+                  <div class="countdown-unit-box">
+                    <span class="countdown-unit-label">H</span>
+                    <div class="timer-stepper-mini">
+                      <button type="button" class="timer-step-btn mini" data-action="dec" data-target="countdown-hours">−</button>
+                      <input type="number" id="countdown-hours-input" class="timer-step-input mini mono" min="0" max="99" value="0">
+                      <button type="button" class="timer-step-btn mini" data-action="inc" data-target="countdown-hours">+</button>
+                    </div>
+                  </div>
+                  <div class="countdown-unit-sep">:</div>
+                  <div class="countdown-unit-box">
+                    <span class="countdown-unit-label">M</span>
+                    <div class="timer-stepper-mini">
+                      <button type="button" class="timer-step-btn mini" data-action="dec" data-target="countdown-minutes">−</button>
+                      <input type="number" id="countdown-minutes-input" class="timer-step-input mini mono" min="0" max="59" value="5">
+                      <button type="button" class="timer-step-btn mini" data-action="inc" data-target="countdown-minutes">+</button>
+                    </div>
+                  </div>
+                  <div class="countdown-unit-sep">:</div>
+                  <div class="countdown-unit-box">
+                    <span class="countdown-unit-label">S</span>
+                    <div class="timer-stepper-mini">
+                      <button type="button" class="timer-step-btn mini" data-action="dec" data-target="countdown-seconds">−</button>
+                      <input type="number" id="countdown-seconds-input" class="timer-step-input mini mono" min="0" max="59" value="0">
+                      <button type="button" class="timer-step-btn mini" data-action="inc" data-target="countdown-seconds">+</button>
+                    </div>
+                  </div>
+                  <button type="button" class="btn-ctrl-reset" data-ctrl="countdown-duration" title="Reset to 5 min"><i data-lucide="rotate-ccw"></i></button>
+                </div>
+              </div>
+
+              <!-- Quick Preset Chips -->
+              <div class="timer-custom-row">
+                <div class="timer-custom-label-wrap">
+                  <span class="timer-custom-label">Quick Presets</span>
+                </div>
+                <div class="timer-preset-chips" id="countdown-presets-row">
+                  <button type="button" class="preset-chip" data-mins="5">5m</button>
+                  <button type="button" class="preset-chip" data-mins="10">10m</button>
+                  <button type="button" class="preset-chip" data-mins="15">15m</button>
+                  <button type="button" class="preset-chip" data-mins="25">25m</button>
+                  <button type="button" class="preset-chip" data-mins="45">45m</button>
+                  <button type="button" class="preset-chip" data-mins="60">60m</button>
+                </div>
+              </div>
+
+              <!-- Optional Label -->
+              <div class="timer-custom-row">
+                <div class="timer-custom-label-wrap">
+                  <span class="timer-custom-label">Timer Label</span>
+                  <span class="timer-custom-sub">Shown when timer finishes</span>
+                </div>
+                <div class="timer-label-input-wrap">
+                  <input type="text" id="countdown-label-input" class="terminal-input" placeholder="e.g. Tea, Roast, Meeting" maxlength="50">
+                  <button type="button" class="btn-ctrl-reset" data-ctrl="countdown-label" title="Clear label"><i data-lucide="rotate-ccw"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stopwatch Laps Card -->
+          <div class="timer-custom-card hidden" id="timer-config-stopwatch">
+            <div class="timer-custom-card-header">
+              <div class="timer-custom-card-title">
+                <i data-lucide="list-ordered"></i>
+                <span>Recorded Laps</span>
+              </div>
+            </div>
+            <div class="stopwatch-laps-container" id="stopwatch-laps-container">
+              <table class="stopwatch-laps-table">
+                <thead>
+                  <tr>
+                    <th>Lap</th>
+                    <th>Lap Time</th>
+                    <th>Overall Split</th>
+                  </tr>
+                </thead>
+                <tbody id="stopwatch-laps-body">
+                  <tr class="no-laps-row">
+                    <td colspan="3">No laps recorded yet. Press "Lap" while running.</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1078,6 +1319,77 @@
               <label class="setting-label">Privacy Blocklist (auto-redacted words)</label>
               <textarea id="privacy-blocklist" class="terminal-input full-width mono" rows="3" placeholder="1password, bitwarden, bank, login, incognito"></textarea>
               <span class="setting-hint">Windows or URLs containing these words are never sent to AI providers</span>
+            </div>
+          </div>
+
+          <!-- SECTION 6.2: TIMERS & POMODORO (Item T1) -->
+          <div class="settings-group-card" id="section-settings-timers">
+            <div class="settings-group-title">
+              <div class="title-with-icon">
+                <i data-lucide="timer"></i>
+                <span>Timers & Pomodoro</span>
+              </div>
+              <button type="button" class="btn-reset-section" data-section="timers" id="btn-reset-section-timers" title="Reset Timer Settings to default">Reset section</button>
+            </div>
+            <span class="setting-hint">Configure Pomodoro phase durations and countdown defaults</span>
+
+            <div class="setting-row">
+              <div class="setting-label-wrap">
+                <span class="setting-label">Pomodoro Focus</span>
+                <span class="setting-sub">1 – 180 min</span>
+              </div>
+              <div class="timer-stepper-wrap">
+                <input type="number" id="setting-timer-focus" class="timer-step-input mono" min="1" max="180" value="25">
+                <span class="timer-step-unit">min</span>
+                <button type="button" class="btn-ctrl-reset hidden" data-ctrl="setting-timer-focus" title="Reset to 25"><i data-lucide="rotate-ccw"></i></button>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label-wrap">
+                <span class="setting-label">Short Break</span>
+                <span class="setting-sub">1 – 180 min</span>
+              </div>
+              <div class="timer-stepper-wrap">
+                <input type="number" id="setting-timer-shortbreak" class="timer-step-input mono" min="1" max="180" value="5">
+                <span class="timer-step-unit">min</span>
+                <button type="button" class="btn-ctrl-reset hidden" data-ctrl="setting-timer-shortbreak" title="Reset to 5"><i data-lucide="rotate-ccw"></i></button>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label-wrap">
+                <span class="setting-label">Long Break</span>
+                <span class="setting-sub">1 – 180 min</span>
+              </div>
+              <div class="timer-stepper-wrap">
+                <input type="number" id="setting-timer-longbreak" class="timer-step-input mono" min="1" max="180" value="15">
+                <span class="timer-step-unit">min</span>
+                <button type="button" class="btn-ctrl-reset hidden" data-ctrl="setting-timer-longbreak" title="Reset to 15"><i data-lucide="rotate-ccw"></i></button>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label-wrap">
+                <span class="setting-label">Sessions Before Long Break</span>
+                <span class="setting-sub">1 – 20</span>
+              </div>
+              <div class="timer-stepper-wrap">
+                <input type="number" id="setting-timer-sessions" class="timer-step-input mono" min="1" max="20" value="4">
+                <span class="timer-step-unit"></span>
+                <button type="button" class="btn-ctrl-reset hidden" data-ctrl="setting-timer-sessions" title="Reset to 4"><i data-lucide="rotate-ccw"></i></button>
+              </div>
+            </div>
+
+            <div class="setting-toggle-row">
+              <div class="setting-toggle-text">
+                <div class="toggle-title">Auto-start Next Phase</div>
+                <div class="toggle-desc">Automatically transition between focus and break</div>
+              </div>
+              <div class="timer-switch-wrap">
+                <input type="checkbox" id="setting-timer-autostart" class="toggle-checkbox">
+                <button type="button" class="btn-ctrl-reset hidden" data-ctrl="setting-timer-autostart" title="Reset to OFF"><i data-lucide="rotate-ccw"></i></button>
+              </div>
             </div>
           </div>
 

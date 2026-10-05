@@ -32,6 +32,7 @@ const EMOTION_PRIORITIES = {
   proud: 4,      // all to-dos completed
   excited: 4,    // test connection / 3rd pomodoro / import
   focus: 4,      // pomodoro focus session
+  relaxed: 4,    // pomodoro break session
 
   // Level 3: Reminder events
   celebrating: 3,
@@ -103,6 +104,7 @@ class FaceBotController {
     this.bubbleBadge = document.getElementById('bubble-badge');
     this.bubbleText = document.getElementById('bubble-text');
     this.bubbleTimer = null;
+    this.bubbleHideTimeout = null;
 
     this.init();
   }
@@ -268,6 +270,11 @@ class FaceBotController {
       }, 500);
     }
 
+    if (this.bubbleHideTimeout) {
+      clearTimeout(this.bubbleHideTimeout);
+      this.bubbleHideTimeout = null;
+    }
+
     if (this.bubbleTimer) {
       clearTimeout(this.bubbleTimer);
       this.bubbleTimer = null;
@@ -317,7 +324,10 @@ class FaceBotController {
     this.bubbleEl.classList.remove('fade-in');
     this.bubbleEl.classList.add('fade-out');
 
-    setTimeout(() => {
+    if (this.bubbleHideTimeout) {
+      clearTimeout(this.bubbleHideTimeout);
+    }
+    this.bubbleHideTimeout = setTimeout(() => {
       this.bubbleEl.style.display = 'none';
       if (this.bubbleText) this.bubbleText.textContent = '';
       if (this.bubbleBadge) this.bubbleBadge.textContent = '';
@@ -327,6 +337,7 @@ class FaceBotController {
       if (ipcRenderer) {
         ipcRenderer.send('pet:bubble-hidden');
       }
+      this.bubbleHideTimeout = null;
     }, 200);
 
     if (this.bubbleTimer) {

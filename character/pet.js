@@ -599,7 +599,8 @@
           `;
         }
 
-        // 20. RELIEVED (Back to normal / music stop / unmuted)
+        // 20. RELIEVED / RELAXED (Back to normal / break time / music stop)
+        case 'relaxed':
         case 'relieved': {
           const arcW = (baseRx * 1.35).toFixed(1);
           return `

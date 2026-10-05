@@ -212,12 +212,12 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Real UI action tests for all 13 emotions with Playwright on packaged app, output table, re-run full emotion regression
 
 ## Item T1 — ALL TIMERS MUST BE CUSTOMIZABLE
-- [ ] Pomodoro: editable focus, short break, long break minutes (defaults 25/5/15), sessions before long break (default 4), auto-start toggle; standalone short & long break
-- [ ] Countdown: custom hours/minutes/seconds stepper inputs, quick preset chips (5, 10, 15, 25, 45, 60 min), label, start/pause/resume/reset
-- [ ] Stopwatch: start/pause/reset + laps
-- [ ] Validation (countdown 1s to 99:59:59, Pomodoro 1 to 180 min), persistence, reset-to-default icon, "Reset section", import/export
-- [ ] Main-process timestamp logic (end time), accurate across panel closed / sleep; end bubble + reaction + sound
-- [ ] Test with real clicks on packaged app: 5s countdown, custom 1m Pomodoro, panel closed, sleep/resume accuracy
+- [x] Pomodoro: editable focus, short break, long break minutes (defaults 25/5/15), sessions before long break (default 4), auto-start toggle; standalone short & long break
+- [x] Countdown: custom hours/minutes/seconds stepper inputs, quick preset chips (5, 10, 15, 25, 45, 60 min), label, start/pause/resume/reset
+- [x] Stopwatch: start/pause/reset + laps
+- [x] Validation (countdown 1s to 99:59:59, Pomodoro 1 to 180 min), persistence, reset-to-default icon, "Reset section", import/export
+- [x] Main-process timestamp logic (end time), accurate across panel closed / sleep; end bubble + reaction + sound
+- [x] Test with real clicks on packaged app: 5s countdown, custom 1m Pomodoro, panel closed, sleep/resume accuracy
 
 ## Item R3 — REMINDER "+5m" (SNOOZE) DOES NOT WORK
 - [ ] Reproduce with real click: not yet due postpones 5 min; already fired re-arms 5 min from now and dismisses bubble
@@ -234,6 +234,16 @@ Resume any time: check boxes below, pick up from first unchecked item.
 ## Item V1 — VERSION SHOWN IN THE APP = RELEASE VERSION
 - [ ] Single source of truth: `package.json` "version" across git tag, file names, `app.getVersion()`, Settings -> About, tray tooltip, update checker
 - [ ] CI check: release workflow fails early if pushed tag != "v" + package.json version
+
+## Item UI4 — POLISH THE TABS + NEW APP-WIDE FONT
+- [ ] Bundled local fonts (zero network, cross-platform identical): Nunito (400, 600, 700), Fredoka (500, 600, tabular-nums), JetBrains Mono (code blocks only). Fallback system stack.
+- [ ] SIL Open Font License credited in Settings -> About and README, license files kept.
+- [ ] Layout & spacing: panel padding 20px, card padding 16-20px with 12-16px gap, 8-12px row gap, min 12px padding around text, line-height 1.5 body / 1.2 titles, type scale 18-20 / 15-16 / 14 / 12, min 40px interactive targets.
+- [ ] Soft cute styling: radius 16 on cards, 12 on controls, pill badges, pastel tints via color-mix (solid colors, no blur/filters), small pet-face SVG empty states, gentle hover/press (120-150ms).
+- [ ] Tab-by-tab polish: Timer (mode chips, Fredoka clock, session dots, collapsible customize, presets, laps rows), Notes (search+New row, soft tint cards, preview, time chip, actions, editor view, empty state), Reminders (card form, bell in circle, badges, aligned actions, Upcoming/Done groups, empty state), To-Do, Tools, Settings, Chat, Welcome screen.
+- [ ] Readability: contrast >= 4.5:1 on solid surfaces for any accent (including yellow & dark blue), automatic black/white text on accent buttons, min 420x560 to large size, no card overflow.
+- [ ] Self-check & automated verification: Playwright audit across 3 sizes and 3 accents, check no unintended scrollWidth > clientWidth, text padding >= 12px, fonts loaded and active, zero font network requests.
+- [ ] Resources: panel-open RAM and idle numbers must not regress; lazy load.
 
 ## Item PERF — RE-VERIFY RESOURCES
 - [ ] Measure packaged app via `top -l 4 -pid <pid>`: GPU helper < 3% CPU & < 10 wakeups/s, renderer < 1%, main < 1%, WindowServer increase < 2%

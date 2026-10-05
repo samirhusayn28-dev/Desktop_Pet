@@ -16,6 +16,7 @@ const systemSense = require('./system-sense');
 const contextSensor = require('./context-sensor');
 const UpdateChecker = require('./update-checker');
 const BootLifecycle = require('./boot-lifecycle');
+const timerManager = require('./timer-manager');
 
 app.commandLine.appendSwitch('disable-features', 'Autofill,Translate,MediaRouter,CalculateNativeWinOcclusion,SpareRendererForSitePerProcess');
 app.commandLine.appendSwitch('renderer-process-limit', '2');
@@ -234,6 +235,7 @@ function createPetWindow() {
   // Start throttled cursor tracking & idle detection
   startThrottledCursorTracking();
   startIdleMonitoring();
+  timerManager.setWindows(petWindow, panelWindow);
 }
 
 /**
@@ -430,7 +432,7 @@ function startIdleMonitoring() {
       const sleepySec = (store.get('settings.behavior.idleSleepyMinutes') || 2) * 60;
       const sleepingSec = (store.get('settings.behavior.idleSleepingMinutes') || 5) * 60;
 
-      if (isPomodoroFocusActive) {
+      if (timerManager.isFocusActive() || isPomodoroFocusActive) {
         // Pet does not fall asleep during Pomodoro focus
         return;
       }
@@ -521,6 +523,7 @@ function closePanel() {
     } catch (e) {}
     panelWindow.destroy();
     panelWindow = null;
+    timerManager.setWindows(petWindow, null);
   }
 }
 
@@ -588,6 +591,7 @@ function createPanelWindow() {
   });
 
   panelWindow.loadFile(path.join(__dirname, '..', 'panel-window', 'panel.html'));
+  timerManager.setWindows(petWindow, panelWindow);
 
   panelWindow.once('ready-to-show', () => {
     if (panelWindow && !panelWindow.isDestroyed()) {
@@ -602,6 +606,7 @@ function createPanelWindow() {
 
   panelWindow.on('closed', () => {
     panelWindow = null;
+    timerManager.setWindows(petWindow, null);
   });
 }
 
@@ -1125,7 +1130,8 @@ ipcMain.handle('data:export', async () => {
         activeProvider: store.get('settings.ai.activeProvider') || 'gemini',
         models: store.get('settings.ai.models') || {},
         baseUrls: store.get('settings.ai.baseUrls') || {}
-      }
+      },
+      timers: store.get('settings.timers') || {}
     };
 
     const notes = store.get('notes') || [];
@@ -1311,6 +1317,9 @@ ipcMain.handle('data:apply-import', async (e, { data, notesStrategy }) => {
         if (data.settings.ai.baseUrls) {
           store.set('settings.ai.baseUrls', Object.assign({}, store.get('settings.ai.baseUrls') || {}, data.settings.ai.baseUrls));
         }
+      }
+      if (data.settings.timers && typeof data.settings.timers === 'object') {
+        timerManager.updateSettings(data.settings.timers);
       }
     }
 

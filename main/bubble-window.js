@@ -52,6 +52,16 @@ class BubbleWindowManager {
       return;
     }
 
+    if (item.force || item.critical) {
+      if (this.currentTimeout) {
+        clearTimeout(this.currentTimeout);
+        this.currentTimeout = null;
+      }
+      this.queue.unshift(item);
+      this.processQueue();
+      return;
+    }
+
     this.queue.push(item);
     if (!this.isShowing) {
       this.processQueue();

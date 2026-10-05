@@ -3613,3 +3613,272 @@ button:focus-visible {
   height: 12px;
 }
 
+/* ==========================================================================
+   ITEM T1 — CUSTOMIZABLE TIMERS STYLES
+   ========================================================================== */
+.timer-custom-card {
+  width: 100%;
+  background: var(--surface-1, #18181D);
+  border: 1px solid var(--border-subtle, #282830);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.timer-custom-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 8px;
+}
+
+.timer-custom-card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main, #FFFFFF);
+}
+
+.timer-custom-card-title svg,
+.timer-custom-card-title i {
+  width: 15px;
+  height: 15px;
+  color: var(--theme-primary, #FF7A2F);
+}
+
+.timer-custom-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.timer-custom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.timer-custom-label-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.timer-custom-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main, #EDEDEE);
+}
+
+.timer-custom-sub {
+  font-size: 11px;
+  color: var(--text-muted, #8E8E93);
+}
+
+.timer-stepper-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timer-step-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2, #24242A);
+  border: 1px solid var(--border-subtle, #32323A);
+  border-radius: 6px;
+  color: var(--text-main, #EDEDEE);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition-fast);
+}
+
+.timer-step-btn:hover {
+  background: var(--theme-primary, #FF7A2F);
+  border-color: var(--theme-primary, #FF7A2F);
+  color: #FFFFFF;
+}
+
+.timer-step-btn:active {
+  transform: scale(0.95);
+}
+
+.timer-step-input {
+  width: 52px;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle, #32323A);
+  border-radius: 6px;
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  padding: 0 4px;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.timer-step-input::-webkit-outer-spin-button,
+.timer-step-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.timer-step-input:focus {
+  border-color: var(--theme-primary, #FF7A2F);
+}
+
+.timer-step-unit {
+  font-size: 12px;
+  color: var(--text-muted, #8E8E93);
+  min-width: 24px;
+}
+
+.countdown-stepper-triple-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.countdown-steppers-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.countdown-unit-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.countdown-unit-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted, #8E8E93);
+  letter-spacing: 0.5px;
+}
+
+.countdown-unit-sep {
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 14px;
+}
+
+.timer-stepper-mini {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.timer-step-btn.mini {
+  width: 24px;
+  height: 26px;
+  font-size: 13px;
+  border-radius: 4px;
+}
+
+.timer-step-input.mini {
+  width: 44px;
+  height: 26px;
+  font-size: 13px;
+  border-radius: 4px;
+}
+
+.timer-preset-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.preset-chip {
+  background: var(--surface-2, #24242A);
+  border: 1px solid var(--border-subtle, #32323A);
+  border-radius: 14px;
+  padding: 4px 11px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-main, #EDEDEE);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.preset-chip:hover {
+  background: var(--theme-primary-alpha, rgba(255, 122, 47, 0.16));
+  border-color: var(--theme-primary, #FF7A2F);
+  color: var(--theme-primary, #FF7A2F);
+}
+
+.preset-chip:active {
+  transform: scale(0.96);
+}
+
+.timer-label-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.timer-switch-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stopwatch-laps-container {
+  max-height: 160px;
+  overflow-y: auto;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.stopwatch-laps-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.stopwatch-laps-table th {
+  position: sticky;
+  top: 0;
+  background: #1C1C22;
+  padding: 6px 10px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted, #8E8E93);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stopwatch-laps-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: #EDEDEE;
+}
+
+.stopwatch-laps-table tr.no-laps-row td {
+  text-align: center;
+  color: var(--text-muted, #8E8E93);
+  padding: 14px 10px;
+}
+
+

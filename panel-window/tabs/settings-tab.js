@@ -71,6 +71,13 @@ const CENTRAL_DEFAULTS = {
     contextAwareness: true,
     allowScreenshots: false,
     blocklist: '1password, bitwarden, lastpass, keychain, bank, chase, wellsfargo, paypal, login, signin, incognito, private browsing'
+  },
+  timers: {
+    focusMinutes: 25,
+    shortBreakMinutes: 5,
+    longBreakMinutes: 15,
+    sessionsBeforeLongBreak: 4,
+    autoStartNext: false
   }
 };
 
@@ -314,6 +321,19 @@ class SettingsTab {
       const blocklist = store.get('settings.privacy.blocklist') || ['1password', 'bitwarden', 'lastpass', 'bank', 'login', 'incognito', 'private'];
       this.privacyBlocklist.value = Array.isArray(blocklist) ? blocklist.join(', ') : blocklist;
     }
+
+    // 6.2 Timers (Item T1)
+    const timersSettings = store.get('settings.timers.pomodoro') || {};
+    const tFocus = document.getElementById('setting-timer-focus');
+    const tShort = document.getElementById('setting-timer-shortbreak');
+    const tLong = document.getElementById('setting-timer-longbreak');
+    const tSessions = document.getElementById('setting-timer-sessions');
+    const tAutostart = document.getElementById('setting-timer-autostart');
+    if (tFocus) tFocus.value = timersSettings.focusMinutes ?? CENTRAL_DEFAULTS.timers.focusMinutes;
+    if (tShort) tShort.value = timersSettings.shortBreakMinutes ?? CENTRAL_DEFAULTS.timers.shortBreakMinutes;
+    if (tLong) tLong.value = timersSettings.longBreakMinutes ?? CENTRAL_DEFAULTS.timers.longBreakMinutes;
+    if (tSessions) tSessions.value = timersSettings.sessionsBeforeLongBreak ?? CENTRAL_DEFAULTS.timers.sessionsBeforeLongBreak;
+    if (tAutostart) tAutostart.checked = !!(timersSettings.autoStartNext ?? CENTRAL_DEFAULTS.timers.autoStartNext);
 
     // 7. About (Item W1 & Item V1)
     if (this.aboutVersionDisplay) {
@@ -1230,6 +1250,23 @@ class SettingsTab {
       });
     }
 
+    // 6.2 Timers Events (Item T1)
+    const timerInputIds = ['setting-timer-focus', 'setting-timer-shortbreak', 'setting-timer-longbreak', 'setting-timer-sessions'];
+    timerInputIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('change', () => this.saveTimersSettings());
+        el.addEventListener('input', () => this.updateAllResetButtons());
+      }
+    });
+    const tAutostart = document.getElementById('setting-timer-autostart');
+    if (tAutostart) {
+      tAutostart.addEventListener('change', () => {
+        this.saveTimersSettings();
+        this.updateAllResetButtons();
+      });
+    }
+
     // 6.5 Data Management Events (Item I1)
     if (this.btnExportData) {
       this.btnExportData.addEventListener('click', async () => {
@@ -1529,7 +1566,14 @@ class SettingsTab {
       // 6. Privacy
       { id: 'privacy-context', section: 'privacy', key: 'settings.privacy.contextAwareness', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.privacy.contextAwareness },
       { id: 'privacy-screenshots', section: 'privacy', key: 'settings.privacy.allowScreenshots', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.privacy.allowScreenshots },
-      { id: 'privacy-blocklist', section: 'privacy', key: 'settings.privacy.blocklist', type: 'blocklist', defaultVal: CENTRAL_DEFAULTS.privacy.blocklist }
+      { id: 'privacy-blocklist', section: 'privacy', key: 'settings.privacy.blocklist', type: 'blocklist', defaultVal: CENTRAL_DEFAULTS.privacy.blocklist },
+
+      // 7. Timers (Item T1)
+      { id: 'setting-timer-focus', section: 'timers', key: 'settings.timers.pomodoro.focusMinutes', type: 'number', defaultVal: CENTRAL_DEFAULTS.timers.focusMinutes },
+      { id: 'setting-timer-shortbreak', section: 'timers', key: 'settings.timers.pomodoro.shortBreakMinutes', type: 'number', defaultVal: CENTRAL_DEFAULTS.timers.shortBreakMinutes },
+      { id: 'setting-timer-longbreak', section: 'timers', key: 'settings.timers.pomodoro.longBreakMinutes', type: 'number', defaultVal: CENTRAL_DEFAULTS.timers.longBreakMinutes },
+      { id: 'setting-timer-sessions', section: 'timers', key: 'settings.timers.pomodoro.sessionsBeforeLongBreak', type: 'number', defaultVal: CENTRAL_DEFAULTS.timers.sessionsBeforeLongBreak },
+      { id: 'setting-timer-autostart', section: 'timers', key: 'settings.timers.pomodoro.autoStartNext', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.timers.autoStartNext }
     ];
 
     // Ensure reset buttons exist for all resettable controls
@@ -1659,6 +1703,14 @@ class SettingsTab {
       el.value = '';
       if (store) store.set(`settings.ai.baseUrls.${providerId}`, '');
       el.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (ctrl.type === 'number') {
+      el.value = ctrl.defaultVal;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      if (store && ctrl.key) store.set(ctrl.key, ctrl.defaultVal);
+      if (ctrl.section === 'timers') {
+        this.saveTimersSettings();
+      }
     } else if (ctrl.type === 'blocklist') {
       const defaultStr = '1password, bitwarden, lastpass, keychain, bank, chase, wellsfargo, paypal, login, signin, incognito, private browsing';
       el.value = defaultStr;
@@ -1670,6 +1722,28 @@ class SettingsTab {
 
     if (window.soundEffects) window.soundEffects.playTap();
     this.updateAllResetButtons();
+  }
+
+  async saveTimersSettings() {
+    const focusVal = parseInt(document.getElementById('setting-timer-focus')?.value, 10) || 25;
+    const shortBreakVal = parseInt(document.getElementById('setting-timer-shortbreak')?.value, 10) || 5;
+    const longBreakVal = parseInt(document.getElementById('setting-timer-longbreak')?.value, 10) || 15;
+    const sessionsVal = parseInt(document.getElementById('setting-timer-sessions')?.value, 10) || 4;
+    const autoStartVal = !!document.getElementById('setting-timer-autostart')?.checked;
+
+    const payload = {
+      pomodoro: {
+        focusMinutes: Math.min(180, Math.max(1, focusVal)),
+        shortBreakMinutes: Math.min(180, Math.max(1, shortBreakVal)),
+        longBreakMinutes: Math.min(180, Math.max(1, longBreakVal)),
+        sessionsBeforeLongBreak: Math.min(20, Math.max(1, sessionsVal)),
+        autoStartNext: autoStartVal
+      }
+    };
+    const ipc = typeof require !== 'undefined' ? require('electron').ipcRenderer : null;
+    if (ipc) {
+      await ipc.invoke('timer:update-settings', payload);
+    }
   }
 
   updateAllResetButtons() {
@@ -1684,6 +1758,8 @@ class SettingsTab {
         isDiff = (el.value.trim() !== String(ctrl.defaultVal).trim());
       } else if (ctrl.type === 'checkbox') {
         isDiff = (el.checked !== !!ctrl.defaultVal);
+      } else if (ctrl.type === 'number') {
+        isDiff = (parseInt(el.value, 10) !== ctrl.defaultVal);
       } else if (ctrl.type === 'slider') {
         const cur = ctrl.isFloat ? parseFloat(el.value) : parseInt(el.value, 10);
         isDiff = (cur !== ctrl.defaultVal);
@@ -1722,6 +1798,10 @@ class SettingsTab {
       this.resettableControls.filter(c => c.section === sectionName).forEach(ctrl => {
         this.resetControl(ctrl);
       });
+      if (sectionName === 'timers') {
+        const ipc = typeof require !== 'undefined' ? require('electron').ipcRenderer : null;
+        if (ipc) ipc.invoke('timer:reset-settings');
+      }
     }
 
     if (window.soundEffects) window.soundEffects.playChirp();
@@ -1729,7 +1809,7 @@ class SettingsTab {
   }
 
   resetAllSettings() {
-    ['general', 'behavior', 'reactions', 'appearance', 'ai', 'privacy'].forEach(sec => {
+    ['general', 'behavior', 'reactions', 'appearance', 'ai', 'privacy', 'timers'].forEach(sec => {
       this.resetSection(sec);
     });
     if (window.soundEffects) window.soundEffects.playChirp();
