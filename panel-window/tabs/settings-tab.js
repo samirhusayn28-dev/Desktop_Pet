@@ -20,7 +20,7 @@ const DEFAULT_PET_APPEARANCE = {
 
 const CENTRAL_DEFAULTS = {
   general: {
-    petName: 'Pixel',
+    petName: 'Pixie',
     userName: 'Samir',
     alwaysOnTop: true,
     rememberPosition: true,
