@@ -31,6 +31,7 @@ const CENTRAL_DEFAULTS = {
     idleSleepyMinutes: 2,
     idleSleepingMinutes: 5,
     bubbleDuration: 5,
+    snoozeMinutes: 5,
     soundsEnabled: false,
     soundVolume: 50,
     soundReminders: true,
@@ -105,6 +106,10 @@ class SettingsTab {
     this.dispIdleSleeping = document.getElementById('disp-idle-sleeping');
     this.bubbleDurationSlider = document.getElementById('setting-bubble-duration');
     this.dispBubbleDuration = document.getElementById('disp-bubble-duration');
+    this.snoozeDurationSelect = document.getElementById('setting-snooze-duration');
+    this.snoozeCustomInput = document.getElementById('setting-snooze-custom');
+    this.dispSnoozeDuration = document.getElementById('disp-snooze-duration');
+    this.btnResetSnoozeDuration = document.getElementById('reset-snooze-duration');
     this.soundsToggle = document.getElementById('setting-sounds-enabled');
     this.soundSubControls = document.getElementById('sound-sub-controls');
     this.soundVolumeSlider = document.getElementById('setting-sound-volume');
@@ -266,6 +271,10 @@ class SettingsTab {
       this.bubbleDurationSlider.value = bubbleDuration;
       if (this.dispBubbleDuration) this.dispBubbleDuration.textContent = `${bubbleDuration} sec`;
     }
+    const snoozeMinutes = store.get('settings.behavior.snoozeMinutes') !== undefined
+      ? store.get('settings.behavior.snoozeMinutes')
+      : CENTRAL_DEFAULTS.behavior.snoozeMinutes;
+    this.updateSnoozeControls(snoozeMinutes);
     if (this.soundsToggle) this.soundsToggle.checked = soundsEnabled;
     if (this.soundSubControls) this.soundSubControls.style.display = soundsEnabled ? 'flex' : 'none';
     if (this.soundVolumeSlider) {
@@ -359,6 +368,29 @@ class SettingsTab {
       } catch (e) {
         this.aboutVersionDisplay.textContent = 'v1.0.2';
       }
+    }
+  }
+
+  updateSnoozeControls(val) {
+    const numVal = parseInt(val, 10) || 5;
+    if (this.dispSnoozeDuration) this.dispSnoozeDuration.textContent = `${numVal} min`;
+    if (this.snoozeDurationSelect) {
+      if ([5, 10, 15, 30].includes(numVal)) {
+        this.snoozeDurationSelect.value = String(numVal);
+        if (this.snoozeCustomInput) this.snoozeCustomInput.style.display = 'none';
+      } else {
+        this.snoozeDurationSelect.value = 'custom';
+        if (this.snoozeCustomInput) {
+          this.snoozeCustomInput.style.display = 'inline-block';
+          this.snoozeCustomInput.value = numVal;
+        }
+      }
+    }
+  }
+
+  broadcastSnoozeChanged(val) {
+    if (window.panelController?.remindersTab?.updateSnoozeButtons) {
+      window.panelController.remindersTab.updateSnoozeButtons(val);
     }
   }
 
@@ -774,6 +806,48 @@ class SettingsTab {
         const val = parseInt(e.target.value, 10);
         if (this.dispBubbleDuration) this.dispBubbleDuration.textContent = `${val} sec`;
         window.panelController.store.set('settings.behavior.bubbleDuration', val);
+      });
+    }
+
+    if (this.snoozeDurationSelect) {
+      this.snoozeDurationSelect.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val === 'custom') {
+          if (this.snoozeCustomInput) {
+            this.snoozeCustomInput.style.display = 'inline-block';
+            this.snoozeCustomInput.focus();
+            const customVal = parseInt(this.snoozeCustomInput.value, 10) || 5;
+            window.panelController.store.set('settings.behavior.snoozeMinutes', customVal);
+            if (this.dispSnoozeDuration) this.dispSnoozeDuration.textContent = `${customVal} min`;
+            this.broadcastSnoozeChanged(customVal);
+          }
+        } else {
+          if (this.snoozeCustomInput) this.snoozeCustomInput.style.display = 'none';
+          const numVal = parseInt(val, 10);
+          window.panelController.store.set('settings.behavior.snoozeMinutes', numVal);
+          if (this.dispSnoozeDuration) this.dispSnoozeDuration.textContent = `${numVal} min`;
+          this.broadcastSnoozeChanged(numVal);
+        }
+      });
+    }
+
+    if (this.snoozeCustomInput) {
+      this.snoozeCustomInput.addEventListener('change', (e) => {
+        let customVal = parseInt(e.target.value, 10) || 5;
+        customVal = Math.max(1, Math.min(180, customVal));
+        e.target.value = customVal;
+        window.panelController.store.set('settings.behavior.snoozeMinutes', customVal);
+        if (this.dispSnoozeDuration) this.dispSnoozeDuration.textContent = `${customVal} min`;
+        this.broadcastSnoozeChanged(customVal);
+      });
+    }
+
+    if (this.btnResetSnoozeDuration) {
+      this.btnResetSnoozeDuration.addEventListener('click', () => {
+        window.panelController.store.set('settings.behavior.snoozeMinutes', 5);
+        this.updateSnoozeControls(5);
+        this.broadcastSnoozeChanged(5);
+        if (window.soundEffects) window.soundEffects.playTap();
       });
     }
 
@@ -1527,6 +1601,7 @@ class SettingsTab {
       { id: 'setting-idle-sleepy', section: 'behavior', key: 'settings.behavior.idleSleepyMinutes', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.idleSleepyMinutes, dispId: 'disp-idle-sleepy', suffix: ' min' },
       { id: 'setting-idle-sleeping', section: 'behavior', key: 'settings.behavior.idleSleepingMinutes', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.idleSleepingMinutes, dispId: 'disp-idle-sleeping', suffix: ' min' },
       { id: 'setting-bubble-duration', section: 'behavior', key: 'settings.behavior.bubbleDuration', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.bubbleDuration, dispId: 'disp-bubble-duration', suffix: ' sec' },
+      { id: 'setting-snooze-duration', section: 'behavior', key: 'settings.behavior.snoozeMinutes', type: 'snooze', defaultVal: CENTRAL_DEFAULTS.behavior.snoozeMinutes },
       { id: 'setting-sounds-enabled', section: 'behavior', key: 'settings.behavior.soundsEnabled', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.soundsEnabled },
       { id: 'setting-sound-volume', section: 'behavior', key: 'settings.behavior.soundVolume', type: 'slider', defaultVal: CENTRAL_DEFAULTS.behavior.soundVolume, dispId: 'disp-sound-volume', suffix: '%' },
       { id: 'setting-sound-reminders', section: 'behavior', key: 'settings.behavior.soundReminders', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.soundReminders },
@@ -1711,6 +1786,10 @@ class SettingsTab {
       if (ctrl.section === 'timers') {
         this.saveTimersSettings();
       }
+    } else if (ctrl.type === 'snooze') {
+      if (store && ctrl.key) store.set(ctrl.key, ctrl.defaultVal);
+      this.updateSnoozeControls(ctrl.defaultVal);
+      this.broadcastSnoozeChanged(ctrl.defaultVal);
     } else if (ctrl.type === 'blocklist') {
       const defaultStr = '1password, bitwarden, lastpass, keychain, bank, chase, wellsfargo, paypal, login, signin, incognito, private browsing';
       el.value = defaultStr;

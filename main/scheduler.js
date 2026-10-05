@@ -196,33 +196,71 @@ class Scheduler {
     }
   }
 
-  snoozeReminder(reminderId, minutes = 5) {
-    const reminders = store.get('reminders') || [];
-    const rem = reminders.find(r => r.id === reminderId);
-    if (!rem) return;
+  setWindows(petWin, panelWin) {
+    this.petWindowRef = petWin;
+    this.panelWindowRef = panelWin;
+  }
 
-    const targetDate = new Date(Date.now() + minutes * 60000);
-    const hours = String(targetDate.getHours()).padStart(2, '0');
-    const mins = String(targetDate.getMinutes()).padStart(2, '0');
-    rem.time = `${hours}:${mins}`;
+  snoozeReminder(reminderId, minutes) {
+    const reminders = store.get('reminders') || [];
+    const rem = reminders.find(r => r.id === reminderId || String(r.id) === String(reminderId));
+    if (!rem) return null;
+
+    const snoozeMins = Number(minutes) || store.get('settings.behavior.snoozeMinutes') || 5;
+    const now = new Date();
+    const todayDateStr = now.toDateString();
+
+    const [rh, rm] = (rem.time || '00:00').split(':').map(Number);
+    const remMinutes = (rh || 0) * 60 + (rm || 0);
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    // Already fired if: disabled (for 'once' reminders), or already triggered today, or scheduled time <= current time
+    const isAlreadyFired = !rem.enabled ||
+      (rem.lastTriggered && String(rem.lastTriggered).includes(todayDateStr)) ||
+      (remMinutes <= currentMinutes);
+
+    let newHoursStr, newMinsStr;
+
+    if (isAlreadyFired) {
+      // Already fired: dismiss active bubble & re-arm snoozeMins from NOW
+      bubble.hide();
+      const targetDate = new Date(now.getTime() + snoozeMins * 60000);
+      newHoursStr = String(targetDate.getHours()).padStart(2, '0');
+      newMinsStr = String(targetDate.getMinutes()).padStart(2, '0');
+    } else {
+      // Not yet due: postpone by snoozeMins from current scheduled time
+      const totalMins = (remMinutes + snoozeMins) % 1440;
+      newHoursStr = String(Math.floor(totalMins / 60)).padStart(2, '0');
+      newMinsStr = String(totalMins % 60).padStart(2, '0');
+    }
+
+    rem.time = `${newHoursStr}:${newMinsStr}`;
     rem.enabled = true;
     rem.lastTriggered = null;
 
     store.set('reminders', reminders);
 
-    bubble.show({
-      badge: 'SNOOZED',
-      text: `Reminder snoozed for ${minutes} min (${rem.time}).`,
-      sound: 'tap',
-      category: 'reminders',
-      emotion: 'wink',
-      duration: 3500
-    });
+    if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
+      this.panelWindowRef.webContents.send('reminders:changed', reminders);
+    }
+
+    if (!isAlreadyFired) {
+      bubble.show({
+        badge: 'SNOOZED',
+        text: `Reminder snoozed for ${snoozeMins} min (${rem.time}).`,
+        sound: 'tap',
+        category: 'reminders',
+        emotion: 'wink',
+        duration: 3500
+      });
+    }
+
+    return rem;
   }
 
   reschedule(reminderId) {
     const reminders = store.get('reminders') || [];
-    const rem = reminders.find(r => r.id === reminderId);
+    const rem = reminders.find(r => r.id === reminderId || String(r.id) === String(reminderId));
     if (!rem) return;
 
     rem.enabled = true;

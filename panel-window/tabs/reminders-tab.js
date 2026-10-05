@@ -83,7 +83,8 @@ class RemindersTab {
         const snoozeBtn = e.target.closest('.reminder-snooze-btn');
         if (snoozeBtn) {
           const id = snoozeBtn.dataset.id;
-          if (id) this.snoozeReminder(id, 5);
+          const snoozeMinutes = (window.panelController?.store?.get('settings.behavior.snoozeMinutes')) || 5;
+          if (id) this.snoozeReminder(id, snoozeMinutes);
           return;
         }
 
@@ -112,6 +113,15 @@ class RemindersTab {
             e.preventDefault();
             this.cancelEditing();
           }
+        }
+      });
+    }
+
+    if (window.panelController?.ipcRenderer) {
+      window.panelController.ipcRenderer.on('reminders:changed', (e, updatedReminders) => {
+        if (Array.isArray(updatedReminders) && !this.editingId) {
+          this.reminders = updatedReminders;
+          this.render();
         }
       });
     }
@@ -220,32 +230,65 @@ class RemindersTab {
     }
   }
 
-  snoozeReminder(id, minutes = 5) {
-    const item = this.reminders.find(r => r.id === id);
+  snoozeReminder(id, minutes) {
+    const snoozeMinutes = minutes || (window.panelController?.store?.get('settings.behavior.snoozeMinutes')) || 5;
+
+    if (window.panelController?.ipcRenderer) {
+      window.panelController.ipcRenderer.send('reminders:snooze', { id, minutes: snoozeMinutes });
+    }
+
+    const item = this.reminders.find(r => r.id === id || String(r.id) === String(id));
     if (item) {
       const now = new Date();
-      now.setMinutes(now.getMinutes() + minutes);
-      const hours = now.getHours().toString().padStart(2, '0');
-      const mins = now.getMinutes().toString().padStart(2, '0');
-      item.time = `${hours}:${mins}`;
-      item.enabled = true;
-      item.lastTriggered = null;
-      this.saveReminders();
-      this.render();
-      if (window.soundEffects) window.soundEffects.playTap();
+      const todayDateStr = now.toDateString();
+      const [rh, rm] = (item.time || '00:00').split(':').map(Number);
+      const remMinutes = (rh || 0) * 60 + (rm || 0);
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-      if (window.panelController?.ipcRenderer) {
-        window.panelController.ipcRenderer.send('reminders:reschedule', id);
-        window.panelController.ipcRenderer.send('reminders:updated');
+      const isAlreadyFired = !item.enabled ||
+        (item.lastTriggered && String(item.lastTriggered).includes(todayDateStr)) ||
+        (remMinutes <= currentMinutes);
+
+      let newH, newM;
+      if (isAlreadyFired) {
+        const targetDate = new Date(now.getTime() + snoozeMinutes * 60000);
+        newH = String(targetDate.getHours()).padStart(2, '0');
+        newM = String(targetDate.getMinutes()).padStart(2, '0');
+      } else {
+        const totalMins = (remMinutes + snoozeMinutes) % 1440;
+        newH = String(Math.floor(totalMins / 60)).padStart(2, '0');
+        newM = String(totalMins % 60).padStart(2, '0');
       }
 
-      window.panelController.notifyPet('pet:show-bubble', {
-        badge: 'SNOOZED',
-        text: `Snoozed "${item.title}" for ${minutes} mins (${item.time})`,
-        duration: 3500,
-        emotion: 'wink'
-      });
+      item.time = `${newH}:${newM}`;
+      item.enabled = true;
+      item.lastTriggered = null;
+
+      this.saveReminders();
+      this.render();
+
+      if (window.soundEffects) window.soundEffects.playTap();
+
+      if (!isAlreadyFired) {
+        window.panelController.notifyPet('pet:show-bubble', {
+          badge: 'SNOOZED',
+          text: `Snoozed "${item.title}" for ${snoozeMinutes} min (${item.time})`,
+          duration: 3500,
+          emotion: 'wink'
+        });
+      }
     }
+  }
+
+  updateSnoozeButtons(snoozeMinutes) {
+    const mins = parseInt(snoozeMinutes, 10) || 5;
+    if (!this.listContainer) return;
+    const buttons = this.listContainer.querySelectorAll('.reminder-snooze-btn');
+    buttons.forEach(btn => {
+      btn.title = `Snooze ${mins} minutes`;
+      const span = btn.querySelector('span');
+      if (span) span.textContent = `+${mins}m`;
+    });
   }
 
   deleteReminder(id) {
@@ -335,9 +378,9 @@ class RemindersTab {
             </div>
           </div>
           <div class="reminder-item-actions">
-            <button class="reminder-snooze-btn" data-id="${r.id}" title="Snooze 5 minutes">
+            <button class="reminder-snooze-btn" data-id="${r.id}" title="Snooze ${(window.panelController?.store?.get('settings.behavior.snoozeMinutes')) || 5} minutes">
               <i data-lucide="alarm-clock"></i>
-              <span>+5m</span>
+              <span>+${(window.panelController?.store?.get('settings.behavior.snoozeMinutes')) || 5}m</span>
             </button>
             <button class="reminder-edit-btn" data-id="${r.id}" title="Edit reminder">
               <i data-lucide="edit-3"></i>

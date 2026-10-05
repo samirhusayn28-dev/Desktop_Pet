@@ -821,6 +821,29 @@
               <input type="range" id="setting-bubble-duration" min="2" max="12" step="1" value="5" class="terminal-slider">
             </div>
 
+            <!-- Reminder Snooze Length (Item R3) -->
+            <div class="setting-item">
+              <div class="slider-label-row">
+                <label class="setting-label" for="setting-snooze-duration">Reminder Snooze Length</label>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="slider-val" id="disp-snooze-duration">5 min</span>
+                  <button type="button" class="btn-reset-control" id="reset-snooze-duration" title="Reset to 5 min">
+                    <i data-lucide="rotate-ccw"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="snooze-select-row" style="display: flex; gap: 8px; margin-top: 6px;">
+                <select id="setting-snooze-duration" class="terminal-select" style="flex: 1;">
+                  <option value="5">5 minutes (Default)</option>
+                  <option value="10">10 minutes</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="custom">Custom...</option>
+                </select>
+                <input type="number" id="setting-snooze-custom" min="1" max="180" value="5" class="terminal-input mono" style="width: 72px; display: none;" title="Custom minutes">
+              </div>
+            </div>
+
             <!-- Master Sounds Toggle (Item SND1) -->
             <div class="setting-toggle-row">
               <div class="setting-toggle-text">

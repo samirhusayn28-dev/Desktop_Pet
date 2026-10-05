@@ -220,10 +220,10 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Test with real clicks on packaged app: 5s countdown, custom 1m Pomodoro, panel closed, sleep/resume accuracy
 
 ## Item R3 — REMINDER "+5m" (SNOOZE) DOES NOT WORK
-- [ ] Reproduce with real click: not yet due postpones 5 min; already fired re-arms 5 min from now and dismisses bubble
-- [ ] Scheduler in main process rescheduled (same id), list updates, persists across restart, fires at new time
-- [ ] Snooze length setting (5/10/15/30 min or custom, default 5, reset icon) and button label follows it
-- [ ] Test: reminder for +1 minute, click snooze before and after it fires, verify both new fire times
+- [x] Reproduce with real click: not yet due postpones 5 min; already fired re-arms 5 min from now and dismisses bubble
+- [x] Scheduler in main process rescheduled (same id), list updates, persists across restart, fires at new time
+- [x] Snooze length setting (5/10/15/30 min or custom, default 5, reset icon) and button label follows it
+- [x] Test: reminder for +1 minute, click snooze before and after it fires, verify both new fire times
 
 ## Item B2 — LONG BUBBLE TEXT OVERFLOWS THE BUBBLE
 - [ ] CSS: `max-width: 280px; overflow-wrap: anywhere; word-break: break-word; line-clamp: 4` with ellipsis

@@ -236,6 +236,7 @@ function createPetWindow() {
   startThrottledCursorTracking();
   startIdleMonitoring();
   timerManager.setWindows(petWindow, panelWindow);
+  scheduler.setWindows(petWindow, panelWindow);
 }
 
 /**
@@ -592,6 +593,7 @@ function createPanelWindow() {
 
   panelWindow.loadFile(path.join(__dirname, '..', 'panel-window', 'panel.html'));
   timerManager.setWindows(petWindow, panelWindow);
+  scheduler.setWindows(petWindow, panelWindow);
 
   panelWindow.once('ready-to-show', () => {
     if (panelWindow && !panelWindow.isDestroyed()) {
@@ -607,6 +609,7 @@ function createPanelWindow() {
   panelWindow.on('closed', () => {
     panelWindow = null;
     timerManager.setWindows(petWindow, null);
+    scheduler.setWindows(petWindow, null);
   });
 }
 
@@ -1067,7 +1070,12 @@ ipcMain.on('pet:update-glasses', (e, enabled) => {
 });
 
 ipcMain.on('reminders:snooze', (e, { id, minutes }) => {
-  scheduler.snoozeReminder(id, minutes);
+  const result = scheduler.snoozeReminder(id, minutes);
+  e.returnValue = result;
+});
+
+ipcMain.handle('reminders:snooze-action', async (e, { id, minutes }) => {
+  return scheduler.snoozeReminder(id, minutes);
 });
 
 ipcMain.on('reminders:reschedule', (e, id) => {
