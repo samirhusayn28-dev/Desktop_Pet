@@ -23,7 +23,9 @@ jobs:
         run: npm ci
 
       - name: Build macOS
-        run: npx electron-builder --mac --x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --mac --x64 --publish never
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -50,7 +52,9 @@ jobs:
         run: npm ci
 
       - name: Build Windows
-        run: npx electron-builder --win --x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --x64 --publish never
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -83,7 +87,10 @@ jobs:
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           name: "Pixie v${{ steps.version.outputs.VERSION }}"
           body: |
             ## 🐾 Pixie v${{ steps.version.outputs.VERSION }}
