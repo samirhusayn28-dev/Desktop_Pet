@@ -2,6 +2,16 @@
 
 All notable changes to Pixie are documented in this file.
 
+## [1.0.7] - 2026-10-05 — **Auto-Update Detection Reliability Fix**
+
+### Fixed
+- **Update Not Detected Automatically** — Complete rewrite of `update-checker.js`:
+  - **Aggressive boot schedule**: Checks at **15 seconds → 2 minutes → 30 minutes** after launch instead of a single 8-second check that was easy to miss or fail.
+  - **Pet re-reacts on panel open**: When the panel opens and a pending update is already cached, Pixie now **re-shows the speech bubble** ("New version v1.x.x is ready! Open Settings to download.") — so the user cannot miss it just because they opened the panel after the initial notification.
+  - **Retry on transient network failure**: If the GitHub API is unavailable or rate-limited at boot, the checker automatically retries after 30s, 60s, and 120s instead of silently giving up for 4 hours.
+  - **Hourly periodic check** (was: every 4 hours) — ensures long-running sessions always catch updates within an hour.
+  - **Concurrent check guard**: Prevents stacked auto-checks from overlapping if the previous one is still in flight.
+
 ## [1.0.6] - 2026-10-05 — **Reminder Scheduler Deep Fix**
 
 ### Fixed

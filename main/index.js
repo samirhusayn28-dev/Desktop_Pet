@@ -618,10 +618,13 @@ function createPanelWindow() {
 
   panelWindow.webContents.on('did-finish-load', () => {
     if (updateChecker && updateChecker.getLatestResult() && panelWindow && !panelWindow.isDestroyed()) {
+      // Send cached update status to panel (shows banner)
       panelWindow.webContents.send('update:status', {
         result: updateChecker.getLatestResult(),
         isManual: false
       });
+      // Also re-trigger pet bubble so user notices the update (not just a silent banner)
+      updateChecker.notifyPetOfCachedUpdate();
     }
   });
 

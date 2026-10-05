@@ -1,12 +1,13 @@
 /**
- * Desktop Pet — GitHub Release Update Checker (Item U3)
- * 
+ * Desktop Pet — GitHub Release Update Checker
+ *
  * - Repository: samirhusayn28-dev/Desktop_Pet
- * - Checks automatically 60s after boot and every 24 hours
- * - Manual trigger via "Check now" in About tab
- * - Picks platform-specific assets: macOS Intel (.dmg) / Windows (.exe)
+ * - Auto-check schedule: 15s after boot → 2min → 30min → then every 1hr
+ * - Retry on transient network failure (up to 3 attempts, 30s apart)
+ * - On panel open with cached update: pet re-shows bubble so user can't miss it
+ * - Manual trigger via "Check now" in Settings tab always bypasses skip/cooldown
+ * - Platform-specific download asset: macOS (.dmg) / Windows (.exe)
  * - Truthful status: offline/failure shows "Couldn't check" (never false "up to date")
- * - Pet speech bubble + panel notification + "Skip this version"
  */
 
 const electron = require('electron');
@@ -14,13 +15,22 @@ const store = require('./secure-store');
 
 const GITHUB_REPO = 'samirhusayn28-dev/Desktop_Pet';
 
+// Boot check schedule (ms after start)
+const BOOT_SCHEDULE = [15_000, 2 * 60_000, 30 * 60_000];
+// Recurring interval after boot schedule is exhausted (ms)
+const PERIODIC_INTERVAL = 60 * 60_000; // every 1 hour
+// Retry delays on transient failure (ms)
+const RETRY_DELAYS = [30_000, 60_000, 120_000];
+
 class UpdateChecker {
   constructor(relayToPetFn, getPanelWindowFn) {
     this.relayToPet = relayToPetFn;
     this.getPanelWindow = getPanelWindowFn;
-    this.initialCheckTimer = null;
-    this.periodicCheckTimer = null;
+    this.timers = [];
+    this.periodicTimer = null;
     this.latestResult = null;
+    this.retryCount = 0;
+    this.checking = false;
     this.setupPowerEvents();
   }
 
@@ -28,37 +38,88 @@ class UpdateChecker {
     try {
       if (electron.powerMonitor) {
         electron.powerMonitor.on('resume', () => {
-          setTimeout(() => this.check(false), 5000);
+          // Check 5s after waking in case the network is re-connecting
+          this._scheduleOnce(5000, () => this.check(false));
         });
       }
     } catch (e) {}
   }
 
   start() {
-    // Automatic check promptly after boot (8 seconds)
-    this.initialCheckTimer = setTimeout(() => {
-      this.check(false);
-    }, 8000);
+    this._clearAll();
 
-    // Periodic background auto-check every 4 hours
-    this.periodicCheckTimer = setInterval(() => {
+    // Progressive boot schedule: 15s → 2min → 30min
+    BOOT_SCHEDULE.forEach((delay, i) => {
+      const t = setTimeout(async () => {
+        const result = await this.check(false);
+        // If first boot check succeeds with an update, stop the remaining boot checks
+        if (result && result.status === 'update_available' && i === 0) {
+          // Cancel later boot checks (2min, 30min) — already found update
+          this.timers.slice(1).forEach(clearTimeout);
+        }
+      }, delay);
+      this.timers.push(t);
+    });
+
+    // Recurring periodic check every 1 hour after all boot checks
+    this.periodicTimer = setTimeout(() => {
+      this._startPeriodic();
+    }, BOOT_SCHEDULE[BOOT_SCHEDULE.length - 1] + 1000);
+    this.timers.push(this.periodicTimer);
+
+    console.log('[UpdateChecker] Auto-update checker started (15s / 2min / 30min / 1hr schedule)');
+  }
+
+  _startPeriodic() {
+    if (this._periodicInterval) clearInterval(this._periodicInterval);
+    this._periodicInterval = setInterval(() => {
       this.check(false);
-    }, 4 * 60 * 60 * 1000);
+    }, PERIODIC_INTERVAL);
+  }
+
+  _scheduleOnce(delayMs, fn) {
+    const t = setTimeout(fn, delayMs);
+    this.timers.push(t);
+    return t;
+  }
+
+  _clearAll() {
+    this.timers.forEach(t => { try { clearTimeout(t); } catch (e) {} });
+    this.timers = [];
+    if (this._periodicInterval) {
+      clearInterval(this._periodicInterval);
+      this._periodicInterval = null;
+    }
   }
 
   stop() {
-    if (this.initialCheckTimer) {
-      clearTimeout(this.initialCheckTimer);
-      this.initialCheckTimer = null;
-    }
-    if (this.periodicCheckTimer) {
-      clearInterval(this.periodicCheckTimer);
-      this.periodicCheckTimer = null;
-    }
+    this._clearAll();
   }
 
   getLatestResult() {
     return this.latestResult;
+  }
+
+  /**
+   * Called by index.js when the panel window opens with a cached update available.
+   * Re-shows the pet bubble so the user cannot miss there is an update waiting.
+   */
+  notifyPetOfCachedUpdate() {
+    if (!this.latestResult || this.latestResult.status !== 'update_available') return;
+    const { latestVersion } = this.latestResult;
+    const skippedVersion = store.get('settings.general.skippedVersion');
+    if (skippedVersion === latestVersion) return;
+
+    if (this.relayToPet) {
+      this.relayToPet('pet:show-bubble', {
+        badge: 'UPDATE AVAILABLE',
+        text: `New version v${latestVersion} is ready! Open Settings to download.`,
+        duration: 10000,
+        sound: 'chirp',
+        category: 'reactions',
+        emotion: 'excited'
+      });
+    }
   }
 
   compareSemver(v1, v2) {
@@ -106,21 +167,24 @@ class UpdateChecker {
   }
 
   async check(isManual = false) {
+    // Respect user opt-out only for automatic checks
     if (!isManual && store.get('settings.general.autoUpdateCheck') === false) {
       return { status: 'disabled' };
     }
 
+    // Prevent concurrent checks
+    if (this.checking && !isManual) return this.latestResult;
+    this.checking = true;
+
     const currentVersion = this.getCurrentVersion();
     const url = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 
-    return new Promise((resolve) => {
+    const result = await new Promise((resolve) => {
       let settled = false;
-      const finish = (result) => {
+      const finish = (res) => {
         if (settled) return;
         settled = true;
-        this.latestResult = result;
-        this.notifyPanel(result, isManual);
-        resolve(result);
+        resolve(res);
       };
 
       try {
@@ -137,38 +201,30 @@ class UpdateChecker {
 
         request.on('response', (response) => {
           if (response.statusCode === 404) {
-            return finish({
-              status: 'no_releases',
-              message: 'No published releases found for this repository.',
-              currentVersion
-            });
+            return finish({ status: 'no_releases', currentVersion });
           }
-
+          if (response.statusCode === 403 || response.statusCode === 429) {
+            // Rate limited — treat as transient error so retry fires
+            return finish({ status: 'error', error: 'GitHub API rate limited.', transient: true, currentVersion });
+          }
           if (response.statusCode !== 200) {
-            return finish({
-              status: 'error',
-              error: `GitHub API returned HTTP ${response.statusCode}`,
-              currentVersion
-            });
+            return finish({ status: 'error', error: `GitHub API returned HTTP ${response.statusCode}`, currentVersion });
           }
 
-          response.on('data', (chunk) => {
-            responseData += chunk.toString('utf8');
-          });
+          response.on('data', (chunk) => { responseData += chunk.toString('utf8'); });
 
           response.on('end', () => {
             try {
               const release = JSON.parse(responseData);
               const latestTag = release.tag_name || '';
               const latestVersion = latestTag.replace(/^v/, '');
-
               const isNewer = this.compareSemver(latestVersion, currentVersion) > 0;
               const skippedVersion = store.get('settings.general.skippedVersion');
               const isSkipped = (skippedVersion === latestVersion);
 
               if (isNewer) {
                 const downloadUrl = this.pickAssetForCurrentPlatform(release.assets) || release.html_url;
-                const res = {
+                return finish({
                   status: 'update_available',
                   currentVersion,
                   latestVersion,
@@ -177,84 +233,88 @@ class UpdateChecker {
                   downloadUrl,
                   releaseUrl: release.html_url,
                   isSkipped
-                };
-
-                // Show speech bubble only if not skipped or if user explicitly checked
-                if ((!isSkipped || isManual) && this.relayToPet) {
-                  this.relayToPet('pet:show-bubble', {
-                    badge: 'UPDATE AVAILABLE',
-                    text: `Update available! v${latestVersion}`,
-                    duration: 8000,
-                    sound: 'chirp',
-                    category: 'reactions',
-                    emotion: 'excited'
-                  });
-                }
-
-                // Native OS Desktop Notification
-                if (!isSkipped || isManual) {
-                  try {
-                    if (electron.Notification && electron.Notification.isSupported()) {
-                      const notif = new electron.Notification({
-                        title: 'Pixie Desktop Pet — Update Available',
-                        body: `Version v${latestVersion} is available on GitHub! Click to update.`,
-                        silent: false
-                      });
-                      notif.on('click', () => {
-                        const panelWindow = this.getPanelWindow ? this.getPanelWindow() : null;
-                        if (panelWindow && !panelWindow.isDestroyed()) {
-                          panelWindow.show();
-                          panelWindow.focus();
-                          panelWindow.webContents.send('panel:switch-tab', 'settings');
-                        } else if (downloadUrl) {
-                          electron.shell.openExternal(downloadUrl);
-                        }
-                      });
-                      notif.show();
-                    }
-                  } catch (e) {}
-                }
-
-                return finish(res);
-              } else {
-                return finish({
-                  status: 'up_to_date',
-                  currentVersion,
-                  latestVersion
                 });
+              } else {
+                return finish({ status: 'up_to_date', currentVersion, latestVersion });
               }
             } catch (parseErr) {
-              return finish({
-                status: 'error',
-                error: 'Could not parse GitHub release information.',
-                currentVersion
-              });
+              return finish({ status: 'error', error: 'Could not parse GitHub release information.', currentVersion });
             }
           });
         });
 
-        request.on('error', (err) => {
-          return finish({
-            status: 'error',
-            error: "Couldn't check for updates. Check your internet connection.",
-            offline: true,
-            currentVersion
-          });
+        request.on('error', () => {
+          finish({ status: 'error', error: "Couldn't check for updates. Check your internet connection.", offline: true, transient: true, currentVersion });
         });
 
         request.end();
       } catch (err) {
-        return finish({
-          status: 'error',
-          error: "Couldn't check for updates. Check your internet connection.",
-          offline: true,
-          currentVersion
-        });
+        finish({ status: 'error', error: "Couldn't check for updates.", offline: true, transient: true, currentVersion });
       }
     });
+
+    this.checking = false;
+    this.latestResult = result;
+
+    // --- Notify panel ---
+    this._notifyPanel(result, isManual);
+
+    // --- Notify pet and OS ---
+    if (result.status === 'update_available') {
+      const { latestVersion, isSkipped } = result;
+      const showNotifications = !isSkipped || isManual;
+
+      if (showNotifications) {
+        // Pet speech bubble
+        if (this.relayToPet) {
+          this.relayToPet('pet:show-bubble', {
+            badge: 'UPDATE AVAILABLE',
+            text: `New version v${latestVersion} is ready! Open Settings to download.`,
+            duration: 10000,
+            sound: 'chirp',
+            category: 'reactions',
+            emotion: 'excited'
+          });
+        }
+
+        // Native OS desktop notification
+        try {
+          if (electron.Notification && electron.Notification.isSupported()) {
+            const notif = new electron.Notification({
+              title: 'Pixie Desktop Pet — Update Available',
+              body: `Version v${latestVersion} is available on GitHub. Click to open Settings.`,
+              silent: false
+            });
+            notif.on('click', () => {
+              const panelWindow = this.getPanelWindow ? this.getPanelWindow() : null;
+              if (panelWindow && !panelWindow.isDestroyed()) {
+                panelWindow.show();
+                panelWindow.focus();
+                panelWindow.webContents.send('panel:switch-tab', 'settings');
+              } else if (result.downloadUrl) {
+                electron.shell.openExternal(result.downloadUrl);
+              }
+            });
+            notif.show();
+          }
+        } catch (e) {}
+
+        this.retryCount = 0; // Reset retry counter on success
+      }
+    } else if (result.status === 'error' && result.transient && !isManual) {
+      // Retry on transient network failure
+      const delay = RETRY_DELAYS[this.retryCount] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+      this.retryCount = Math.min(this.retryCount + 1, RETRY_DELAYS.length - 1);
+      console.warn(`[UpdateChecker] Transient error — retrying in ${delay / 1000}s`);
+      this._scheduleOnce(delay, () => this.check(false));
+    } else {
+      this.retryCount = 0;
+    }
+
+    return result;
   }
 
-  notifyPanel(result, isManual) {
+  _notifyPanel(result, isManual) {
     try {
       const panelWindow = this.getPanelWindow ? this.getPanelWindow() : null;
       if (panelWindow && !panelWindow.isDestroyed()) {
