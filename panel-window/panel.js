@@ -72,6 +72,7 @@ class PanelController {
     this.renderHeaderPetFace();
     this.setupCursorTracking();
     this.setupIPC();
+    this.setupUpdateBanner();
     this.refreshIcons();
   }
 
@@ -310,6 +311,60 @@ class PanelController {
         this.chatTab.updateModelBadge();
       }
     });
+  }
+
+  setupUpdateBanner() {
+    this.updateBannerEl = document.getElementById('panel-update-banner');
+    this.updateBannerTitle = document.getElementById('update-banner-title');
+    this.updateBannerVersion = document.getElementById('update-banner-version');
+    this.updateDownloadBtn = document.getElementById('btn-banner-download');
+    this.updateDismissBtn = document.getElementById('btn-banner-close');
+    this.settingsUpdateDot = document.getElementById('settings-update-dot');
+
+    if (this.updateDismissBtn && this.updateBannerEl) {
+      this.updateDismissBtn.addEventListener('click', () => {
+        this.updateBannerEl.classList.add('hidden');
+      });
+    }
+
+    if (this.ipcRenderer) {
+      this.ipcRenderer.on('update:status', (event, { result, isManual }) => {
+        this.handleUpdateStatus(result);
+      });
+
+      // Query cached update result from main process on startup
+      this.ipcRenderer.invoke('update:get-cached-status').then((cached) => {
+        if (cached) this.handleUpdateStatus(cached);
+      }).catch(() => {});
+    }
+  }
+
+  handleUpdateStatus(result) {
+    if (!result || result.status !== 'update_available') return;
+    const skipped = this.store.get('settings.general.skippedVersion');
+    if (skipped === result.latestVersion) return;
+
+    if (this.settingsUpdateDot) {
+      this.settingsUpdateDot.classList.remove('hidden');
+    }
+
+    if (this.updateBannerEl) {
+      if (this.updateBannerTitle) {
+        this.updateBannerTitle.textContent = `Update Available (v${result.latestVersion})`;
+      }
+      if (this.updateBannerVersion) {
+        this.updateBannerVersion.textContent = `A newer version is ready on GitHub.`;
+      }
+      if (this.updateDownloadBtn) {
+        this.updateDownloadBtn.onclick = () => {
+          if (this.ipcRenderer) {
+            this.ipcRenderer.send('update:open-download', result.downloadUrl || result.releaseUrl);
+          }
+        };
+      }
+      this.updateBannerEl.classList.remove('hidden');
+      this.refreshIcons();
+    }
   }
 }
 

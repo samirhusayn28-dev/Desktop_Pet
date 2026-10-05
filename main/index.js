@@ -616,6 +616,15 @@ function createPanelWindow() {
     }
   });
 
+  panelWindow.webContents.on('did-finish-load', () => {
+    if (updateChecker && updateChecker.getLatestResult() && panelWindow && !panelWindow.isDestroyed()) {
+      panelWindow.webContents.send('update:status', {
+        result: updateChecker.getLatestResult(),
+        isManual: false
+      });
+    }
+  });
+
   panelWindow.on('blur', () => {
     lastPanelBlurTime = Date.now();
   });
@@ -1531,6 +1540,13 @@ ipcMain.handle('update:check-status', async () => {
     return await updateChecker.check(true);
   }
   return { status: 'error', error: 'Update checker not initialized.' };
+});
+
+ipcMain.handle('update:get-cached-status', () => {
+  if (updateChecker) {
+    return updateChecker.getLatestResult();
+  }
+  return null;
 });
 
 ipcMain.on('update:skip-version', (e, version) => {

@@ -20,18 +20,30 @@ class UpdateChecker {
     this.getPanelWindow = getPanelWindowFn;
     this.initialCheckTimer = null;
     this.periodicCheckTimer = null;
+    this.latestResult = null;
+    this.setupPowerEvents();
+  }
+
+  setupPowerEvents() {
+    try {
+      if (electron.powerMonitor) {
+        electron.powerMonitor.on('resume', () => {
+          setTimeout(() => this.check(false), 5000);
+        });
+      }
+    } catch (e) {}
   }
 
   start() {
-    // Initial check 60 seconds after launch
+    // Automatic check promptly after boot (8 seconds)
     this.initialCheckTimer = setTimeout(() => {
       this.check(false);
-    }, 60000);
+    }, 8000);
 
-    // Periodic check every 24 hours
+    // Periodic background auto-check every 4 hours
     this.periodicCheckTimer = setInterval(() => {
       this.check(false);
-    }, 24 * 60 * 60 * 1000);
+    }, 4 * 60 * 60 * 1000);
   }
 
   stop() {
@@ -43,6 +55,10 @@ class UpdateChecker {
       clearInterval(this.periodicCheckTimer);
       this.periodicCheckTimer = null;
     }
+  }
+
+  getLatestResult() {
+    return this.latestResult;
   }
 
   compareSemver(v1, v2) {
@@ -102,6 +118,7 @@ class UpdateChecker {
       const finish = (result) => {
         if (settled) return;
         settled = true;
+        this.latestResult = result;
         this.notifyPanel(result, isManual);
         resolve(result);
       };
@@ -165,9 +182,37 @@ class UpdateChecker {
                 // Show speech bubble only if not skipped or if user explicitly checked
                 if ((!isSkipped || isManual) && this.relayToPet) {
                   this.relayToPet('pet:show-bubble', {
+                    badge: 'UPDATE AVAILABLE',
                     text: `Update available! v${latestVersion}`,
-                    duration: 6000
+                    duration: 8000,
+                    sound: 'chirp',
+                    category: 'reactions',
+                    emotion: 'excited'
                   });
+                }
+
+                // Native OS Desktop Notification
+                if (!isSkipped || isManual) {
+                  try {
+                    if (electron.Notification && electron.Notification.isSupported()) {
+                      const notif = new electron.Notification({
+                        title: 'Pixie Desktop Pet — Update Available',
+                        body: `Version v${latestVersion} is available on GitHub! Click to update.`,
+                        silent: false
+                      });
+                      notif.on('click', () => {
+                        const panelWindow = this.getPanelWindow ? this.getPanelWindow() : null;
+                        if (panelWindow && !panelWindow.isDestroyed()) {
+                          panelWindow.show();
+                          panelWindow.focus();
+                          panelWindow.webContents.send('panel:switch-tab', 'settings');
+                        } else if (downloadUrl) {
+                          electron.shell.openExternal(downloadUrl);
+                        }
+                      });
+                      notif.show();
+                    }
+                  } catch (e) {}
                 }
 
                 return finish(res);

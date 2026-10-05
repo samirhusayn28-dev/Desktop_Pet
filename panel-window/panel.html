@@ -68,6 +68,7 @@
       <div class="panel-window-controls">
         <button class="win-btn settings-gear-btn" id="btn-header-settings" title="Settings">
           <i data-lucide="settings"></i>
+          <span class="settings-update-dot hidden" id="settings-update-dot"></span>
         </button>
         <button class="win-btn win-min-btn" id="btn-win-min" title="Minimize / Hide">
           <i data-lucide="minus"></i>
@@ -105,6 +106,26 @@
         <span class="tab-label">Tools</span>
       </button>
     </nav>
+
+    <!-- Auto-detected Update Banner -->
+    <div class="panel-update-banner hidden" id="panel-update-banner">
+      <div class="update-banner-left">
+        <div class="update-pulse-dot"></div>
+        <div class="update-banner-text">
+          <span class="update-title" id="update-banner-title">Pixie Update Available</span>
+          <span class="update-subtitle" id="update-banner-version">A newer version is ready on GitHub</span>
+        </div>
+      </div>
+      <div class="update-banner-actions">
+        <button type="button" class="banner-download-btn" id="btn-banner-download">
+          <i data-lucide="download"></i>
+          <span>Update</span>
+        </button>
+        <button type="button" class="banner-close-btn" id="btn-banner-close" title="Dismiss">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+    </div>
 
     <!-- 3. Scrollable Tab Contents -->
     <main class="panel-main-content">

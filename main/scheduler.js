@@ -7,7 +7,7 @@
 
 const path = require('path');
 const fs = require('fs');
-const { powerMonitor } = require('electron');
+const { powerMonitor, Notification } = require('electron');
 const store = require('./secure-store');
 const bubble = require('./bubble-window');
 
@@ -17,14 +17,22 @@ class Scheduler {
     this.lastCheckedMinute = '';
     this.waterCounterMinutes = 0;
     this.stretchCounterMinutes = 0;
+    this.suspendTime = null;
+    this.petWindowRef = null;
+    this.panelWindowRef = null;
     this.setupPowerEvents();
   }
 
   setupPowerEvents() {
     try {
       if (powerMonitor) {
+        powerMonitor.on('suspend', () => {
+          this.suspendTime = Date.now();
+        });
         powerMonitor.on('resume', () => {
-          setTimeout(() => this.checkMissedReminders(), 2000);
+          const sleptFrom = this.suspendTime;
+          this.suspendTime = null;
+          setTimeout(() => this.checkSleepMissedReminders(sleptFrom), 2000);
         });
       }
     } catch (e) {}
@@ -36,9 +44,6 @@ class Scheduler {
     this.timer = setInterval(() => {
       this.tick();
     }, 1000);
-
-    // Initial check for missed reminders after startup
-    setTimeout(() => this.checkMissedReminders(), 1500);
 
     console.log('[Scheduler] Background reminder scheduler running (1s precision)');
   }
@@ -101,7 +106,43 @@ class Scheduler {
       ? (userName ? `${userName}, you missed reminder: ${title}!` : `Missed reminder: ${title}!`)
       : (userName ? `Hey ${userName}, time for: ${title}!` : `Time for: ${title}!`);
 
-    // Pet reacts: surprised + bounce + solid speech bubble
+    // 1. Native OS Desktop Notification (pops up even when full screen in other apps)
+    try {
+      if (Notification && Notification.isSupported()) {
+        const notif = new Notification({
+          title: isMissed ? 'Missed Reminder — Pixie' : 'Reminder — Pixie',
+          body: text,
+          silent: false
+        });
+        notif.on('click', () => {
+          if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
+            this.panelWindowRef.show();
+            this.panelWindowRef.focus();
+            this.panelWindowRef.webContents.send('panel:switch-tab', 'reminders');
+          }
+        });
+        notif.show();
+      }
+    } catch (e) {
+      console.warn('[Scheduler] Native notification error:', e.message);
+    }
+
+    // 2. Bring pet to top & wake if sleeping
+    if (this.petWindowRef && !this.petWindowRef.isDestroyed()) {
+      try {
+        this.petWindowRef.show();
+        this.petWindowRef.setAlwaysOnTop(true, 'screen-saver');
+        this.petWindowRef.webContents.send('pet:reset-idle');
+        this.petWindowRef.webContents.send('pet:set-state', {
+          state: isMissed ? 'worried' : 'surprised',
+          duration: 5000,
+          priority: 5,
+          force: true
+        });
+      } catch (e) {}
+    }
+
+    // 3. Speech bubble with loud reminder alarm
     bubble.show({
       badge: isMissed ? 'MISSED REMINDER' : 'REMINDER',
       text,
@@ -109,40 +150,52 @@ class Scheduler {
       category: 'reminders',
       emotion: isMissed ? 'worried' : 'surprised',
       bounce: true,
-      duration: 7000,
+      duration: 8000,
       critical: true
     });
+
+    // 4. Notify panel window
+    if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
+      try {
+        this.panelWindowRef.webContents.send('reminder:triggered', { reminder: rem, isMissed });
+      } catch (e) {}
+    }
   }
 
   evaluateReminders(currentTimeStr, dateObj) {
     const reminders = store.get('reminders') || [];
     let updated = false;
     const todayDateStr = dateObj.toDateString();
-    const currentHours = String(dateObj.getHours()).padStart(2, '0');
-    const currentMins = String(dateObj.getMinutes()).padStart(2, '0');
+    const currentHours = dateObj.getHours();
+    const currentMins = dateObj.getMinutes();
 
     for (const rem of reminders) {
       if (!rem.enabled) continue;
 
+      const [rHoursRaw, rMinsRaw] = (rem.time || '').split(':');
+      const rHours = parseInt(rHoursRaw, 10);
+      const rMins = parseInt(rMinsRaw, 10);
+      if (isNaN(rHours) || isNaN(rMins)) continue;
+
+      const isTimeMatch = (rHours === currentHours && rMins === currentMins);
       let isDue = false;
 
       if (rem.repeat === 'every-hour') {
-        const targetMin = (rem.time || '00:00').split(':')[1];
         const hourTriggerKey = `${todayDateStr}-${currentHours}`;
-        if (currentMins === targetMin && rem.lastTriggered !== hourTriggerKey) {
+        if (rMins === currentMins && rem.lastTriggered !== hourTriggerKey) {
           isDue = true;
           rem.lastTriggered = hourTriggerKey;
           updated = true;
         }
       } else if (rem.repeat === 'daily') {
-        if (rem.time === currentTimeStr && rem.lastTriggered !== todayDateStr) {
+        if (isTimeMatch && rem.lastTriggered !== todayDateStr) {
           isDue = true;
           rem.lastTriggered = todayDateStr;
           updated = true;
         }
       } else {
         // Repeat: 'once'
-        if (rem.time === currentTimeStr && rem.lastTriggered !== todayDateStr) {
+        if (isTimeMatch && rem.lastTriggered !== todayDateStr) {
           isDue = true;
           rem.lastTriggered = todayDateStr;
           rem.enabled = false;
@@ -157,42 +210,61 @@ class Scheduler {
 
     if (updated) {
       store.set('reminders', reminders);
+      if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
+        try {
+          this.panelWindowRef.webContents.send('reminders:changed', reminders);
+        } catch (e) {}
+      }
     }
   }
 
-  checkMissedReminders() {
+  checkSleepMissedReminders(sleptFromTimestamp) {
+    if (!sleptFromTimestamp) return;
+    const now = new Date();
+    const sleepDurationMs = now.getTime() - sleptFromTimestamp;
+    // Only evaluate if slept at least 1 min and less than 24 hours
+    if (sleepDurationMs < 60000 || sleepDurationMs > 86400000) return;
+
     const reminders = store.get('reminders') || [];
     let updated = false;
-    const now = new Date();
     const todayDateStr = now.toDateString();
-    const currentHours = now.getHours();
-    const currentMins = now.getMinutes();
-    const currentTotalMins = currentHours * 60 + currentMins;
+
+    const sleepDate = new Date(sleptFromTimestamp);
+    const startMins = sleepDate.getHours() * 60 + sleepDate.getMinutes();
+    const endMins = now.getHours() * 60 + now.getMinutes();
 
     for (const rem of reminders) {
       if (!rem.enabled) continue;
 
-      const [rHours, rMins] = (rem.time || '00:00').split(':').map(Number);
-      const remTotalMins = (rHours || 0) * 60 + (rMins || 0);
+      const [rHoursRaw, rMinsRaw] = (rem.time || '').split(':');
+      const rHours = parseInt(rHoursRaw, 10);
+      const rMins = parseInt(rMinsRaw, 10);
+      if (isNaN(rHours) || isNaN(rMins)) continue;
 
-      if (rem.repeat === 'once') {
-        if (rem.lastTriggered !== todayDateStr && remTotalMins < currentTotalMins) {
-          this.triggerReminder(rem, true);
+      const remTotalMins = rHours * 60 + rMins;
+
+      // Check if scheduled time fell within the sleep duration
+      const fellInWindow = (startMins <= endMins)
+        ? (remTotalMins >= startMins && remTotalMins <= endMins)
+        : (remTotalMins >= startMins || remTotalMins <= endMins); // crossed midnight
+
+      if (fellInWindow && rem.lastTriggered !== todayDateStr) {
+        this.triggerReminder(rem, true);
+        rem.lastTriggered = todayDateStr;
+        if (rem.repeat === 'once') {
           rem.enabled = false;
-          rem.lastTriggered = todayDateStr;
-          updated = true;
         }
-      } else if (rem.repeat === 'daily') {
-        if (rem.lastTriggered !== todayDateStr && remTotalMins < currentTotalMins) {
-          this.triggerReminder(rem, true);
-          rem.lastTriggered = todayDateStr;
-          updated = true;
-        }
+        updated = true;
       }
     }
 
     if (updated) {
       store.set('reminders', reminders);
+      if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
+        try {
+          this.panelWindowRef.webContents.send('reminders:changed', reminders);
+        } catch (e) {}
+      }
     }
   }
 

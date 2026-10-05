@@ -138,10 +138,12 @@ class SoundManager {
     // Always ensure latest settings before evaluating
     this.loadSettings();
 
-    // 2. Strict Check: If sounds are OFF, DO NOTHING!
-    // No audio element or AudioContext is created, no audio file is loaded, no external process spawned.
-    // (Test sound button in settings passes category: 'test' which tests audio when pressed)
-    if (!this.settings.soundsEnabled && category !== 'test') {
+    // 2. Sound Switch Check:
+    // If master ambient sounds are OFF, allow reminder and timer alarms to sound IF their sub-toggle is active
+    const isSubToggleActive = (category === 'reminders' && this.settings.soundReminders) ||
+                              (category === 'timer' && this.settings.soundTimer) ||
+                              category === 'test';
+    if (!this.settings.soundsEnabled && !isSubToggleActive) {
       return false;
     }
 

@@ -2,6 +2,28 @@
 
 All notable changes to Pixie are documented in this file.
 
+## [1.0.5] - 2026-10-05 — **Instant System Sense, Reminders Fix & Auto Update Detection**
+
+### Fixed
+- **Reminders Not Triggering**:
+  - Replaced strict string time matching with numeric hour and minute evaluation (`rHours === currentHours && rMins === currentMins`), making reminder scheduling 100% immune to padding, extra seconds, or timezone/string format variations.
+  - Eliminated flawed startup missed-reminder check that was falsely disabling upcoming reminders on application boot or window reload.
+  - Added native OS desktop notifications (`Notification` API) so scheduled reminder alerts display immediately in Windows Action Center and macOS Notification Center even when other windows or games are in full screen.
+  - Wakes pet and brings pet window to the foreground with speech bubble and alarm alert when any reminder is due.
+  - Synchronizes reminder state changes (`reminders:changed` IPC) immediately across the background scheduler and the panel UI.
+  - Configured reminder audio alerts to sound whenever `soundReminders` is enabled, even if ambient pet chirps are muted.
+
+- **Windows System Sense Lag & Huge Delay**:
+  - Decoupled fast Core Audio tracking from slow WMI queries: introduced ultra-fast `Get-PixieFastAudio` routine executing in <2ms directly via C# Core Audio COM and registry friendly-name inspection.
+  - Implemented sequence-tagged correlation ID protocol (`PX_RES:<id>:<result>`) preventing any PowerShell response desynchronization or command queue stalls.
+  - Reduced volume polling interval from 1.5s/10s down to 400ms (active) and 1200ms (idle), delivering instantaneous reactions to volume changes, mute/unmute, headphone connect/disconnect, and music playback.
+
+### Added
+- **Automatic GitHub Update Detection**:
+  - Background auto-update check runs 8 seconds after application boot and periodically every 4 hours, as well as on system resume from sleep.
+  - When a new GitHub release is detected, Pixie automatically displays a gentle notification banner in the panel window, an update indicator badge on the Settings button, a pet speech bubble, and a native OS desktop notification with a direct download button.
+  - Retains manual "Check for Updates" button with live status feedback.
+
 ## [1.0.4] - 2026-10-05 — **Windows System Functions & Hardware Parity Update**
 
 ### Fixed

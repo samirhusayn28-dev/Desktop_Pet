@@ -112,6 +112,39 @@ public class PixieAudio {
 }
 '@ -ErrorAction SilentlyContinue 2>$null
 
+function Get-PixieFastAudio {
+    $audio = [PixieAudio]::AudioState()
+    $isHp = "false"
+    try {
+        $parts = $audio.Split(',')
+        $devId = if ($parts.Length -ge 4) { $parts[3] } else { "" }
+        if ($devId) {
+            $reg = "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render\\$devId\\Properties"
+            $p = Get-ItemProperty -Path $reg -ErrorAction SilentlyContinue
+            if ($p) {
+                $desc = "" + $p.'{a45c254e-df1c-4efd-8020-67d146a850e0},2' + " " + $p.'{b3f8fa53-0004-438e-9002-d4c46f370a0f},6'
+                if ($desc -match 'headphone|headset|earphone|airpod|bud|earbud|airpods|beats|bose|sony|jbl|wh-|wf-|sennheiser|plantronics|razer|hyperx|steelseries|wireless stereo|bluetooth audio') {
+                    $isHp = "true"
+                }
+            }
+        }
+    } catch {}
+    return "$audio;$isHp"
+}
+
+function Get-PixieBrightness {
+    try {
+        $b = (Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBrightness -ErrorAction SilentlyContinue).CurrentBrightness
+        if ($b -ne $null) { return "$b" }
+    } catch {
+        try {
+            $b = (Get-WmiObject -Namespace root/wmi -Class WmiMonitorBrightness -ErrorAction SilentlyContinue).CurrentBrightness
+            if ($b -ne $null) { return "$b" }
+        } catch {}
+    }
+    return "NA"
+}
+
 function Get-PixieAll {
     $audio = [PixieAudio]::AudioState()
     $isHp = "false"
@@ -130,16 +163,7 @@ function Get-PixieAll {
         }
     } catch {}
 
-    $br = "NA"
-    try {
-        $b = (Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBrightness -ErrorAction SilentlyContinue).CurrentBrightness
-        if ($b -ne $null) { $br = "$b" }
-    } catch {
-        try {
-            $b = (Get-WmiObject -Namespace root/wmi -Class WmiMonitorBrightness -ErrorAction SilentlyContinue).CurrentBrightness
-            if ($b -ne $null) { $br = "$b" }
-        } catch {}
-    }
+    $br = Get-PixieBrightness
 
     $batt = "NA"
     try {
@@ -166,7 +190,8 @@ Write-Output "PIXIE_READY"
 
 let _winPsProc = null;
 let _winPsBuffer = '';
-let _winPsCbs = [];
+let _winPsSeq = 0;
+const _winPsPending = new Map();
 let _winPsReady = false;
 
 function ensureWinPs() {
@@ -184,11 +209,20 @@ function ensureWinPs() {
         const line = raw.replace(/\r/g, '').trim();
         if (!line) continue;
         if (line === 'PIXIE_READY') { _winPsReady = true; continue; }
-        if (_winPsCbs.length) _winPsCbs.shift()(line);
+        const match = line.match(/^PX_RES:(\d+):(.*)$/);
+        if (match) {
+          const id = parseInt(match[1], 10);
+          const res = match[2];
+          const cb = _winPsPending.get(id);
+          if (cb) {
+            _winPsPending.delete(id);
+            cb(res);
+          }
+        }
       }
     });
-    _winPsProc.on('exit', () => { _winPsProc = null; _winPsReady = false; });
-    _winPsProc.on('error', () => { _winPsProc = null; _winPsReady = false; });
+    _winPsProc.on('exit', () => { _winPsProc = null; _winPsReady = false; _winPsPending.clear(); });
+    _winPsProc.on('error', () => { _winPsProc = null; _winPsReady = false; _winPsPending.clear(); });
 
     // Write initialiser — compiles C# once
     _winPsProc.stdin.write(WIN_PS_AUDIO_INIT + '\n');
@@ -197,20 +231,27 @@ function ensureWinPs() {
   }
 }
 
-function winPsQuery(cmd, timeoutMs = 3000) {
+function winPsQuery(cmd, timeoutMs = 2500) {
   return new Promise((resolve) => {
     if (!_winPsReady || !_winPsProc || _winPsProc.killed) {
       return resolve(null);
     }
+    const qId = ++_winPsSeq;
     const timer = setTimeout(() => {
-      // Remove stale callback on timeout
-      const idx = _winPsCbs.indexOf(cb);
-      if (idx !== -1) _winPsCbs.splice(idx, 1);
+      _winPsPending.delete(qId);
       resolve(null);
     }, timeoutMs);
-    const cb = (line) => { clearTimeout(timer); resolve(line); };
-    _winPsCbs.push(cb);
-    try { _winPsProc.stdin.write(cmd + '\n'); } catch { resolve(null); }
+    _winPsPending.set(qId, (line) => {
+      clearTimeout(timer);
+      resolve(line);
+    });
+    try {
+      _winPsProc.stdin.write(`Write-Output "PX_RES:${qId}:$(${cmd})"\n`);
+    } catch {
+      _winPsPending.delete(qId);
+      clearTimeout(timer);
+      resolve(null);
+    }
   });
 }
 
@@ -454,9 +495,9 @@ class SystemSense {
         if (powerMonitor) idle = powerMonitor.getSystemIdleTime();
       } catch (e) {}
 
-      // Poll ~1.5s while active (<30s idle) or in test mode, 10s otherwise
+      // Poll 400ms while active (<30s idle) or in test mode, 1200ms otherwise (instant reactions, near zero CPU)
       const isTestMode = process.argv.includes('--test-hooks');
-      const delay = (isTestMode || (idle < 30 && !this.isSleeping && !this.isScreenLocked && !this.isSuspended)) ? 1500 : 10000;
+      const delay = (isTestMode || (idle < 30 && !this.isSleeping && !this.isScreenLocked && !this.isSuspended)) ? 400 : 1200;
 
       this.volumeTimer = setTimeout(async () => {
         if (this.isCheckingVolume) return;
@@ -500,9 +541,10 @@ class SystemSense {
       if (process.platform === 'win32') {
         ensureWinPs();
         if (!_winPsReady) return resolve();
-        winPsQuery('Get-PixieAll').then((result) => {
+        // Ultra-fast C# CoreAudio query (<2ms execution, no slow WMI)
+        winPsQuery('Get-PixieFastAudio', 1500).then((result) => {
           if (!result) return resolve();
-          // Format: vol,mute,peak,devId;isHp;br;batt
+          // Format: vol,mute,peak,devId;isHp
           const sections = result.split(';');
           const audioParts = (sections[0] || '').split(',');
           const vol = parseInt(audioParts[0], 10);
@@ -513,7 +555,7 @@ class SystemSense {
             this._applyVolumeBandLogic(vol, muted);
           }
 
-          // Real-time headphone detection from Core Audio
+          // Real-time headphone detection from Core Audio (<1ms registry friendly name)
           if (sections.length > 1) {
             const isHp = sections[1].trim() === 'true';
             this._applyHeadphoneState(isHp);
@@ -522,26 +564,6 @@ class SystemSense {
           // Real-time audio activity detection (peak > 5 means audio is actively outputting)
           const isAudioActive = peak >= 5;
           this.processAudioPlayingState(isAudioActive).catch(() => {});
-
-          // Brightness telemetry update
-          if (sections.length > 2 && sections[2].trim() !== 'NA') {
-            const br = parseInt(sections[2].trim(), 10);
-            if (!isNaN(br)) {
-              this.state.brightnessAvailable = true;
-              this.state.brightnessLevel = br;
-              this._applyBrightnessBandLogic(br);
-            }
-          }
-
-          // Battery telemetry update
-          if (sections.length > 3 && sections[3].trim() !== 'NA') {
-            const battParts = sections[3].trim().split(',');
-            const bPct = parseInt(battParts[0], 10);
-            const bChg = (battParts[1] || '').toLowerCase() === 'true';
-            if (!isNaN(bPct)) {
-              this.processBatteryState(bPct, bChg);
-            }
-          }
 
           resolve();
         }).catch(() => resolve());
@@ -627,28 +649,47 @@ class SystemSense {
     return new Promise((resolve) => {
       // ── Windows branch ──────────────────────────────────────────────────
       if (process.platform === 'win32') {
-        // WMI WmiMonitorBrightness — works on laptops with internal display
-        execFile('wmic', [
-          '/namespace:\\\\root\\wmi',
-          'path', 'WmiMonitorBrightness',
-          'get', 'CurrentBrightness',
-          '/format:value'
-        ], { timeout: 3000, windowsHide: true }, (err, stdout) => {
-          if (err || !stdout) {
-            this.state.brightnessAvailable = false;
-            return resolve();
-          }
-          const match = stdout.match(/CurrentBrightness=(\d+)/i);
-          if (!match) {
-            this.state.brightnessAvailable = false;
-            return resolve();
-          }
-          this.state.brightnessAvailable = true;
-          const pct = parseInt(match[1], 10);
-          this.state.brightnessLevel = pct;
-          this._applyBrightnessBandLogic(pct);
-          resolve();
-        });
+        const doWmic = () => {
+          execFile('wmic', [
+            '/namespace:\\\\root\\wmi',
+            'path', 'WmiMonitorBrightness',
+            'get', 'CurrentBrightness',
+            '/format:value'
+          ], { timeout: 3000, windowsHide: true }, (err, stdout) => {
+            if (err || !stdout) {
+              this.state.brightnessAvailable = false;
+              return resolve();
+            }
+            const match = stdout.match(/CurrentBrightness=(\d+)/i);
+            if (!match) {
+              this.state.brightnessAvailable = false;
+              return resolve();
+            }
+            this.state.brightnessAvailable = true;
+            const pct = parseInt(match[1], 10);
+            this.state.brightnessLevel = pct;
+            this._applyBrightnessBandLogic(pct);
+            resolve();
+          });
+        };
+
+        if (_winPsReady) {
+          winPsQuery('Get-PixieBrightness', 2000).then((res) => {
+            if (res && res !== 'NA') {
+              const pct = parseInt(res.trim(), 10);
+              if (!isNaN(pct)) {
+                this.state.brightnessAvailable = true;
+                this.state.brightnessLevel = pct;
+                this._applyBrightnessBandLogic(pct);
+                return resolve();
+              }
+            }
+            doWmic();
+          }).catch(() => doWmic());
+          return;
+        }
+
+        doWmic();
         return;
       }
 
@@ -1028,7 +1069,7 @@ class SystemSense {
       // ── Windows branch ──────────────────────────────────────────────────
       if (process.platform === 'win32') {
         if (_winPsReady) {
-          winPsQuery('Get-PixieAll').then((res) => {
+          winPsQuery('Get-PixieFastAudio', 1500).then((res) => {
             if (res && res.includes(';')) {
               const isHp = res.split(';')[1].trim() === 'true';
               this._applyHeadphoneState(isHp);
