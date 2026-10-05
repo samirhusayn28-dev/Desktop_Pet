@@ -2,6 +2,17 @@
 
 All notable changes to Pixie are documented in this file.
 
+## [1.0.6] - 2026-10-05 — **Reminder Scheduler Deep Fix**
+
+### Fixed
+- **Reminders Still Not Triggering** — Complete rewrite of `scheduler.js` evaluation engine:
+  - **`checkPastDueOnStartup()`**: On every app launch, scans all enabled reminders and fires any that were due within the last 30 minutes (as "missed" alerts), so reminders are never silently lost if the app was closed at their scheduled time.
+  - **`evaluateNow()`**: Called immediately whenever the user adds or edits a reminder via the panel. Checks if the reminder time is right now or up to 2 minutes in the past and fires it immediately — so setting a reminder for "now" always works.
+  - **`firedThisSession` deduplication Set**: Prevents any reminder from double-firing in the same app session regardless of how many times `evaluateNow`, `evaluateReminders`, or `checkPastDueOnStartup` are called.
+  - **Snooze/Reschedule properly clears session state**: After snooze or edit, the reminder's session entry is removed so it can fire again at its new time.
+  - **Comprehensive error isolation**: Each trigger step (native notification, pet window, bubble, panel IPC) is independently try-caught so a failure in one never blocks the others.
+  - **Debug logging**: Console now logs `[Scheduler] FIRING reminder "..." at HH:MM` so reminder activity is traceable in the app's developer console.
+
 ## [1.0.5] - 2026-10-05 — **Instant System Sense, Reminders Fix & Auto Update Detection**
 
 ### Fixed

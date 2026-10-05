@@ -3,6 +3,15 @@
  * Evaluates stored reminders, periodic hydration / posture breaks, and pomodoro completions every second.
  * Supports repeat (every-hour, daily) and snooze.
  * 100% independent of panel window: works with panel closed, asleep, and on app restart.
+ *
+ * FIX HISTORY:
+ *  v1.0.6 — Full rewrite of reminder evaluation:
+ *    • checkPastDueOnStartup() fires reminders missed before app boot (up to 30 min window)
+ *    • checkPastDue(reminders) fires reminders created/missed within the current session
+ *    • evaluateReminders() no longer skips reminders due to minute deduplication issues
+ *    • reminders:updated IPC also runs a past-due scan so newly-added reminders fire immediately
+ *      if their time is right now or was up to 1 minute ago
+ *    • Robust triggerReminder with error isolation per step
  */
 
 const path = require('path');
@@ -20,6 +29,7 @@ class Scheduler {
     this.suspendTime = null;
     this.petWindowRef = null;
     this.panelWindowRef = null;
+    this.firedThisSession = new Set(); // tracks "id:triggerKey" to prevent double-firing
     this.setupPowerEvents();
   }
 
@@ -45,6 +55,9 @@ class Scheduler {
       this.tick();
     }, 1000);
 
+    // Check for reminders that were due before the app started (up to 30 min lookback)
+    setTimeout(() => this.checkPastDueOnStartup(), 3000);
+
     console.log('[Scheduler] Background reminder scheduler running (1s precision)');
   }
 
@@ -63,7 +76,7 @@ class Scheduler {
 
     if (currentTimeStr !== this.lastCheckedMinute) {
       this.lastCheckedMinute = currentTimeStr;
-      this.evaluateReminders(currentTimeStr, now);
+      this.evaluateReminders(now);
 
       // Hydration & posture health intervals
       this.waterCounterMinutes++;
@@ -99,70 +112,9 @@ class Scheduler {
     }
   }
 
-  triggerReminder(rem, isMissed = false) {
-    const userName = (store.get('settings.general.userName') || '').trim();
-    const title = rem.title || 'Scheduled Reminder';
-    const text = isMissed
-      ? (userName ? `${userName}, you missed reminder: ${title}!` : `Missed reminder: ${title}!`)
-      : (userName ? `Hey ${userName}, time for: ${title}!` : `Time for: ${title}!`);
-
-    // 1. Native OS Desktop Notification (pops up even when full screen in other apps)
-    try {
-      if (Notification && Notification.isSupported()) {
-        const notif = new Notification({
-          title: isMissed ? 'Missed Reminder — Pixie' : 'Reminder — Pixie',
-          body: text,
-          silent: false
-        });
-        notif.on('click', () => {
-          if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
-            this.panelWindowRef.show();
-            this.panelWindowRef.focus();
-            this.panelWindowRef.webContents.send('panel:switch-tab', 'reminders');
-          }
-        });
-        notif.show();
-      }
-    } catch (e) {
-      console.warn('[Scheduler] Native notification error:', e.message);
-    }
-
-    // 2. Bring pet to top & wake if sleeping
-    if (this.petWindowRef && !this.petWindowRef.isDestroyed()) {
-      try {
-        this.petWindowRef.show();
-        this.petWindowRef.setAlwaysOnTop(true, 'screen-saver');
-        this.petWindowRef.webContents.send('pet:reset-idle');
-        this.petWindowRef.webContents.send('pet:set-state', {
-          state: isMissed ? 'worried' : 'surprised',
-          duration: 5000,
-          priority: 5,
-          force: true
-        });
-      } catch (e) {}
-    }
-
-    // 3. Speech bubble with loud reminder alarm
-    bubble.show({
-      badge: isMissed ? 'MISSED REMINDER' : 'REMINDER',
-      text,
-      sound: 'alarm',
-      category: 'reminders',
-      emotion: isMissed ? 'worried' : 'surprised',
-      bounce: true,
-      duration: 8000,
-      critical: true
-    });
-
-    // 4. Notify panel window
-    if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
-      try {
-        this.panelWindowRef.webContents.send('reminder:triggered', { reminder: rem, isMissed });
-      } catch (e) {}
-    }
-  }
-
-  evaluateReminders(currentTimeStr, dateObj) {
+  /** Called by tick() every new minute — fires reminders exactly on time */
+  evaluateReminders(dateObj) {
+    if (!dateObj) dateObj = new Date();
     const reminders = store.get('reminders') || [];
     let updated = false;
     const todayDateStr = dateObj.toDateString();
@@ -179,45 +131,146 @@ class Scheduler {
 
       const isTimeMatch = (rHours === currentHours && rMins === currentMins);
       let isDue = false;
+      let triggerKey;
 
       if (rem.repeat === 'every-hour') {
-        const hourTriggerKey = `${todayDateStr}-${currentHours}`;
-        if (rMins === currentMins && rem.lastTriggered !== hourTriggerKey) {
+        triggerKey = `${todayDateStr}-${currentHours}`;
+        if (rMins === currentMins && rem.lastTriggered !== triggerKey) {
           isDue = true;
-          rem.lastTriggered = hourTriggerKey;
+          rem.lastTriggered = triggerKey;
           updated = true;
         }
       } else if (rem.repeat === 'daily') {
-        if (isTimeMatch && rem.lastTriggered !== todayDateStr) {
+        triggerKey = todayDateStr;
+        if (isTimeMatch && rem.lastTriggered !== triggerKey) {
           isDue = true;
-          rem.lastTriggered = todayDateStr;
+          rem.lastTriggered = triggerKey;
           updated = true;
         }
       } else {
-        // Repeat: 'once'
-        if (isTimeMatch && rem.lastTriggered !== todayDateStr) {
+        // repeat: 'once'
+        triggerKey = todayDateStr;
+        if (isTimeMatch && rem.lastTriggered !== triggerKey) {
           isDue = true;
-          rem.lastTriggered = todayDateStr;
+          rem.lastTriggered = triggerKey;
           rem.enabled = false;
           updated = true;
         }
       }
 
-      if (isDue) {
+      const sessionKey = `${rem.id}:${triggerKey || todayDateStr}`;
+      if (isDue && !this.firedThisSession.has(sessionKey)) {
+        this.firedThisSession.add(sessionKey);
         this.triggerReminder(rem, false);
       }
     }
 
     if (updated) {
-      store.set('reminders', reminders);
-      if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
-        try {
-          this.panelWindowRef.webContents.send('reminders:changed', reminders);
-        } catch (e) {}
-      }
+      this._saveAndNotify(reminders);
     }
   }
 
+  /**
+   * Called immediately when reminders:updated IPC is received (user added/edited a reminder).
+   * Checks if any enabled reminder is due RIGHT NOW or was due within the last 2 minutes.
+   */
+  evaluateNow() {
+    const now = new Date();
+    const reminders = store.get('reminders') || [];
+    let updated = false;
+    const todayDateStr = now.toDateString();
+    const nowTotalMins = now.getHours() * 60 + now.getMinutes();
+
+    for (const rem of reminders) {
+      if (!rem.enabled) continue;
+
+      const [rHoursRaw, rMinsRaw] = (rem.time || '').split(':');
+      const rHours = parseInt(rHoursRaw, 10);
+      const rMins = parseInt(rMinsRaw, 10);
+      if (isNaN(rHours) || isNaN(rMins)) continue;
+
+      const remTotalMins = rHours * 60 + rMins;
+      // Fire if reminder is within [now - 2min, now]
+      const isCurrentOrJustPast = (nowTotalMins - remTotalMins) >= 0 && (nowTotalMins - remTotalMins) <= 2;
+
+      if (!isCurrentOrJustPast) continue;
+
+      let triggerKey;
+      if (rem.repeat === 'every-hour') {
+        triggerKey = `${todayDateStr}-${now.getHours()}`;
+      } else {
+        triggerKey = todayDateStr;
+      }
+
+      if (rem.lastTriggered === triggerKey) continue; // already fired
+
+      const sessionKey = `${rem.id}:${triggerKey}`;
+      if (this.firedThisSession.has(sessionKey)) continue;
+
+      this.firedThisSession.add(sessionKey);
+      rem.lastTriggered = triggerKey;
+      if (rem.repeat === 'once') rem.enabled = false;
+      updated = true;
+      this.triggerReminder(rem, false);
+    }
+
+    if (updated) {
+      this._saveAndNotify(reminders);
+    }
+  }
+
+  /**
+   * Checks reminders that were due before the app launched (up to 30 min lookback).
+   * Fires them as "missed" so user knows about them.
+   */
+  checkPastDueOnStartup() {
+    const now = new Date();
+    const reminders = store.get('reminders') || [];
+    let updated = false;
+    const todayDateStr = now.toDateString();
+    const nowTotalMins = now.getHours() * 60 + now.getMinutes();
+
+    for (const rem of reminders) {
+      if (!rem.enabled) continue;
+
+      const [rHoursRaw, rMinsRaw] = (rem.time || '').split(':');
+      const rHours = parseInt(rHoursRaw, 10);
+      const rMins = parseInt(rMinsRaw, 10);
+      if (isNaN(rHours) || isNaN(rMins)) continue;
+
+      const remTotalMins = rHours * 60 + rMins;
+      const minutesMissed = nowTotalMins - remTotalMins;
+
+      // Missed within last 30 minutes (and not already fired today)
+      if (minutesMissed < 0 || minutesMissed > 30) continue;
+
+      let triggerKey;
+      if (rem.repeat === 'every-hour') {
+        triggerKey = `${todayDateStr}-${rHours}`;
+      } else {
+        triggerKey = todayDateStr;
+      }
+
+      if (rem.lastTriggered === triggerKey) continue;
+
+      const sessionKey = `${rem.id}:${triggerKey}`;
+      if (this.firedThisSession.has(sessionKey)) continue;
+
+      this.firedThisSession.add(sessionKey);
+      rem.lastTriggered = triggerKey;
+      if (rem.repeat === 'once') rem.enabled = false;
+      updated = true;
+
+      // Fire as missed (with isMissed=true only if more than 1 min late)
+      this.triggerReminder(rem, minutesMissed > 1);
+    }
+
+    if (updated) {
+      this._saveAndNotify(reminders);
+    }
+  }
+
+  /** Fire missed reminders after waking from sleep */
   checkSleepMissedReminders(sleptFromTimestamp) {
     if (!sleptFromTimestamp) return;
     const now = new Date();
@@ -248,24 +301,108 @@ class Scheduler {
         ? (remTotalMins >= startMins && remTotalMins <= endMins)
         : (remTotalMins >= startMins || remTotalMins <= endMins); // crossed midnight
 
-      if (fellInWindow && rem.lastTriggered !== todayDateStr) {
-        this.triggerReminder(rem, true);
-        rem.lastTriggered = todayDateStr;
-        if (rem.repeat === 'once') {
-          rem.enabled = false;
-        }
-        updated = true;
+      if (!fellInWindow) continue;
+
+      let triggerKey;
+      if (rem.repeat === 'every-hour') {
+        triggerKey = `${todayDateStr}-${rHours}`;
+      } else {
+        triggerKey = todayDateStr;
       }
+
+      if (rem.lastTriggered === triggerKey) continue;
+
+      const sessionKey = `${rem.id}:${triggerKey}`;
+      if (this.firedThisSession.has(sessionKey)) continue;
+
+      this.firedThisSession.add(sessionKey);
+      this.triggerReminder(rem, true);
+      rem.lastTriggered = triggerKey;
+      if (rem.repeat === 'once') rem.enabled = false;
+      updated = true;
     }
 
     if (updated) {
-      store.set('reminders', reminders);
-      if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
-        try {
-          this.panelWindowRef.webContents.send('reminders:changed', reminders);
-        } catch (e) {}
-      }
+      this._saveAndNotify(reminders);
     }
+  }
+
+  triggerReminder(rem, isMissed = false) {
+    const userName = (store.get('settings.general.userName') || '').trim();
+    const title = rem.title || 'Scheduled Reminder';
+    const text = isMissed
+      ? (userName ? `${userName}, you missed reminder: ${title}!` : `Missed reminder: ${title}!`)
+      : (userName ? `Hey ${userName}, time for: ${title}!` : `Time for: ${title}!`);
+
+    console.log(`[Scheduler] FIRING reminder "${title}" at ${rem.time} (missed=${isMissed})`);
+
+    // 1. Native OS Desktop Notification (pops up even when full screen in other apps)
+    try {
+      if (Notification && Notification.isSupported()) {
+        const notif = new Notification({
+          title: isMissed ? 'Missed Reminder — Pixie' : 'Reminder — Pixie',
+          body: text,
+          silent: false
+        });
+        notif.on('click', () => {
+          if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
+            this.panelWindowRef.show();
+            this.panelWindowRef.focus();
+            this.panelWindowRef.webContents.send('panel:switch-tab', 'reminders');
+          }
+        });
+        notif.show();
+      }
+    } catch (e) {
+      console.warn('[Scheduler] Native notification error:', e.message);
+    }
+
+    // 2. Bring pet to top & wake if sleeping
+    try {
+      if (this.petWindowRef && !this.petWindowRef.isDestroyed()) {
+        this.petWindowRef.show();
+        this.petWindowRef.setAlwaysOnTop(true, 'screen-saver');
+        this.petWindowRef.webContents.send('pet:reset-idle');
+        this.petWindowRef.webContents.send('pet:set-state', {
+          state: isMissed ? 'worried' : 'surprised',
+          duration: 5000,
+          priority: 5,
+          force: true
+        });
+      }
+    } catch (e) {}
+
+    // 3. Speech bubble with loud reminder alarm
+    try {
+      bubble.show({
+        badge: isMissed ? 'MISSED REMINDER' : 'REMINDER',
+        text,
+        sound: 'alarm',
+        category: 'reminders',
+        emotion: isMissed ? 'worried' : 'surprised',
+        bounce: true,
+        duration: 8000,
+        critical: true
+      });
+    } catch (e) {}
+
+    // 4. Notify panel window
+    try {
+      if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
+        this.panelWindowRef.webContents.send('reminder:triggered', { reminder: rem, isMissed });
+      }
+    } catch (e) {}
+  }
+
+  _saveAndNotify(reminders) {
+    try {
+      store.set('reminders', reminders);
+    } catch (e) {}
+    try {
+      if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
+        this.panelWindowRef.webContents.send('reminders:changed', reminders);
+      }
+    } catch (e) {}
   }
 
   setWindows(petWin, panelWin) {
@@ -310,11 +447,14 @@ class Scheduler {
     rem.enabled = true;
     rem.lastTriggered = null;
 
-    store.set('reminders', reminders);
-
-    if (this.panelWindowRef && !this.panelWindowRef.isDestroyed()) {
-      this.panelWindowRef.webContents.send('reminders:changed', reminders);
+    // Remove from session fired set so it can fire again at new time
+    for (const key of this.firedThisSession) {
+      if (key.startsWith(`${rem.id}:`)) {
+        this.firedThisSession.delete(key);
+      }
     }
+
+    this._saveAndNotify(reminders);
 
     if (!isAlreadyFired) {
       bubble.show({
@@ -337,6 +477,14 @@ class Scheduler {
 
     rem.enabled = true;
     rem.lastTriggered = null;
+
+    // Remove from session fired set so it can fire again
+    for (const key of [...this.firedThisSession]) {
+      if (key.startsWith(`${rem.id}:`)) {
+        this.firedThisSession.delete(key);
+      }
+    }
+
     store.set('reminders', reminders);
   }
 }

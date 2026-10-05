@@ -1205,10 +1205,8 @@ ipcMain.on('reminders:reschedule', (e, id) => {
 });
 
 ipcMain.on('reminders:updated', () => {
-  const now = new Date();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  scheduler.evaluateReminders(`${hours}:${minutes}`, now);
+  // Check if any reminder is due right now or was due in the last 2 minutes
+  scheduler.evaluateNow();
 });
 
 ipcMain.on('window:set-always-on-top', (e, val) => {
