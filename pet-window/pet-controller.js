@@ -261,6 +261,8 @@ class FaceBotController {
   showBubble({ text, badge = '', duration = 5000, sound = '', category = '', emotion = '', bounce = false }) {
     if (!this.bubbleEl || !text) return;
 
+    this.lastBubbleData = { text, badge, duration, sound, category, emotion };
+
     if (bounce && this.container) {
       this.container.classList.remove('bounce-drop');
       void this.container.offsetWidth;
@@ -296,9 +298,27 @@ class FaceBotController {
     this.bubbleEl.classList.add('fade-in');
     this.bubbleEl.style.display = 'block';
 
-    // Tell main process to expand pet window height so bubble fits without clipping
+    // Force layout reflow and measure rendered bounds (Item B2)
+    const bubbleRect = this.bubbleEl.getBoundingClientRect();
+    const measuredW = Math.ceil(bubbleRect.width);
+    const measuredH = Math.ceil(bubbleRect.height);
+
+    const isClamped = this.bubbleText ? (this.bubbleText.scrollHeight > this.bubbleText.clientHeight + 2) : false;
+    if (isClamped) {
+      this.bubbleEl.setAttribute('title', 'Click to view full message in panel');
+      this.bubbleEl.dataset.clamped = 'true';
+    } else {
+      this.bubbleEl.removeAttribute('title');
+      delete this.bubbleEl.dataset.clamped;
+    }
+
+    // Tell main process measured dimensions for dynamic window sizing & work area clamping
     if (ipcRenderer) {
-      ipcRenderer.send('pet:bubble-shown');
+      ipcRenderer.send('pet:bubble-shown', {
+        width: measuredW,
+        height: measuredH,
+        isClamped
+      });
     }
 
     if (sound && window.soundEffects) {
@@ -332,6 +352,9 @@ class FaceBotController {
       if (this.bubbleText) this.bubbleText.textContent = '';
       if (this.bubbleBadge) this.bubbleBadge.textContent = '';
       this.bubbleEl.classList.remove('fade-out');
+      this.bubbleEl.classList.remove('flipped-below');
+      const root = document.getElementById('pet-root-container');
+      if (root) root.classList.remove('bubble-flipped');
 
       // Tell main process to reset pet window bounds to compact pet size
       if (ipcRenderer) {
@@ -466,6 +489,23 @@ class FaceBotController {
   }
 
   setupEvents() {
+    // Bubble click affordance: click to open in panel & dismiss (Item B2)
+    if (this.bubbleEl) {
+      this.bubbleEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.lastBubbleData && ipcRenderer) {
+          const cat = this.lastBubbleData.category || '';
+          const targetTab = cat === 'reminders' ? 'reminders' : (cat === 'timer' ? 'timer' : 'chat');
+          ipcRenderer.send('panel:open', {
+            tab: targetTab,
+            fullText: this.lastBubbleData.text,
+            badge: this.lastBubbleData.badge
+          });
+        }
+        this.hideBubble();
+      });
+    }
+
     // Item H2: Driven strictly by insidePet state from Main Process hit testing
     if (ipcRenderer) {
       ipcRenderer.on('pet:inside-change', (event, isInside) => {
@@ -787,6 +827,19 @@ class FaceBotController {
 
     ipcRenderer.on('pet:hide-bubble', () => {
       this.hideBubble();
+    });
+
+    ipcRenderer.on('pet:bubble-position', (event, { flipped }) => {
+      const root = document.getElementById('pet-root-container');
+      if (this.bubbleEl) {
+        if (flipped) {
+          this.bubbleEl.classList.add('flipped-below');
+          if (root) root.classList.add('bubble-flipped');
+        } else {
+          this.bubbleEl.classList.remove('flipped-below');
+          if (root) root.classList.remove('bubble-flipped');
+        }
+      }
     });
 
     // 4. Real-time Appearance Updates

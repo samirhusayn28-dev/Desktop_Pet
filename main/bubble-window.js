@@ -27,7 +27,19 @@ class BubbleWindowManager {
 
     ipcMain.on('bubble:dismissed', () => {
       this.isShowing = false;
+      if (this.currentTimeout) {
+        clearTimeout(this.currentTimeout);
+        this.currentTimeout = null;
+      }
       setTimeout(() => this.processQueue(), 250);
+    });
+
+    ipcMain.on('pet:bubble-hidden', () => {
+      this.isShowing = false;
+      if (this.currentTimeout) {
+        clearTimeout(this.currentTimeout);
+        this.currentTimeout = null;
+      }
     });
 
     ipcMain.on('pet:update-accent', (e, color) => {

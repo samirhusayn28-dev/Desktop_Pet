@@ -246,6 +246,8 @@ function createPetWindow() {
  * Includes 2px hysteresis to prevent edge jitter.
  */
 let isPetHoveredOrInside = false;
+let unexpandedPetBounds = null;
+let activeBubbleMetrics = null;
 
 function getPetBodyRect(winW, winH) {
   const appConfig = store.get('settings.appearance') || {};
@@ -265,9 +267,9 @@ function getPetBodyRect(winW, winH) {
   const vrx = Math.max(0, Math.min(maxR, maxR * (roundness / 50)));
 
   // SVG position inside window:
-  // .pet-app-container: flex column, align-items: center, justify-content: flex-end, padding-bottom: 10px
+  const isFlipped = activeBubbleMetrics && activeBubbleMetrics.flipped;
   const svgX = (winW - size) / 2;
-  const svgY = winH - 10 - size;
+  const svgY = isFlipped ? 10 : (winH - 10 - size);
 
   // Real pet body rounded rect in window coordinates:
   const bodyX = svgX + vx * k;
@@ -300,7 +302,18 @@ function isCursorInPetHitArea(screenX, screenY) {
   const relX = screenX - winX;
   const relY = screenY - winY;
 
-  // Check Pet's Real Rounded-Rectangle Shape (bubble area is NOT counted as pet)
+  // 1. Hit-test bubble rectangle if visible (Item B2: hit-test pet + bubble)
+  if (activeBubbleMetrics && activeBubbleMetrics.visible) {
+    const bW = activeBubbleMetrics.width || 200;
+    const bH = activeBubbleMetrics.height || 60;
+    const bX = (winW - bW) / 2;
+    const bY = activeBubbleMetrics.flipped ? (winH - bH - 10) : 10;
+    if (relX >= bX - 4 && relX <= bX + bW + 4 && relY >= bY - 4 && relY <= bY + bH + 4) {
+      return true;
+    }
+  }
+
+  // 2. Check Pet's Real Rounded-Rectangle Shape (bubble area is NOT counted as pet)
   const { bodyX, bodyY, bodyW, bodyH, bodyR } = getPetBodyRect(winW, winH);
 
   // 2px hysteresis: if already inside, expand test area by 2px to prevent flicker at boundary
@@ -911,6 +924,10 @@ ipcMain.on('pet:drag-end', () => {
     const [x, y] = petWindow.getPosition();
     store.set('window.petX', x);
     store.set('window.petY', y);
+    if (unexpandedPetBounds) {
+      unexpandedPetBounds.x = x;
+      unexpandedPetBounds.y = y;
+    }
   }
   bubble.syncPosition();
 
@@ -940,6 +957,84 @@ ipcMain.on('pet:show-bubble', (e, data) => {
 
 ipcMain.on('pet:hide-bubble', () => {
   bubble.hide();
+});
+
+ipcMain.on('pet:bubble-shown', (e, { width, height, isClamped }) => {
+  if (!petWindow || petWindow.isDestroyed()) return;
+
+  const currentScale = (store.get('settings.appearance.scale')) || 1.0;
+  const [baseW, baseH] = getPetWindowSize(currentScale);
+
+  if (!unexpandedPetBounds) {
+    const [curX, curY] = petWindow.getPosition();
+    unexpandedPetBounds = { x: curX, y: curY, width: baseW, height: baseH };
+  }
+
+  const bW = Math.max(120, Math.min(280, width || 220));
+  const bH = Math.max(40, height || 60);
+
+  const display = screen.getDisplayNearestPoint({
+    x: unexpandedPetBounds.x + baseW / 2,
+    y: unexpandedPetBounds.y + baseH / 2
+  });
+  const workArea = display.workArea;
+
+  const spaceAbove = unexpandedPetBounds.y - workArea.y;
+  const spaceBelow = (workArea.y + workArea.height) - (unexpandedPetBounds.y + baseH);
+
+  // Flip below if not enough room above and more room below
+  const neededBubbleSpace = bH + 20;
+  const shouldFlipBelow = (spaceAbove < neededBubbleSpace) && (spaceBelow >= spaceAbove);
+
+  petWindow.webContents.send('pet:bubble-position', { flipped: shouldFlipBelow });
+
+  const totalW = Math.max(baseW, bW + 24);
+  const totalH = baseH + bH + 16;
+
+  let newX = unexpandedPetBounds.x - Math.round((totalW - baseW) / 2);
+  let newY;
+
+  if (shouldFlipBelow) {
+    newY = unexpandedPetBounds.y;
+  } else {
+    newY = unexpandedPetBounds.y + baseH - totalH;
+  }
+
+  // Clamp to display work area (never overflow screen edges)
+  newX = Math.max(workArea.x, Math.min(workArea.x + workArea.width - totalW, newX));
+  newY = Math.max(workArea.y, Math.min(workArea.y + workArea.height - totalH, newY));
+
+  petWindow.setBounds({
+    x: Math.round(newX),
+    y: Math.round(newY),
+    width: Math.round(totalW),
+    height: Math.round(totalH)
+  });
+
+  activeBubbleMetrics = {
+    visible: true,
+    width: bW,
+    height: bH,
+    flipped: shouldFlipBelow,
+    isClamped: !!isClamped
+  };
+});
+
+ipcMain.on('pet:bubble-hidden', () => {
+  activeBubbleMetrics = null;
+  if (!petWindow || petWindow.isDestroyed()) return;
+
+  if (unexpandedPetBounds) {
+    const currentScale = (store.get('settings.appearance.scale')) || 1.0;
+    const [baseW, baseH] = getPetWindowSize(currentScale);
+    petWindow.setBounds({
+      x: unexpandedPetBounds.x,
+      y: unexpandedPetBounds.y,
+      width: baseW,
+      height: baseH
+    });
+    unexpandedPetBounds = null;
+  }
 });
 
 ipcMain.on('pet:set-state', (e, data) => {
@@ -1092,6 +1187,16 @@ ipcMain.on('reminders:updated', () => {
 ipcMain.on('window:set-always-on-top', (e, val) => {
   if (petWindow) petWindow.setAlwaysOnTop(val);
   if (panelWindow) panelWindow.setAlwaysOnTop(val);
+});
+
+ipcMain.on('window:set-pos', (e, { x, y }) => {
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.setPosition(Math.round(x), Math.round(y));
+    if (unexpandedPetBounds) {
+      unexpandedPetBounds.x = Math.round(x);
+      unexpandedPetBounds.y = Math.round(y);
+    }
+  }
 });
 
 ipcMain.on('window:set-launch-login', (e, openAtLogin) => {

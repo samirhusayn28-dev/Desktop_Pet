@@ -226,10 +226,10 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Test: reminder for +1 minute, click snooze before and after it fires, verify both new fire times
 
 ## Item B2 — LONG BUBBLE TEXT OVERFLOWS THE BUBBLE
-- [ ] CSS: `max-width: 280px; overflow-wrap: anywhere; word-break: break-word; line-clamp: 4` with ellipsis
-- [ ] Clamped affordance: hover/click to see full text in panel
-- [ ] Dynamic sizing from MEASURED rendered height (render, measure, setBounds); clamp to display work area, flip to side with room; hit-test pet + bubble
-- [ ] Tests: long reminder title, 300-char AI error, long word without spaces, emoji, RTL text, screen edges, max pet size, glasses ON
+- [x] CSS: `max-width: 280px; overflow-wrap: anywhere; word-break: break-word; line-clamp: 4` with ellipsis
+- [x] Clamped affordance: hover/click to see full text in panel
+- [x] Dynamic sizing from MEASURED rendered height (render, measure, setBounds); clamp to display work area, flip to side with room; hit-test pet + bubble
+- [x] Tests: long reminder title, 300-char AI error, long word without spaces, emoji, RTL text, screen edges, max pet size, glasses ON
 
 ## Item V1 — VERSION SHOWN IN THE APP = RELEASE VERSION
 - [ ] Single source of truth: `package.json` "version" across git tag, file names, `app.getVersion()`, Settings -> About, tray tooltip, update checker

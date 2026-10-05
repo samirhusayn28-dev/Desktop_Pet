@@ -48,24 +48,47 @@ html, body {
   pointer-events: none;
 }
 
-/* Solid Cute Material Speech Bubble (No blur, no transparency lag) */
+.pet-app-container.bubble-flipped {
+  justify-content: flex-start;
+  padding-top: 10px;
+  padding-bottom: 0;
+}
+
+/* Solid Cute Material Speech Bubble (Item B2: max-width 280px, overflow-wrap, line-clamp 4) */
 .pet-speech-bubble {
   position: absolute;
   top: 10px;
   left: 50%;
   transform: translateX(-50%);
   width: max-content;
-  max-width: 270px;
+  max-width: 280px;
+  box-sizing: border-box;
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 10px 14px;
   color: var(--text);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--border);
-  pointer-events: none !important;
+  pointer-events: auto !important;
+  cursor: pointer;
   z-index: 100;
   text-align: center;
   transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.pet-speech-bubble.flipped-below {
+  top: auto;
+  bottom: 10px;
+}
+
+.pet-speech-bubble.flipped-below .bubble-tail {
+  top: -6px;
+  bottom: auto;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  border-right: none;
+  border-bottom: none;
 }
 
 .pet-speech-bubble.fade-in {
@@ -115,12 +138,17 @@ html, body {
   font-weight: 500;
   line-height: 1.4;
   color: var(--text);
+  max-width: 252px;
+  overflow-wrap: anywhere;
   word-break: break-word;
   display: -webkit-box;
   -webkit-line-clamp: 4;
+  line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+  direction: auto;
+  unicode-bidi: plaintext;
 }
 
 .bubble-tail {
