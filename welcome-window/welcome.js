@@ -327,12 +327,27 @@ class WelcomeController {
     }
 
     const userName = (this.inputUserName?.value || '').trim();
-    const petName = (this.inputPetName?.value || 'Bolt').trim();
+    const petName = (this.inputPetName?.value || 'Pixie').trim();
     const glassesEnabled = !!this.toggleGlasses?.checked;
     const soundsEnabled = !!this.toggleSounds?.checked;
     const aiProvider = this.selectProvider?.value || 'gemini';
     const aiModel = this.selectModel?.value || this.providerDefaults[aiProvider];
     const apiKey = (this.inputApiKey?.value || '').trim();
+
+    // Ensure appearance object is completely updated with current DOM values
+    if (this.inputScale) this.appearance.scale = parseFloat(this.inputScale.value) || 1.0;
+    if (this.inputWidth) this.appearance.width = parseFloat(this.inputWidth.value) || 136;
+    if (this.inputHeight) this.appearance.height = parseFloat(this.inputHeight.value) || 120;
+    if (this.inputRoundness) this.appearance.roundness = parseFloat(this.inputRoundness.value) || 36;
+    if (this.inputDepth) this.appearance.depth = parseFloat(this.inputDepth.value) || 80;
+    if (this.inputEyeSize) this.appearance.eyeSize = parseFloat(this.inputEyeSize.value) || 1.0;
+    if (this.inputEyeSpacing) this.appearance.eyeSpacing = parseFloat(this.inputEyeSpacing.value) || 44;
+    if (this.inputMouthWidth) this.appearance.mouthWidth = parseFloat(this.inputMouthWidth.value) || 14;
+    if (this.inputBodyColor) this.appearance.bodyColor = this.inputBodyColor.value || '#FFFFFF';
+    if (this.inputAccentColor) this.appearance.accentColor = this.inputAccentColor.value || '#FF7A2F';
+    this.appearance.primaryColor = this.appearance.accentColor;
+    this.appearance.primaryGlow = this.appearance.accentColor;
+    this.appearance.glassesEnabled = glassesEnabled;
 
     ipcRenderer.send('welcome:finish', {
       save: true,

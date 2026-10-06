@@ -210,15 +210,6 @@ class PanelController {
   switchTab(tabId) {
     this.activeTabId = tabId;
 
-    // Start/stop system stats polling on Tools tab
-    if (this.toolsTab) {
-      if (tabId === 'tools') {
-        this.toolsTab.startPolling();
-      } else {
-        this.toolsTab.stopPolling();
-      }
-    }
-
     // Update Tab Buttons
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tab === tabId);
@@ -243,7 +234,7 @@ class PanelController {
     if (window.TimerTab) this.timerTab = new window.TimerTab();
     if (window.NotesTab) this.notesTab = new window.NotesTab();
     if (window.RemindersTab) this.remindersTab = new window.RemindersTab();
-    if (window.ToolsTab) this.toolsTab = new window.ToolsTab();
+    if (window.ClipboardTab) this.clipboardTab = new window.ClipboardTab();
     if (window.SettingsTab) this.settingsTab = new window.SettingsTab();
   }
 
@@ -289,6 +280,21 @@ class PanelController {
     this.ipcRenderer.on('panel:update-accent', (event, color) => {
       if (window.ThemeManager && window.ThemeManager.applyAccentColor) {
         window.ThemeManager.applyAccentColor(document, color);
+      }
+    });
+
+    this.ipcRenderer.on('panel:reload-settings', () => {
+      this.applyGlassmorphismSettings();
+      this.applyPetName();
+      this.applyInitialTheme();
+      this.renderHeaderPetFace();
+      if (this.settingsTab && typeof this.settingsTab.loadSettings === 'function') {
+        this.settingsTab.loadSettings();
+        this.settingsTab.updateAppearanceUI();
+        this.settingsTab.renderLivePreview();
+      }
+      if (this.chatTab && typeof this.chatTab.updateModelBadge === 'function') {
+        this.chatTab.updateModelBadge();
       }
     });
 

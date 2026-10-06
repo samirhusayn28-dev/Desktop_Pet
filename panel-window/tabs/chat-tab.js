@@ -199,9 +199,13 @@ class ChatTab {
       const store = window.panelController.store;
       const activeProviderId = store.get('settings.ai.activeProvider') || 'gemini';
       const model = store.get(`settings.ai.models.${activeProviderId}`);
-      const baseUrl = store.get(`settings.ai.baseUrls.${activeProviderId}`);
-      const apiKey = store.get(`settings.ai.apiKeys.${activeProviderId}`) || '';
-      const petName = store.get('settings.general.petName') || 'Bolt';
+      let apiKey = store.get(`settings.ai.apiKeys.${activeProviderId}`) || store.get(`settings.ai.keys.${activeProviderId}`) || '';
+      if (!apiKey && window.panelController.ipcRenderer) {
+        try {
+          apiKey = await window.panelController.ipcRenderer.invoke('ai:get-key', activeProviderId);
+        } catch (e) {}
+      }
+      const petName = store.get('settings.general.petName') || 'Pixie';
 
       // Refresh desktop context
       await this.updateContextBanner();

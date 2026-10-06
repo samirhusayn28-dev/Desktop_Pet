@@ -8,25 +8,30 @@ const fs = require('fs');
 const path = require('path');
 const electron = require('electron');
 
+function getCanonicalUserDataPath() {
+  const home = process.env.HOME || process.env.USERPROFILE || '.';
+  if (process.platform === 'darwin') {
+    return path.join(home, 'Library', 'Application Support', 'Desktop Pet');
+  } else if (process.platform === 'win32') {
+    const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+    return path.join(appData, 'Desktop Pet');
+  } else {
+    const configDir = process.env.XDG_CONFIG_HOME || path.join(home, '.config');
+    return path.join(configDir, 'Desktop Pet');
+  }
+}
+
 class SecureStore {
   constructor() {
-    this.userDataPath = null;
+    this.userDataPath = getCanonicalUserDataPath();
     try {
       const app = electron.app || (electron.remote && electron.remote.app);
-      if (app && typeof app.getPath === 'function') {
-        this.userDataPath = app.getPath('userData');
+      if (app && typeof app.setPath === 'function') {
+        try {
+          app.setPath('userData', this.userDataPath);
+        } catch (e) {}
       }
     } catch (e) {}
-
-    if (!this.userDataPath) {
-      const home = process.env.HOME || process.env.USERPROFILE || '.';
-      const packagedDir = path.join(home, 'Library', 'Application Support', 'Desktop Pet');
-      if (fs.existsSync(packagedDir)) {
-        this.userDataPath = packagedDir;
-      } else {
-        this.userDataPath = path.join(home, 'Library', 'Application Support', 'desktop-pet');
-      }
-    }
 
     try {
       if (!fs.existsSync(this.userDataPath)) {
@@ -47,7 +52,7 @@ class SecureStore {
       },
       settings: {
         general: {
-          petName: 'Pixel',
+          petName: 'Pixie',
           userName: 'Samir',
           launchAtLogin: false,
           alwaysOnTop: true,
@@ -221,23 +226,26 @@ class SecureStore {
   // Secure API Key Storage using safeStorage
   getApiKey(provider) {
     try {
-      if (!fs.existsSync(this.secureKeysPath)) return '';
-      const creds = JSON.parse(fs.readFileSync(this.secureKeysPath, 'utf8'));
-      const encryptedBase64 = creds[provider];
-      if (!encryptedBase64) return '';
-
-      const { safeStorage } = electron;
-      if (safeStorage && safeStorage.isEncryptionAvailable()) {
-        const buffer = Buffer.from(encryptedBase64, 'base64');
-        return safeStorage.decryptString(buffer);
-      } else {
-        // Fallback for environments without keychain (simple base64 decode)
-        return Buffer.from(encryptedBase64, 'base64').toString('utf8');
+      if (fs.existsSync(this.secureKeysPath)) {
+        const creds = JSON.parse(fs.readFileSync(this.secureKeysPath, 'utf8'));
+        const encryptedBase64 = creds[provider];
+        if (encryptedBase64) {
+          const { safeStorage } = electron;
+          if (safeStorage && safeStorage.isEncryptionAvailable()) {
+            const buffer = Buffer.from(encryptedBase64, 'base64');
+            const decrypted = safeStorage.decryptString(buffer);
+            if (decrypted) return decrypted;
+          } else {
+            const decoded = Buffer.from(encryptedBase64, 'base64').toString('utf8');
+            if (decoded) return decoded;
+          }
+        }
       }
     } catch (e) {
       console.warn(`[SecureStore] Failed to decrypt key for ${provider}:`, e.message);
-      return '';
     }
+    // Fallback to store settings
+    return this.get(`settings.ai.apiKeys.${provider}`) || this.get(`settings.ai.keys.${provider}`) || '';
   }
 
   setApiKey(provider, plainKey) {
@@ -251,6 +259,8 @@ class SecureStore {
 
       if (!plainKey) {
         delete creds[provider];
+        this.set(`settings.ai.apiKeys.${provider}`, '');
+        this.set(`settings.ai.keys.${provider}`, '');
       } else {
         const { safeStorage } = electron;
         if (safeStorage && safeStorage.isEncryptionAvailable()) {
@@ -260,12 +270,18 @@ class SecureStore {
           // Fallback simple base64 encode
           creds[provider] = Buffer.from(plainKey, 'utf8').toString('base64');
         }
+        this.set(`settings.ai.apiKeys.${provider}`, plainKey);
+        this.set(`settings.ai.keys.${provider}`, plainKey);
       }
 
       fs.writeFileSync(this.secureKeysPath, JSON.stringify(creds, null, 2), 'utf8');
       return true;
     } catch (e) {
       console.error(`[SecureStore] Failed to encrypt key for ${provider}:`, e);
+      if (plainKey) {
+        this.set(`settings.ai.apiKeys.${provider}`, plainKey);
+        this.set(`settings.ai.keys.${provider}`, plainKey);
+      }
       return false;
     }
   }

@@ -25,7 +25,9 @@ class BootLifecycle {
   setupHooks() {
     try {
       if (powerMonitor) {
+        // Fires on macOS/Linux shutdown and Windows shutdown
         powerMonitor.on('shutdown', () => {
+          console.log('[BootLifecycle] powerMonitor shutdown event');
           this.handleGoodbye('shutdown');
         });
       }
@@ -49,6 +51,9 @@ class BootLifecycle {
     try {
       // Windows session-end event (fires on user logoff / shutdown)
       win.on('session-end', () => {
+        console.log('[BootLifecycle] session-end event (Windows)');
+        // Mark store before we lose time
+        store.set('system.lastExit', 'shutdown');
         this.handleGoodbye('shutdown');
       });
     } catch (e) {}
@@ -138,11 +143,11 @@ class BootLifecycle {
       this.relayToPet('pet:set-state', { state: 'goodbye', duration: 1200 });
     }
 
-    // Delay shutdown by ~900ms (< 1s) to show goodbye animation
+    // Delay shutdown by ~600ms (<1s) to show goodbye animation
     setTimeout(() => {
       if (typeof callback === 'function') callback();
       else app.exit(0);
-    }, 900);
+    }, 600);
   }
 }
 

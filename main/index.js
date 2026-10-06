@@ -647,10 +647,16 @@ function createPanelWindow() {
       updateChecker.notifyPetOfCachedUpdate();
     }
 
-    // Deliver any queued tab switch (e.g. "Settings" from right-click menu)
+    // Deliver any queued tab switch with a small delay so PanelController
+    // is fully initialized in the renderer before the IPC arrives
     if (pendingPanelTab) {
-      panelWindow.webContents.send('panel:switch-tab', pendingPanelTab);
+      const tabToSwitch = pendingPanelTab;
       pendingPanelTab = null;
+      setTimeout(() => {
+        if (panelWindow && !panelWindow.isDestroyed()) {
+          panelWindow.webContents.send('panel:switch-tab', tabToSwitch);
+        }
+      }, 350);
     }
   });
 
@@ -1271,7 +1277,20 @@ ipcMain.on('window:set-pos', (e, { x, y }) => {
 });
 
 ipcMain.on('window:set-launch-login', (e, openAtLogin) => {
-  app.setLoginItemSettings({ openAtLogin: !!openAtLogin });
+  try {
+    if (process.platform === 'win32') {
+      // On Windows, use the actual executable path for proper registry entry
+      app.setLoginItemSettings({
+        openAtLogin: !!openAtLogin,
+        path: process.execPath,
+        args: []
+      });
+    } else {
+      app.setLoginItemSettings({ openAtLogin: !!openAtLogin });
+    }
+  } catch (err) {
+    console.error('[Desktop Pet] Failed to set launch at login:', err);
+  }
 });
 
 // Helper for scrubbing sensitive keys on export / import
@@ -1633,149 +1652,9 @@ let lastProcessFetchTime = 0;
 let lastFsSize = [];
 let lastFsFetchTime = 0;
 
-ipcMain.handle('system:get-stats', async () => {
-  try {
-    const now = Date.now();
+// system:get-stats handler removed (Tools tab removed to reduce CPU usage)
 
-    const _s = getSi();
-    if (!cachedStaticInfo) {
-      const [cpu, osInfo, graphics] = await Promise.all([
-        _s.cpu().catch(() => ({})),
-        _s.osInfo().catch(() => ({})),
-        _s.graphics().catch(() => null)
-      ]);
-      cachedStaticInfo = {
-        cpuModel: `${cpu.manufacturer || ''} ${cpu.brand || 'Processor'}`.trim(),
-        cpuSpeed: cpu.speed || 0,
-        osDistro: osInfo.distro || (process.platform === 'darwin' ? 'macOS' : process.platform),
-        osRelease: osInfo.release || '',
-        gpuModel: graphics?.controllers?.[0]?.model || 'Integrated GPU',
-        gpuVram: graphics?.controllers?.[0]?.vram || null
-      };
-    }
 
-    if (now - lastProcessFetchTime > 3000) {
-      _s.processes().then(p => {
-        lastProcessList = (p.list || [])
-          .sort((a, b) => (b.cpu + b.mem) - (a.cpu + a.mem))
-          .slice(0, 5)
-          .map(proc => ({
-            pid: proc.pid,
-            name: proc.name,
-            cpu: parseFloat((proc.cpu || 0).toFixed(1)),
-            mem: parseFloat((proc.mem || 0).toFixed(1))
-          }));
-        lastProcessFetchTime = Date.now();
-      }).catch(() => {});
-    }
-
-    if (now - lastFsFetchTime > 5000) {
-      _s.fsSize().then(disks => {
-        lastFsSize = (disks || [])
-          .filter(d => d.size > 0 && (d.mount === '/' || d.mount.startsWith('/Volumes/')))
-          .map(d => ({
-            fs: d.fs,
-            mount: d.mount,
-            usedGb: (d.used / (1024 ** 3)).toFixed(1),
-            totalGb: (d.size / (1024 ** 3)).toFixed(1),
-            percent: Math.round(d.use)
-          }));
-        lastFsFetchTime = Date.now();
-      }).catch(() => {});
-    }
-
-    const [load, mem, netStats, battery] = await Promise.all([
-      _s.currentLoad().catch(() => ({ currentLoad: 0, cpus: [] })),
-      _s.mem().catch(() => ({ total: 1, used: 0, swapused: 0, swaptotal: 0 })),
-      _s.networkStats().catch(() => []),
-      _s.battery().catch(() => ({ hasBattery: false, percent: 100, isCharging: true }))
-    ]);
-
-    let time = { uptime: 0 };
-    try {
-      time = _s.time();
-    } catch (e) {}
-
-    const cores = (load.cpus || []).map((c, idx) => ({
-      core: idx + 1,
-      load: Math.round(c.load || 0)
-    }));
-
-    let temp = null;
-    try {
-      const t = await _s.cpuTemperature();
-      if (t && t.main > 0) temp = Math.round(t.main);
-    } catch (e) {}
-
-    let rxKb = 0;
-    let txKb = 0;
-    if (Array.isArray(netStats)) {
-      for (const n of netStats) {
-        if (n.rx_sec) rxKb += n.rx_sec / 1024;
-        if (n.tx_sec) txKb += n.tx_sec / 1024;
-      }
-    }
-
-    const memUsage = process.memoryUsage();
-    const petRamMb = Math.round(memUsage.rss / (1024 * 1024));
-
-    return {
-      cpu: {
-        model: cachedStaticInfo.cpuModel,
-        totalLoad: Math.round(load.currentLoad || 0),
-        cores,
-        temp
-      },
-      ram: {
-        totalGb: (mem.total / (1024 ** 3)).toFixed(1),
-        usedGb: (mem.used / (1024 ** 3)).toFixed(1),
-        percent: Math.round((mem.used / (mem.total || 1)) * 100),
-        swapUsedGb: (mem.swapused / (1024 ** 3)).toFixed(1),
-        swapTotalGb: (mem.swaptotal / (1024 ** 3)).toFixed(1)
-      },
-      gpu: {
-        model: cachedStaticInfo.gpuModel,
-        vram: cachedStaticInfo.gpuVram
-      },
-      disks: lastFsSize,
-      network: {
-        rxKb: Math.round(rxKb),
-        txKb: Math.round(txKb)
-      },
-      battery: {
-        hasBattery: battery.hasBattery,
-        percent: battery.percent,
-        isCharging: battery.isCharging
-      },
-      os: {
-        distro: cachedStaticInfo.osDistro,
-        uptimeSeconds: Math.round(time?.uptime || 0)
-      },
-      topProcesses: lastProcessList,
-      petUsage: (() => {
-        try {
-          const metrics = app.getAppMetrics();
-          let totalRamBytes = 0;
-          let totalCpu = 0;
-          for (const m of metrics) {
-            if (m.memory && m.memory.workingSetSize) totalRamBytes += m.memory.workingSetSize * 1024;
-            if (m.cpu && m.cpu.percentCPUUsage) totalCpu += m.cpu.percentCPUUsage;
-          }
-          return {
-            ramMb: Math.round((totalRamBytes > 0 ? totalRamBytes : process.memoryUsage().rss) / (1024 * 1024)),
-            cpuPercent: Math.round(totalCpu * 10) / 10,
-            processCount: metrics.length
-          };
-        } catch (e) {
-          return { ramMb: Math.round(process.memoryUsage().rss / (1024 * 1024)), cpuPercent: 0, processCount: 0 };
-        }
-      })()
-    };
-  } catch (err) {
-    console.warn('[Desktop Pet] System stats error:', err);
-    return null;
-  }
-});
 
 // Sensor Status & Settings Pane
 ipcMain.handle('system:get-sensor-status', async () => {
@@ -2397,7 +2276,7 @@ function createWelcomeWindow() {
 ipcMain.handle('welcome:get-init-data', () => {
   return {
     userName: store.get('settings.general.userName') || '',
-    petName: store.get('settings.general.petName') || 'Bolt',
+    petName: store.get('settings.general.petName') || 'Pixie',
     glassesEnabled: store.get('settings.appearance.glassesEnabled') || false,
     soundsEnabled: store.get('settings.behavior.soundsEnabled') === true,
     appearance: store.get('settings.appearance') || {},
@@ -2422,7 +2301,7 @@ ipcMain.on('welcome:finish', (e, data) => {
       store.set('settings.general.userName', data.userName.trim());
     }
     if (data.petName !== undefined) {
-      const pName = data.petName.trim() || 'Bolt';
+      const pName = data.petName.trim() || 'Pixie';
       store.set('settings.general.petName', pName);
       app.setName(pName);
       createTray();
@@ -2448,11 +2327,21 @@ ipcMain.on('welcome:finish', (e, data) => {
     if (data.appearance) {
       const current = store.get('settings.appearance') || {};
       const updated = Object.assign({}, current, data.appearance);
+      if (data.glassesEnabled !== undefined) {
+        updated.glassesEnabled = !!data.glassesEnabled;
+      }
+      if (data.accentColor) {
+        updated.accentColor = data.accentColor;
+        updated.primaryColor = data.accentColor;
+        updated.primaryGlow = data.accentColor;
+      }
       store.set('settings.appearance', updated);
       relayToPet('pet:apply-appearance', updated);
     }
     if (data.accentColor) {
       store.set('settings.appearance.accentColor', data.accentColor);
+      store.set('settings.appearance.primaryColor', data.accentColor);
+      store.set('settings.appearance.primaryGlow', data.accentColor);
       relayToPet('pet:update-accent', data.accentColor);
       if (panelWindow && !panelWindow.isDestroyed()) {
         panelWindow.webContents.send('panel:update-accent', data.accentColor);
@@ -2466,6 +2355,8 @@ ipcMain.on('welcome:finish', (e, data) => {
     }
     if (data.apiKey && data.aiProvider) {
       store.setApiKey(data.aiProvider, data.apiKey);
+      store.set(`settings.ai.apiKeys.${data.aiProvider}`, data.apiKey);
+      store.set(`settings.ai.keys.${data.aiProvider}`, data.apiKey);
     }
   } else {
     // Skip keeps sounds OFF
@@ -2476,8 +2367,14 @@ ipcMain.on('welcome:finish', (e, data) => {
     }
   }
 
-  // Both Save & Skip mark first run completed
+  // Both Save & Skip mark first run and onboarding completed
   store.set('isFirstRun', false);
+  store.set('onboarding.completed', true);
+
+  // Notify open panel window to reload settings immediately
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    panelWindow.webContents.send('panel:reload-settings');
+  }
 
   if (welcomeWindow && !welcomeWindow.isDestroyed()) {
     welcomeWindow.close();

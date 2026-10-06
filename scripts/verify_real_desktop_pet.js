@@ -31,6 +31,8 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('pet:set-ignore-mouse-events', () => {});
+  ipcMain.on('pet:get-sound-settings', (e) => { e.returnValue = { soundsEnabled: false }; });
+  ipcMain.on('app:get-version', (e) => { e.returnValue = '1.0.9'; });
   ipcMain.on('pet:update-appearance', (e, appearance) => {
     store.set('settings.appearance', appearance);
     if (petWindow && !petWindow.isDestroyed()) {
@@ -94,7 +96,10 @@ app.whenReady().then(async () => {
 
   // Also trigger a speech bubble to capture speech reaction
   await petWindow.webContents.executeJavaScript(`
-    window.faceBotController.showSpeechBubble("Ready to code with you! 🧡", 5000);
+    const ctrl = window.petController || window.faceBotController;
+    if (ctrl && typeof ctrl.showSpeechBubble === 'function') {
+      ctrl.showSpeechBubble("Ready to code with you! 🧡", 5000);
+    }
   `);
   await new Promise(r => setTimeout(r, 600));
   const petBubbleImg = await petWindow.capturePage();
@@ -127,23 +132,36 @@ app.whenReady().then(async () => {
   // 5. Test Live Appearance Modification via Sliders
   console.log('[Test] Testing live slider adjustments (depth 100%, body width 150px)...');
   await panelWindow.webContents.executeJavaScript(`
-    const depthSlider = document.getElementById('setting-pet-depth');
-    const widthSlider = document.getElementById('setting-pet-width');
-    depthSlider.value = 100;
-    widthSlider.value = 150;
-    depthSlider.dispatchEvent(new Event('input'));
-    widthSlider.dispatchEvent(new Event('input'));
+    (() => {
+      const depthSlider = document.getElementById('setting-pet-depth');
+      const widthSlider = document.getElementById('setting-pet-width');
+      if (depthSlider) {
+        depthSlider.value = 100;
+        depthSlider.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (widthSlider) {
+        widthSlider.value = 150;
+        widthSlider.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    })()
   `);
   await new Promise(r => setTimeout(r, 600));
 
   // Sync to pet window
   const updatedAppearance = await panelWindow.webContents.executeJavaScript(`
-    window.panelController.settingsTab.appearance
+    (() => {
+      return (window.panelController && window.panelController.settingsTab && window.panelController.settingsTab.appearance) ? window.panelController.settingsTab.appearance : {};
+    })()
   `);
 
   await petWindow.webContents.executeJavaScript(`
-    window.faceBotController.pet.updateConfig(${JSON.stringify(updatedAppearance)});
-    window.faceBotController.render();
+    (() => {
+      const ctrl = window.petController || window.faceBotController;
+      if (ctrl && ctrl.pet) {
+        ctrl.pet.updateConfig(${JSON.stringify(updatedAppearance || {})});
+        ctrl.render();
+      }
+    })()
   `);
   await new Promise(r => setTimeout(r, 600));
 
@@ -153,7 +171,10 @@ app.whenReady().then(async () => {
 
   // Reset to default
   await panelWindow.webContents.executeJavaScript(`
-    document.getElementById('btn-reset-appearance').click();
+    (() => {
+      const btn = document.getElementById('btn-reset-appearance');
+      if (btn) btn.click();
+    })()
   `);
   await new Promise(r => setTimeout(r, 400));
 

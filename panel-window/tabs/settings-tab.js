@@ -422,7 +422,58 @@ class SettingsTab {
     }
   }
 
+  setupFirstRunModal() {
+    this.firstRunModal = document.getElementById('first-run-modal');
+    this.firstRunPetAvatar = document.getElementById('first-run-pet-avatar');
+    const petNameInput = document.getElementById('onboarding-pet-name');
+    const providerSelect = document.getElementById('onboarding-provider');
+    const apiKeyInput = document.getElementById('onboarding-api-key');
+    const btnStart = document.getElementById('btn-start-companion');
+
+    if (btnStart) {
+      btnStart.addEventListener('click', async () => {
+        const store = window.panelController?.store;
+        const petName = (petNameInput?.value || 'Pixie').trim();
+        const provider = providerSelect?.value || 'gemini';
+        const apiKey = (apiKeyInput?.value || '').trim();
+
+        if (store) {
+          store.set('settings.general.petName', petName);
+          store.set('settings.ai.activeProvider', provider);
+          if (apiKey) {
+            if (store.setApiKey) store.setApiKey(provider, apiKey);
+            store.set(`settings.ai.apiKeys.${provider}`, apiKey);
+            store.set(`settings.ai.keys.${provider}`, apiKey);
+          }
+          store.set('onboarding.completed', true);
+          store.set('isFirstRun', false);
+        }
+
+        if (window.panelController?.ipcRenderer) {
+          window.panelController.ipcRenderer.send('pet:update-name', petName);
+          if (apiKey) {
+            await window.panelController.ipcRenderer.invoke('ai:save-key', { provider, key: apiKey });
+          }
+        }
+
+        if (window.panelController?.applyPetName) {
+          window.panelController.applyPetName(petName);
+        }
+
+        if (this.firstRunModal) {
+          this.firstRunModal.classList.add('hidden');
+        }
+
+        this.loadSettings();
+        if (window.panelController?.chatTab?.updateModelBadge) {
+          window.panelController.chatTab.updateModelBadge();
+        }
+      });
+    }
+  }
+
   checkFirstRun() {
+    this.setupFirstRunModal();
     if (!window.panelController) return;
     const store = window.panelController.store;
     const completed = store.get('onboarding.completed');
