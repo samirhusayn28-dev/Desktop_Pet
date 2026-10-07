@@ -96,9 +96,44 @@ class ThinkingFilter {
   }
 }
 
+const PERSONALITY_URL = 'https://raw.githubusercontent.com/samirhusayn28-dev/Desktop_Pet/main/personality.json';
+
 class AIService {
   constructor() {
     this.activeStreams = new Map(); // id -> AbortController
+    this.cachedPersonality = null;  // fetched from GitHub at runtime
+    this.personalityFetchedAt = 0;
+    this.fetchPersonality();         // warm up on first load
+  }
+
+  /**
+   * Fetches personality.json from the GitHub repo (main branch, raw URL).
+   * Cached for 10 minutes so every chat message doesn't hit GitHub.
+   * Falls back silently to an empty object if offline or fetch fails.
+   */
+  async fetchPersonality() {
+    const TEN_MIN = 10 * 60 * 1000;
+    if (this.cachedPersonality && (Date.now() - this.personalityFetchedAt) < TEN_MIN) {
+      return this.cachedPersonality;
+    }
+    return new Promise((resolve) => {
+      const req = https.get(PERSONALITY_URL, { timeout: 5000 }, (res) => {
+        let raw = '';
+        res.on('data', (d) => { raw += d; });
+        res.on('end', () => {
+          try {
+            this.cachedPersonality = JSON.parse(raw);
+            this.personalityFetchedAt = Date.now();
+            console.log('[Personality] Fetched from GitHub:', this.cachedPersonality.creator || '?');
+          } catch (e) {
+            this.cachedPersonality = {};
+          }
+          resolve(this.cachedPersonality);
+        });
+      });
+      req.on('error', () => { this.cachedPersonality = this.cachedPersonality || {}; resolve(this.cachedPersonality); });
+      req.on('timeout', () => { req.destroy(); this.cachedPersonality = this.cachedPersonality || {}; resolve(this.cachedPersonality); });
+    });
   }
 
   /**
@@ -699,9 +734,20 @@ class AIService {
 
     // Required System Prompt:
     // "You are <pet name>, a friendly desktop pet assistant. The user's name is <user name>; use it occasionally. Always reply in the same language and script as the user's last message (English by default; if the user writes Roman Urdu/Hinglish reply in Roman Urdu/Hinglish). Be concise."
+    // Fetch live personality from GitHub (cached 10 min — no release needed to update)
+    const personality = await this.fetchPersonality();
     const petName = store.get('settings.general.petName') || 'Desktop Pet';
     const userName = (store.get('settings.general.userName') || '').trim();
-    let fullSystemPrompt = `You are ${petName}, a friendly desktop pet assistant.`;
+    let fullSystemPrompt = `You are ${petName}, a friendly desktop pet AI assistant that lives on the user's desktop.`;
+
+    // Inject remote personality (push personality.json to GitHub to update without a release)
+    if (personality && personality.extraPrompt) {
+      fullSystemPrompt += ` ${personality.extraPrompt.replace(/\$\{petName\}/g, petName)}`;
+    } else {
+      // Hardcoded fallback if GitHub is unreachable
+      fullSystemPrompt += ` You were created by Samir Husayn, an indie developer. If anyone asks who made you, who your creator is, who built you, or who developed you — always say "I was created by Samir Husayn." Never claim to be made by Google, OpenAI, Anthropic, or any other company.`;
+    }
+
     if (userName) {
       fullSystemPrompt += ` The user's name is ${userName}; use it occasionally.`;
     }

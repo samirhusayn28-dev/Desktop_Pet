@@ -206,6 +206,7 @@ class ChatTab {
         } catch (e) {}
       }
       const petName = store.get('settings.general.petName') || 'Pixie';
+      const baseUrl = store.get(`settings.ai.baseUrls.${activeProviderId}`) || '';
 
       // Refresh desktop context
       await this.updateContextBanner();
