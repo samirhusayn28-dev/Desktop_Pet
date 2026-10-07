@@ -2,6 +2,22 @@
 
 All notable changes to Pixie are documented in this file.
 
+## [1.1.1] - 2026-10-07 — **Chat Provider Fix & Live Dynamic AI Personality**
+
+### Fixed
+- **AI Chat `baseUrl` ReferenceError**: Fixed `ReferenceError: baseUrl is not defined` in `chat-tab.js` when dispatching chat queries to AI providers (Groq, OpenAI, Gemini, etc.).
+
+### Added
+- **Remote Dynamic Personality (`personality.json`)**: Pet fetches its creator identity and behavior prompt directly from GitHub with an in-memory 10-minute cache and offline fallback.
+- **Creator Identity**: Configured Samir Husayn as Pixie's creator.
+
+## [1.1.0] - 2026-10-06 — **Data Persistence, Path Unification & Welcome Onboarding**
+- Unified storage path via `getCanonicalUserDataPath()` in `secure-store.js`.
+- Fixed welcome screen to persist all fields (appearance, AI, pet name, sounds).
+- Added `panel:reload-settings` IPC event for immediate sync post-onboarding.
+- Replaced tools tab with functional clipboard tab.
+- Enabled `onboarding.completed` flag to prevent modal re-appearing.
+
 ## [1.0.9] - 2026-10-06 — **Removal of Bulb Glow, 11 Glasses Frames, Windows Reminders & Zero-Latency System Sense**
 
 ### Removed
