@@ -155,9 +155,17 @@ function Get-PixieFastAudio {
             $reg = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\$devId\Properties"
             $p = Get-ItemProperty -Path $reg -ErrorAction SilentlyContinue
             if ($p) {
-                $desc = "" + $p.'{a45c254e-df1c-4efd-8020-67d146a850e0},2' + " " + $p.'{b3f8fa53-0004-438e-9002-d4c46f370a0f},6'
-                if ($desc -match 'headphone|headset|earphone|airpod|bud|earbud|airpods|beats|bose|sony|jbl|wh-|wf-|sennheiser|plantronics|razer|hyperx|steelseries|wireless stereo|bluetooth audio') {
+                # Check PKEY_AudioEndpoint_FormFactor: 3=Headphones, 5=Headset, 1=Speakers
+                $ff = $p.'{1da5d803-d01f-450f-953f-be50882e289e},0'
+                if ($ff -eq 3 -or $ff -eq 5) {
                     $isHp = "true"
+                } elseif ($ff -eq 1) {
+                    $isHp = "false"
+                } else {
+                    $desc = "" + $p.'{a45c254e-df1c-4efd-8020-67d146a850e0},14' + " " + $p.'{a45c254e-df1c-4efd-8020-67d146a850e0},2' + " " + $p.'{b3f8fa53-0004-438e-9002-d4c46f370a0f},6'
+                    if ($desc -notmatch 'speakers?' -and $desc -match 'headphone|headset|earphone|airpod|bud|earbud|airpods|beats|bose|sony|jbl|wh-|wf-|sennheiser|plantronics|razer|hyperx|steelseries|wireless stereo|bluetooth audio') {
+                        $isHp = "true"
+                    }
                 }
             }
             $script:lastIsHp = $isHp
@@ -476,7 +484,12 @@ class SystemSense {
   }
 
   canReact(eventType, customCooldown = null) {
-    const isEnabled = store.get(`settings.reactions.${eventType}`);
+    let settingKey = eventType;
+    if (eventType.startsWith('battery_') || eventType === 'battery') settingKey = 'battery';
+    if (eventType.startsWith('headphones_') || eventType === 'headphones') settingKey = 'headphones';
+    if (eventType.startsWith('network_') || eventType === 'network') settingKey = 'network';
+
+    const isEnabled = store.get(`settings.reactions.${settingKey}`);
     if (isEnabled === false) return false;
 
     const now = Date.now();
@@ -591,8 +604,8 @@ class SystemSense {
             this._applyHeadphoneState(isHp);
           }
 
-          // 3. Real-time audio activity detection (peak > 5 means audio is actively outputting)
-          const isAudioActive = peak >= 5;
+          // 3. Real-time audio activity detection (peak >= 35 means audio is actively outputting, not line noise)
+          const isAudioActive = peak >= 35;
           this.processAudioPlayingState(isAudioActive).catch(() => {});
 
           // 4. Battery (<1ms kernel32 GetSystemPowerStatus via C#)
@@ -666,7 +679,7 @@ class SystemSense {
     if (isMuteOrZero) {
       newBand = 'MUTED';
     } else if (this.currentVolumeBand === 'MAX') {
-      newBand = vol < 92 ? (vol <= 15 ? 'LOW' : 'NORMAL') : 'MAX';
+      newBand = vol < 90 ? (vol <= 15 ? 'LOW' : 'NORMAL') : 'MAX';
     } else if (this.currentVolumeBand === 'LOW') {
       newBand = vol >= 98 ? 'MAX' : (vol >= 20 ? 'NORMAL' : 'LOW');
     } else if (this.currentVolumeBand === 'MUTED') {
@@ -675,11 +688,12 @@ class SystemSense {
       newBand = vol >= 98 ? 'MAX' : (vol <= 15 ? 'LOW' : 'NORMAL');
     }
 
-    const isEnabled = store.get('settings.reactions.volume') !== false;
     if (newBand !== this.currentVolumeBand) {
       const prevBand = this.currentVolumeBand;
       this.currentVolumeBand = newBand;
-      if (isEnabled && !this.isSleeping) {
+
+      // Rate limit and ensure pet is not sleeping
+      if (this.canReact('volume', 25000) && !this.isSleeping) {
         const name = this.getUserName();
         if (newBand === 'MAX') {
           this.sendPetEmotion('irritated', 4000);
@@ -690,7 +704,7 @@ class SystemSense {
         } else if (newBand === 'LOW') {
           this.sendPetEmotion('sad', 3500);
           bubble.show({ badge: 'LOW VOLUME', text: 'Can barely hear anything down here...', sound: 'tap', emotion: 'sad', duration: 3000 });
-        } else if (newBand === 'NORMAL') {
+        } else if (newBand === 'NORMAL' && (prevBand === 'MAX' || prevBand === 'LOW' || prevBand === 'MUTED')) {
           this.sendPetEmotion('relieved', 3000);
           bubble.show({ badge: 'VOLUME OK', text: 'Ah, that is much better.', sound: 'happy', emotion: 'relieved', duration: 2500 });
         }
@@ -764,24 +778,28 @@ class SystemSense {
       newBand = 'HIGH';
     } else if (pct <= 25) {
       newBand = 'LOW';
-    } else if (this.currentBrightnessBand === 'HIGH' && pct < 90) {
+    } else if (this.currentBrightnessBand === 'HIGH' && pct < 88) {
       newBand = 'NORMAL';
-    } else if (this.currentBrightnessBand === 'LOW' && pct > 30) {
+    } else if (this.currentBrightnessBand === 'LOW' && pct > 32) {
       newBand = 'NORMAL';
     } else if (!this.currentBrightnessBand) {
-      newBand = (pct >= 90) ? 'HIGH' : ((pct <= 30) ? 'LOW' : 'NORMAL');
+      newBand = (pct >= 95) ? 'HIGH' : ((pct <= 25) ? 'LOW' : 'NORMAL');
+      this.currentBrightnessBand = newBand;
+      return;
     }
     if (newBand !== this.currentBrightnessBand) {
       const oldBand = this.currentBrightnessBand;
       this.currentBrightnessBand = newBand;
-      if (newBand === 'HIGH') {
-        this.sendPetEmotion('squint', 4000);
-        bubble.show({ badge: 'MAX BRIGHTNESS', text: 'So bright! Sunglasses recommended!', emotion: 'squint' });
-      } else if (newBand === 'LOW') {
-        this.sendPetEmotion('dull', 4000);
-        bubble.show({ badge: 'DIM SCREEN', text: 'Screen is dim and cozy...', emotion: 'dull' });
-      } else if (oldBand) {
-        this.sendPetEmotion('relieved', 2000);
+      if (this.canReact('brightness', 30000) && !this.isSleeping) {
+        if (newBand === 'HIGH') {
+          this.sendPetEmotion('squint', 4000);
+          bubble.show({ badge: 'MAX BRIGHTNESS', text: 'So bright! Sunglasses recommended!', emotion: 'squint' });
+        } else if (newBand === 'LOW') {
+          this.sendPetEmotion('dull', 4000);
+          bubble.show({ badge: 'DIM SCREEN', text: 'Screen is dim and cozy...', emotion: 'dull' });
+        } else if (oldBand === 'HIGH' || oldBand === 'LOW') {
+          this.sendPetEmotion('relieved', 2000);
+        }
       }
     }
   }
@@ -800,7 +818,7 @@ class SystemSense {
 
           const pct = parseInt(match[1], 10);
           const stateStr = match[2].trim().toLowerCase();
-          const isCharging = stateStr.includes('charging') || stateStr.includes('ac power');
+          const isCharging = (stdout.includes("'AC Power'") || stdout.includes('AC attached') || stateStr.includes('charging') || stateStr.includes('charged')) && !stateStr.includes('discharging');
 
           this.processBatteryState(pct, isCharging);
           resolve();
@@ -850,7 +868,7 @@ class SystemSense {
     // Plugged in
     if (!this.state.batteryCharging && isCharging) {
       this.state.batteryCharging = true;
-      if (this.canReact('battery_plug', 10000)) {
+      if (this.canReact('battery_plug', 15000)) {
         this.sendPetEmotion('charging', 4000);
         bubble.show({
           badge: 'CHARGER CONNECTED',
@@ -863,7 +881,7 @@ class SystemSense {
     // Unplugged
     else if (this.state.batteryCharging && !isCharging) {
       this.state.batteryCharging = false;
-      if (this.canReact('battery_unplug', 10000)) {
+      if (this.canReact('battery_unplug', 15000)) {
         this.sendPetEmotion('surprised', 2500);
         bubble.show({
           badge: 'ON BATTERY',
@@ -920,17 +938,24 @@ class SystemSense {
       if (!enabled) return resolve();
 
       if (process.platform === 'darwin') {
-        // macOS: system-wide audio assertion in pmset -g assertions
-        exec('pmset -g assertions 2>/dev/null', (err, stdout) => {
-          let isAudioActive = false;
-          if (!err && stdout) {
-            isAudioActive = /coreaudiod|AppleHDAEngineOutput|audio-out|com\.apple\.audio/i.test(stdout);
+        // First check if Spotify or Apple Music is actively playing
+        this.getJxaTrackTitle().then((trackTitle) => {
+          if (trackTitle) {
+            this.processAudioPlayingState(true, trackTitle).then(resolve).catch(() => resolve());
+            return;
           }
-          this.processAudioPlayingState(isAudioActive).then(resolve).catch(() => resolve());
-        });
+          // If no music app track, check if system has active audio playback sleep assertion
+          exec('pmset -g assertions 2>/dev/null', (err, stdout) => {
+            let isAudioActive = false;
+            if (!err && stdout) {
+              isAudioActive = /PreventUserIdleSystemSleep[\s\S]*?(?:coreaudiod|com\.apple\.audio\.context)/i.test(stdout);
+            }
+            this.processAudioPlayingState(isAudioActive, '').then(resolve).catch(() => resolve());
+          });
+        }).catch(() => resolve());
       } else if (process.platform === 'win32') {
         this.checkWindowsAudioState().then((isAudioActive) => {
-          this.processAudioPlayingState(isAudioActive).then(resolve).catch(() => resolve());
+          this.processAudioPlayingState(isAudioActive, '').then(resolve).catch(() => resolve());
         }).catch(() => resolve());
       } else {
         resolve();
@@ -942,7 +967,8 @@ class SystemSense {
   // Strategy: check for known media player processes + browser processes
   async checkWindowsAudioState() {
     if (typeof this.lastAudioPeak === 'number') {
-      return this.lastAudioPeak >= 5;
+      // Must be at least 35 (3.5% volume) to be true audio playback
+      return this.lastAudioPeak >= 35;
     }
     return false;
   }
@@ -977,7 +1003,7 @@ class SystemSense {
     });
   }
 
-  async processAudioPlayingState(isAudioActive) {
+  async processAudioPlayingState(isAudioActive, track = '') {
     const now = Date.now();
     if (isAudioActive) {
       this.audioStoppedTime = null;
@@ -988,24 +1014,28 @@ class SystemSense {
       // USER REQUEST: audio is playing on the system for 5+ seconds
       if (playingDuration >= 5000 && !this.state.isMusicPlaying) {
         this.state.isMusicPlaying = true;
-        let trackTitle = '';
-        if (process.platform === 'darwin') {
+        let trackTitle = track;
+        if (!trackTitle && process.platform === 'darwin') {
           try {
             trackTitle = await this.getJxaTrackTitle();
           } catch (e) {}
         }
         this.state.currentTrack = trackTitle;
         this.sendPetEmotion('vibing', 0, 2, true, true); // held state while vibing
-        const text = trackTitle
-          ? `Grooving to ${trackTitle.replace(/^(Spotify|Music):\s*/, '')}! ♪`
-          : 'Grooving to the beats! ♪';
-        bubble.show({
-          badge: 'VIBING TO MUSIC ♪',
-          text,
-          sound: 'happy',
-          category: 'reactions',
-          emotion: 'vibing'
-        });
+
+        // Cooldown: only show bubble if not alerted within 60s
+        if (this.canReact('media', 60000)) {
+          const text = trackTitle
+            ? `Grooving to ${trackTitle.replace(/^(Spotify|Music):\s*/, '')}! ♪`
+            : 'Grooving to the beats! ♪';
+          bubble.show({
+            badge: 'VIBING TO MUSIC ♪',
+            text,
+            sound: 'happy',
+            category: 'reactions',
+            emotion: 'vibing'
+          });
+        }
       }
     } else {
       this.audioStartTime = null;
@@ -1075,7 +1105,7 @@ class SystemSense {
   checkHeadphones(force = false) {
     return new Promise((resolve) => {
       const now = Date.now();
-      const throttleMs = process.platform === 'win32' ? 5000 : 45000;
+      const throttleMs = 3000; // 3s on both platforms for fast, accurate response
       if (!force && this.state.headphonesConnected !== null && (now - this.lastHeadphonesCheck < throttleMs)) {
         return resolve();
       }
@@ -1101,8 +1131,22 @@ class SystemSense {
 
       exec(`system_profiler SPAudioDataType 2>/dev/null`, (err, stdout) => {
         if (err || !stdout) return resolve();
-        const isHeadphones = /Default Output Device: Yes[\s\S]*?(Output Source: (Headphones|AirPods|Bluetooth)|Transport: (Bluetooth))/i.test(stdout) ||
-                             /(AirPods|Headphones|EarPods|Buds)/i.test(stdout.split('Default Output Device: Yes')[0] || '');
+
+        // Extract ONLY the block that is the active Default Output Device
+        const sections = stdout.split(/\n(?=\s{4,8}[^\s:][^\n]+:\s*\n)/);
+        const defaultOutSec = sections.find(s => /Default Output Device:\s*Yes/i.test(s));
+
+        let isHeadphones = false;
+        if (defaultOutSec) {
+          if (/Output Source:\s*Internal Speakers/i.test(defaultOutSec)) {
+            isHeadphones = false;
+          } else if (/Output Source:\s*(Headphones|AirPods|Bluetooth)|Transport:\s*Bluetooth/i.test(defaultOutSec)) {
+            isHeadphones = true;
+          } else {
+            const firstLine = (defaultOutSec.split('\n')[0] || '').trim();
+            isHeadphones = /(AirPods|Headphones|EarPods|Buds|Headset)/i.test(firstLine);
+          }
+        }
         this._applyHeadphoneState(isHeadphones);
         resolve();
       });

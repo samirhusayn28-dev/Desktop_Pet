@@ -2,6 +2,17 @@
 
 All notable changes to Pixie are documented in this file.
 
+## [1.1.2] - 2026-10-14 — **SystemSense Accuracy & False-Positive Elimination (macOS & Windows)**
+
+### Fixed
+- **Battery AC / Charger Flip-Flop**: Resolved battery state misdetection on macOS where `Now drawing from 'AC Power'` and `AC attached; not charging` caused the pet to falsely cycle between "On Battery" and "Charger Connected".
+- **Headphone False Positives & Latency**:
+  - macOS: Fixed issue where paired/inactive Bluetooth audio devices caused perpetual false headphone detections. Reduced check throttle from 45 seconds to 3 seconds for instant and responsive headphone detection.
+  - Windows: Added `PKEY_AudioEndpoint_FormFactor` inspection and excluded `Speakers/Headphones` driver descriptions from triggering false headphone reactions.
+- **Random Media/Music Vibing**: Eliminated false positives caused by static macOS audio drivers and ambient Windows audio noise (`peak >= 35` threshold). Added 60s cooldown to media alerts.
+- **Volume & Brightness Rate-Limiting**: Added debounced cooldowns (25s on volume, 30s on brightness) preventing rapid slider movement from triggering stacked speech bubbles.
+- **Settings Sub-Event Mapping**: Mapped `battery_*`, `headphones_*`, and `network_*` events to parent settings so disabling reactions in Settings is strictly respected.
+
 ## [1.1.1] - 2026-10-07 — **Chat Provider Fix & Live Dynamic AI Personality**
 
 ### Fixed
