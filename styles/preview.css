@@ -84,11 +84,10 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(22, 23, 30, 0.7);
-  border: 1px solid var(--border-subtle);
+  background: #2c2c2e;
+  border: 1px solid #48484a;
   border-radius: 999px;
   padding: 8px 18px;
-  backdrop-filter: blur(12px);
 }
 
 .badge {

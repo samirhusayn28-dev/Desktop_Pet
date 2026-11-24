@@ -1,136 +1,99 @@
-# Desktop Pet — Minimal AI Pair Programmer Companion 🤍⚡
+# Pixie — Black Matte AI Desktop Companion
 
-A lightweight, expressive desktop companion built with **Electron + Node.js + Solid Dark Material UI**. Floats seamlessly on your desktop as an embossed, tactile face-bot companion with live hardware awareness, intelligent IDE/browser context detection, universal multi-provider AI chat, to-do lists, focus timer, notes, system telemetry, and round glasses.
+Pixie is a lightweight, expressive desktop companion built with **Electron + Node.js**. It floats above your desktop as a code-driven SVG pet, with a compact solid-black panel for chat, daily tools, privacy controls, and settings.
 
-Designed & Developed by **Samir Husayn** ([samirhusayn28-dev](https://github.com/samirhusayn28-dev)).
-
----
-
-## ✨ Features & Architecture
-
-### 1. Minimalist Vector Face-Bot Companion
-- **Pure Floating Character**: Zero window frames or border clippings. Floats transparently on your desktop at `screen-saver` window level.
-- **Accurate Shape Hit-Testing**: Clicks outside the pet contour pass directly through to background apps with transparent mouse event forwarding.
-- **Micro-Physics Dragging & Clicking**: Mouse clicks (< 4px) toggle the assistant panel; movements $\ge$ 4px drag the companion smoothly across monitors with display boundary clamping.
-- **Throttled Eye Tracking (30 FPS)**: Global cursor tracking polled in the main process with a 1.5px movement threshold to conserve CPU.
-- **Round Frame Glasses**: Customizable SVG glasses overlay centered on eyes with eye-tracking clamped within lenses.
-- **25 Expressive Vector Emotions**: Shape-only eye/mouth morphs with static SVG overlays (transform/opacity only, zero GPU waste). Includes happy, sad, wink, love, thinking, surprised, cool, focus, annoyed, dizzy, blush, excited, scared, bored, proud, worried, grateful, goodbye, and more.
-- **Idle Detection & Power-Saving**: Transitions to sleepy at 2 min and sleeping at 5 min with all animation loops paused. Wake from sleep/lock is completely silent with no unwanted popups.
-- **Startup Welcome & Shutdown Goodbye**: Greets once per real system boot/login with a time-of-day aware message ("Good morning, <name>!"); shows a brief (< 1s) goodbye wave on shutdown, logout, or tray Quit.
-
-### 2. Multi-Provider AI Engine (Electron Main Process)
-- **Zero CORS / CSP Failures**: All AI requests execute directly from the Node.js Main process with streaming chunks piped over IPC.
-- **Supported Providers**:
-  - **Google Gemini**: Dynamic `v1beta` model discovery (e.g. `gemini-2.0-flash-lite`, `gemini-1.5-flash`).
-  - **Groq Cloud**: Ultra-fast OpenAI-compatible endpoints (`llama-3.3-70b-versatile`).
-  - **OpenAI**: ChatGPT / GPT-4o / GPT-4o Mini with dynamic models.
-  - **Anthropic Claude**: Messages API streaming (`claude-3-5-sonnet`, `claude-3-5-haiku`).
-  - **DeepSeek / Qwen / OpenRouter**: Native OpenAI-compatible streaming endpoints.
-  - **Ollama**: Local, private, zero-data-leak LLMs via `/api/chat`.
-- **System Prompt & Language Adaptation**: Honors user name and pet name, mirrors the user's conversational language (including Roman Urdu/Hinglish).
-- **Thinking Filter**: Automatically extracts and filters `<think>` reasoning tags for clean chat bubbles.
-- **"Test Connection" Button**: Real-time probe in Settings with clear PASS / FAIL status and friendly troubleshooting explanations.
-
-### 3. Productivity Tools & Solid Material Panel
-- **Solid Dark Material UI**: Opaque dark background (#111113) without CPU/GPU-draining blurs or backdrop filters.
-- **To-Do List**: Quick task management with add, toggle, and delete.
-- **Pomodoro Focus Timer**: Circular SVG countdown ring with work/break presets and chime reminders.
-- **Scratchpad Notes**: Local notes with instant search and New note creation.
-- **Scheduled Reminders**: Aligned grid form with sound effects, speech bubbles, snooze, and repeat options.
-- **Hardware Telemetry**: Real process metrics (CPU %, RAM, Battery, Volume) without fake or randomized data.
-- **Data Export & Import**: Complete backup of settings, notes, to-dos, and reminders in versioned JSON with deep security scrubbing (API keys excluded) and pre-import safety backups.
-- **Central Reset System**: Individual reset icons on every control, per-section resets, and full reset to defaults without touching user notes or API keys.
-
-### 4. SystemSense: Dynamic Environment Awareness
-- **Screen Brightness**: Low brightness -> dim expression; max brightness -> squint eyes.
-- **Audio Volume**: Max volume -> irritated; muted -> quiet "shh" expression; normal -> relieved.
-- **Battery & Power**: Low-battery alerts; plugged-in celebration.
-- **Headphones Detection**: Focus expression when headphones are connected.
-- **High CPU / RAM**: Stressed expression with sweat drop when load > 85%.
-
-### 5. Automated GitHub Update Checker
-- Checks for releases from `samirhusayn28-dev/Desktop_Pet` 60s after startup and every 24h, plus manual "Check now" in Settings -> About.
-- Semver comparator notifies via speech bubble and status badge when an update is available.
-- Directly links to the platform-specific installer (`.dmg` for macOS Intel, `.exe` for Windows).
-- Offline-safe: Displays "Couldn't check" when offline, never false "Up to date".
+Designed & developed by **Samir Husayn** ([samirhusayn28-dev](https://github.com/samirhusayn28-dev)).
 
 ---
 
-## 🔒 Security & Privacy
+## Highlights
 
-- **OS Secure Storage**: API keys are encrypted via Electron `safeStorage` (macOS Keychain / Windows DPAPI). Keys are never committed to git or stored in plain text.
-- **Data Scrubbing**: Exporting data strips all sensitive credentials and secrets automatically.
-- **Zero Background Telemetry**: System context is read only when relevant events fire, never logged or transmitted remotely.
+- **Battery-friendly black matte UI**: the panel, pet bubble, quick menu, standalone bubble, and welcome screen use solid `#000000` / `#08080a` / `#161618` surfaces with a blue accent. There is no blur, glass, transparency slider, or light-theme override.
+- **Cross-platform by design**: macOS and Windows x64 share the same panel sections, reactions, sounds, reminders, notes, clipboard history, backup/import, typing animation, and privacy rules.
+- **Code-driven Pixie pet**: no image assets and no glasses. Eyes and mouth are SVG shapes; the mouth is `#111111`. Multiple emotions and distinct reactions fire for each of the 14 panel sections.
+- **Playful when idle**: after a short pause Pixie starts short, bounded activities — clamped hops, hand waves, clapping, vibing, and eye/mouth antics — instead of sitting in a bored pose.
+- **Typing everywhere**: Pixie reacts while you type in other apps. macOS uses an Accessibility event tap; Windows uses a local low-level keyboard hook with a real message pump that emits only a typing pulse and never reads the pressed key. Settings shows helper readiness and any failure reason.
+- **AI chat with multiple providers**: Gemini, Groq, OpenAI, Anthropic, Qwen, DeepSeek, OpenRouter, Ollama, and custom OpenAI-compatible endpoints, streamed through the Electron main process.
+- **Daily tools**: to-do list, Pomodoro Focus with reminders, multiple notes with pinning and autosave, eval-free scientific calculator, unit converter, color studio, markdown preview, saved prompts, and clipboard history.
+- **Audible reminders and reactions**: sounds are on by default. Reminders live in their own section, fire even when the panel is closed, and show a native popup plus speech bubble and alarm sound, with repeat, snooze, and notification click-through to Reminders.
+- **Local privacy controls**: desktop context is attached only when you send a message. macOS may provide browser tab title/URL; Windows provides foreground app name and window title only. Both use the same blocklist and redaction rules.
 
 ---
 
-## 💻 Installation & Running Locally
+## Panel sections
+
+The in-panel navigation has 14 sections:
+
+`Chat`, `Flow`, `Focus`, `Reminders`, `To-Do`, `Notes`, `Calc`, `Convert`, `Privacy`, `Clipboard`, `Colors`, `Markdown`, `Saved Prompts`, and `Settings`.
+
+**Reminders** is a dedicated section with its own composer and list. Clicking a reminder notification opens it directly.
+
+---
+
+## Backup, restore, and privacy
+
+- API keys are encrypted at rest with Electron `safeStorage` (macOS Keychain / Windows DPAPI).
+- A **full backup** uses `format: "pixie-full-backup"`, `version: 2`, and stores the whole app snapshot plus decrypted `secrets.apiKeys` so a full restore can restore everything. Keep backup files private.
+- Legacy `version: 1` backups remain importable.
+- A safety backup is written before an import is applied.
+- Notes are stored as `tools.notes` with `{ id, title, content, pinned, updatedAt }`; clipboard history is capped at 50 items in `tools.clipboardHistory` and is gated by privacy settings.
+
+---
+
+## Run locally
 
 ### Prerequisites
-- Node.js 18+ or 20+
-- macOS (Intel or Apple Silicon) or Windows 10/11
 
-### 1. Clone & Install
+- Node.js 18+
+- macOS or Windows 10/11
+
 ```bash
-git clone https://github.com/samirhusayn28-dev/Desktop_Pet.git
-cd Desktop_Pet
 npm install
-```
-
-### 2. Start Application (Dev Mode)
-```bash
 npm start
 ```
 
-### 3. Diagnostic Self-Test
-Verify all local subsystems (store, vector renderer, audio assets, sensors, update checker):
+### Self-test
+
 ```bash
 npm run test:selftest
 ```
 
 ---
 
-## 📦 Building Releases
+## Build installers
 
-### macOS Intel DMG (`x64`)
 ```bash
-npx electron-builder --mac --x64
+npm run build:mac   # dist/Pixie-<version>-mac-x64.dmg and .zip
+npm run build:win   # dist/Pixie-<version>-win-x64.exe
+npm run build:all   # both platforms in one command
 ```
-Produces `dist/Desktop-Pet-1.0.1-mac-x64.dmg`.
 
-### Windows x64 NSIS Installer (`.exe`)
-```bash
-npx electron-builder --win --x64
-```
-Produces `dist/Desktop-Pet-1.0.1-win-x64.exe`.
+Current release: **1.2.0**.
+
+The macOS and Windows helper scripts are unpacked into `app.asar.unpacked/main/` so the typing and context helpers are available at runtime.
 
 ---
 
-## 🛡️ Unsigned App Warnings & Permissions
+## First launch and permissions
 
-Desktop Pet is an independent open-source project and is not signed with an expensive Apple Developer ID or Microsoft Authenticode certificate. Follow these quick steps on first launch:
+These builds are **unsigned and not notarized**.
 
-### macOS First Launch
-1. Open the `.dmg` and drag `Desktop Pet.app` to `/Applications`.
-2. Right-click (or Control-click) `Desktop Pet.app` in `/Applications` and select **Open**.
-3. In the confirmation dialog, click **Open**.
-*(Alternatively, run `xattr -cr "/Applications/Desktop Pet.app"` in Terminal).*
+### macOS
 
-### Windows First Launch (SmartScreen)
-1. Run `Desktop-Pet-1.0.1-win-x64.exe`.
-2. When Windows SmartScreen appears ("Windows protected your PC"), click **More info**.
-3. Click **Run anyway**.
+1. Open the `.dmg` and drag `Pixie.app` to `/Applications`.
+2. Control-click `Pixie.app` and choose **Open** if Gatekeeper warns.
+3. Grant **Accessibility** permission to Pixie when prompted so OS-wide typing animation works. If Settings reports a helper failure, use **Accessibility** then **Restart helper**; auto retries will also resume after permission is granted.
+4. Screen Recording and Automation are optional and only needed for screenshot context and browser tab details.
 
-### macOS System Permissions (Settings -> Permissions)
-- **Accessibility**: Needed to read frontmost app title for pair-programming context.
-- **Screen Recording**: Optional; needed only if "Allow Screen Capture for Vision Queries" is enabled.
-- **Automation**: Needed to read the active browser tab URL (Safari, Chrome, Brave).
+### Windows
+
+1. Run `Pixie-1.2.0-win-x64.exe`.
+2. If SmartScreen appears, choose **More info → Run anyway**.
+3. The Windows keyboard hook does not need Accessibility permission. Settings deep links open the relevant Windows Settings pages.
 
 ---
 
-## 📄 License & Open-Source Fonts
-- Code is licensed under the MIT License. Created by [Samir Husayn](https://github.com/samirhusayn28-dev).
-- **Nunito Font**: Licensed under the SIL Open Font License 1.1 (Copyright (c) 2014, Vernon Adams).
-- **Fredoka Font**: Licensed under the SIL Open Font License 1.1 (Copyright (c) 2021, The Fredoka Project Authors).
-- **JetBrains Mono Font**: Licensed under the SIL Open Font License 1.1 (Copyright (c) 2020, JetBrains).
-- **Lucide Icons**: Licensed under the ISC License (Copyright (c) Lucide Contributors).
+## License and fonts
+
+- Code: MIT License. Created by [Samir Husayn](https://github.com/samirhusayn28-dev).
+- Nunito, Fredoka, JetBrains Mono, and Lucide Icons retain their respective open-source licenses.

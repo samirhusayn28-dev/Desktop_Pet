@@ -6,7 +6,7 @@
  * 2. Points 1px, 5px, 20px outside every edge and rounded corner -> inside === false
  * 3. Tested at smallest, default, and largest size
  * 4. Tested at extreme roundness (square: roundness 0, pill: roundness 50)
- * 5. Tested with glasses ON and OFF
+ * 5. Pet renders without glasses at every size
  * 6. Tested with active speech bubble visible -> bubble area does NOT capture clicks
  * 7. Click outside lets clicks pass through (setIgnoreMouseEvents true) and does NOT open panel
  */
@@ -37,11 +37,11 @@ app.whenReady().then(async () => {
 
   // Test matrix configurations
   const configs = [
-    { name: 'Default (136x120, round 36, scale 1.0)', width: 136, height: 120, roundness: 36, scale: 1.0, glasses: false },
-    { name: 'Smallest (60x60, round 20, scale 0.5)', width: 60, height: 60, roundness: 20, scale: 0.5, glasses: false },
-    { name: 'Largest (200x200, round 40, scale 2.0)', width: 200, height: 200, roundness: 40, scale: 2.0, glasses: true },
-    { name: 'Square Extreme (136x120, round 0, scale 1.0)', width: 136, height: 120, roundness: 0, scale: 1.0, glasses: false },
-    { name: 'Pill Extreme (136x120, round 50, scale 1.0)', width: 136, height: 120, roundness: 50, scale: 1.0, glasses: true },
+    { name: 'Default (136x120, round 36, scale 1.0)', width: 136, height: 120, roundness: 36, scale: 1.0 },
+    { name: 'Smallest (60x60, round 20, scale 0.5)', width: 60, height: 60, roundness: 20, scale: 0.5 },
+    { name: 'Largest (200x200, round 40, scale 2.0)', width: 200, height: 200, roundness: 40, scale: 2.0 },
+    { name: 'Square Extreme (136x120, round 0, scale 1.0)', width: 136, height: 120, roundness: 0, scale: 1.0 },
+    { name: 'Pill Extreme (136x120, round 50, scale 1.0)', width: 136, height: 120, roundness: 50, scale: 1.0 },
   ];
 
   let totalTested = 0;
@@ -53,11 +53,25 @@ app.whenReady().then(async () => {
     store.set('settings.appearance.height', cfg.height);
     store.set('settings.appearance.roundness', cfg.roundness);
     store.set('settings.appearance.scale', cfg.scale);
-    store.set('settings.appearance.glassesEnabled', cfg.glasses);
 
     // Apply to pet
     petWindow.webContents.send('theme:apply-custom-appearance', store.get('settings.appearance'));
     await new Promise(r => setTimeout(r, 150));
+
+    // The pet must still render correctly with no glasses and a black mouth
+    const face = await petWindow.webContents.executeJavaScript(`(() => {
+      const svg = document.querySelector('.facebot-svg');
+      const mouth = svg ? svg.querySelector('.coucou-mouth') : null;
+      return {
+        hasSvg: !!svg,
+        hasGlasses: !!document.getElementById('facebot-glasses') || !!(svg && svg.querySelector('[class*="glasses"]')),
+        mouthColor: mouth ? (mouth.getAttribute('stroke') || '').toLowerCase() : null
+      };
+    })()`);
+    if (!face.hasSvg || face.hasGlasses || face.mouthColor !== '#111111') {
+      console.error(`  FAIL [pet render]: svg=${face.hasSvg}, glasses=${face.hasGlasses}, mouth=${face.mouthColor}`);
+      allPassed = false;
+    }
 
     // Get calculated geometry
     const appConfig = store.get('settings.appearance');
@@ -181,7 +195,6 @@ app.whenReady().then(async () => {
   store.set('settings.appearance.height', 120);
   store.set('settings.appearance.roundness', 36);
   store.set('settings.appearance.scale', 1.0);
-  store.set('settings.appearance.glassesEnabled', false);
 
   console.log(`\nItem H2 Tests Completed: ${totalTested} geometry points tested.`);
   console.log(`OVERALL RESULT: ${allPassed ? 'ALL H2 CHECKS PASSED' : 'SOME CHECKS FAILED'}`);

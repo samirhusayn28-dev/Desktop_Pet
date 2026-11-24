@@ -30,3 +30,20 @@ const appApi = {
 };
 
 window.app = appApi;
+
+// In-app fallback for global typing animation: every Pixie window reports key
+// presses through the shared event bus. The macOS helper covers other apps.
+const TYPING_IGNORE_KEYS = new Set([
+  'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab', 'Escape',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'
+]);
+let lastTypingEmit = 0;
+window.addEventListener('keydown', (event) => {
+  if (!event || TYPING_IGNORE_KEYS.has(event.key)) return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const now = Date.now();
+  if (now - lastTypingEmit < 80) return;
+  lastTypingEmit = now;
+  appApi.emit('pet:typing', { source: 'app-window' });
+}, true);

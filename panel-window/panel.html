@@ -2,1490 +2,208 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Desktop Pet</title>
-  
-  <!-- Bundled Offline Fonts (Nunito, Fredoka, JetBrains Mono) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Pixie</title>
+
+  <!-- Bundled offline fonts: JetBrains Mono is used for labels; system sans for body -->
   <link rel="stylesheet" href="../assets/fonts/fonts.css">
-  
-  <!-- Stylesheets -->
+
   <link rel="stylesheet" href="../themes/themes.css">
   <link rel="stylesheet" href="../character/pet.css">
   <link rel="stylesheet" href="panel.css">
 </head>
 <body>
-  <!-- First-Run Welcome Modal (Clean Onboarding) -->
-  <div class="first-run-overlay hidden" id="first-run-modal">
-    <div class="first-run-card">
-      <div class="first-run-icon">
-        <div id="first-run-pet-avatar"></div>
+  <div class="app panel-window-shell" id="panel-shell" data-section="chat">
+
+    <!-- ===================== HEADER ===================== -->
+    <header class="hd panel-header">
+      <div class="pet" id="header-pet-face" title="Pixie"></div>
+      <div class="hd-copy">
+        <b id="panel-title-text">Pixie</b>
+        <div class="st" id="hs"><i></i><span>Ready</span></div>
       </div>
-      <h2 class="first-run-title">Welcome to Desktop Pet!</h2>
-      <p class="first-run-subtitle">Your personal AI pair programmer & desktop companion with live system awareness and real glassmorphism.</p>
-
-      <div class="first-run-form">
-        <div class="setting-item">
-          <label class="setting-label">Name your companion</label>
-          <input type="text" id="onboarding-pet-name" class="terminal-input full-width" value="Pixie" maxlength="20">
-        </div>
-
-        <div class="setting-item">
-          <label class="setting-label">Choose AI Provider</label>
-          <select id="onboarding-provider" class="terminal-select full-width">
-            <option value="gemini" selected>Google Gemini (Recommended - Free Tier)</option>
-            <option value="groq">Groq Cloud (Ultra Fast Llama 3.3)</option>
-            <option value="openai">OpenAI (GPT-4o Mini / GPT-4o)</option>
-            <option value="anthropic">Claude (Anthropic 3.5 Sonnet)</option>
-            <option value="ollama">Ollama (Local Private LLM)</option>
-          </select>
-        </div>
-
-        <div class="setting-item" id="onboarding-key-row">
-          <label class="setting-label">API Key (Optional for now)</label>
-          <input type="password" id="onboarding-api-key" class="terminal-input full-width" placeholder="Enter API key or configure later in Settings">
-        </div>
-
-        <button class="theme-btn-primary full-width" id="btn-start-companion">
-          <i data-lucide="sparkles"></i>
-          <span>Start Pair Programming</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div class="panel-window-shell" id="panel-shell">
-    <!-- 1. Header & Titlebar -->
-    <header class="panel-header">
-      <div class="panel-brand">
-        <!-- Live Mini Pet Face Avatar -->
-        <div class="header-pet-face" id="header-pet-face">
-          <!-- Dynamically filled with mini Pet SVG -->
-        </div>
-        <h1 class="panel-title" id="panel-title-text">Bolt</h1>
-        <span class="provider-pill-badge" id="header-provider-badge">GEMINI</span>
-      </div>
-
-      <div class="panel-window-controls">
-        <button class="win-btn settings-gear-btn" id="btn-header-settings" title="Settings">
-          <i data-lucide="settings"></i>
-          <span class="settings-update-dot hidden" id="settings-update-dot"></span>
-        </button>
-        <button class="win-btn win-min-btn" id="btn-win-min" title="Minimize / Hide">
-          <i data-lucide="minus"></i>
-        </button>
-        <button class="win-btn win-close-btn" id="btn-win-close" title="Close Panel">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
+      <span class="sp"></span>
+      <span class="badge" id="header-provider-badge">GEMINI</span>
+      <button class="sq settings-btn" id="btn-settings" title="Settings" aria-label="Open Pixie settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.9 19.36a1.7 1.7 0 0 0-1.87.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.54 15a1.7 1.7 0 0 0-1.56-1.04H3v-4h.08A1.7 1.7 0 0 0 4.64 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.54a1.7 1.7 0 0 0 1.04-1.56V3h4v.08A1.7 1.7 0 0 0 15.1 4.64a1.7 1.7 0 0 0 1.87-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.46 9c.2.63.78 1.04 1.56 1.04H21v4h-.08A1.7 1.7 0 0 0 19.4 15z"/></svg>
+      </button>
+      <button class="sq guide-btn" id="btn-guide" title="Guide" aria-label="Guide">?</button>
+      <button class="sq" id="btn-win-min" title="Minimize" aria-label="Minimize">&#8211;</button>
+      <button class="sq" id="btn-win-close" title="Close" aria-label="Close">&#215;</button>
     </header>
 
-    <!-- 2. Glassmorphic Tab Bar -->
-    <nav class="panel-tabs">
-      <button class="tab-btn active" data-tab="chat" id="tab-btn-chat" title="Chat">
-        <i data-lucide="message-square"></i>
-        <span class="tab-label">Chat</span>
-      </button>
-      <button class="tab-btn" data-tab="todo" id="tab-btn-todo" title="To-Do">
-        <i data-lucide="check-square"></i>
-        <span class="tab-label">To-Do</span>
-      </button>
-      <button class="tab-btn" data-tab="timer" id="tab-btn-timer" title="Timer">
-        <i data-lucide="timer"></i>
-        <span class="tab-label">Timer</span>
-      </button>
-      <button class="tab-btn" data-tab="notes" id="tab-btn-notes" title="Notes">
-        <i data-lucide="file-text"></i>
-        <span class="tab-label">Notes</span>
-      </button>
-      <button class="tab-btn" data-tab="reminders" id="tab-btn-reminders" title="Reminders">
-        <i data-lucide="bell"></i>
-        <span class="tab-label">Reminders</span>
-      </button>
-      <button class="tab-btn" data-tab="clipboard" id="tab-btn-clipboard" title="Clipboard">
-        <i data-lucide="clipboard-list"></i>
-        <span class="tab-label">Clipboard</span>
-      </button>
-    </nav>
+    <!-- ===================== BODY ===================== -->
+    <div class="bd">
 
-    <!-- Auto-detected Update Banner -->
-    <div class="panel-update-banner hidden" id="panel-update-banner">
-      <div class="update-banner-left">
-        <div class="update-pulse-dot"></div>
-        <div class="update-banner-text">
-          <span class="update-title" id="update-banner-title">Pixie Update Available</span>
-          <span class="update-subtitle" id="update-banner-version">A newer version is ready on GitHub</span>
+      <!-- GROUPED NAVIGATION -->
+      <nav id="panel-tabs" class="panel-tabs" aria-label="Panel sections">
+        <h6>Conversation</h6>
+        <a class="tab-btn active on" data-tab="chat" title="Chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>
+          <span>Chat</span>
+        </a>
+        <a class="tab-btn" data-tab="flow" title="AI Flow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 8v8M18 10c0 5-8 3-12 6"/></svg>
+          <span>Flow</span>
+        </a>
+
+        <h6>Daily Tools</h6>
+        <a class="tab-btn" data-tab="focus" title="Focus Timer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7"/><path d="M12 9v4l2 2M10 3h4"/></svg>
+          <span>Focus</span>
+        </a>
+        <a class="tab-btn" data-tab="reminders" title="Reminders">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9zM10 21h4"/></svg>
+          <span>Reminders</span>
+        </a>
+        <a class="tab-btn" data-tab="todo" title="To-Do">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 7 2 2 3-3M4 15l2 2 3-3M13 8h7M13 16h7"/></svg>
+          <span>To-Do</span>
+        </a>
+        <a class="tab-btn" data-tab="notes" title="Quick Notes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5zM9 10h6M9 14h6"/></svg>
+          <span>Notes</span>
+        </a>
+        <a class="tab-btn" data-tab="calc" title="Calculator">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M8 16h2M12 16h2"/></svg>
+          <span>Calc</span>
+        </a>
+        <a class="tab-btn" data-tab="convert" title="Unit Converter">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg>
+          <span>Convert</span>
+        </a>
+
+        <h6>Utilities</h6>
+        <a class="tab-btn" data-tab="context" title="Privacy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>
+          <span>Privacy</span>
+        </a>
+        <a class="tab-btn" data-tab="clipboard" title="Clipboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9z"/></svg>
+          <span>Clip</span>
+        </a>
+        <a class="tab-btn" data-tab="colors" title="Color Studio">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a8 8 0 1 0 0 16c1.5 0 2-1 1.5-2-.5-1 0-2 1.5-2h2a3 3 0 0 0 3-3c0-5-4-9-8-9z"/><circle cx="8" cy="11" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16" cy="11" r="1"/></svg>
+          <span>Colors</span>
+        </a>
+        <a class="tab-btn" data-tab="markdown" title="Markdown">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="m10 12-2 2 2 2M14 12l2 2-2 2"/></svg>
+          <span>MD</span>
+        </a>
+        <a class="tab-btn" data-tab="snippets" title="Saved Prompts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v17l-5-4-5 4z"/></svg>
+          <span>Snips</span>
+        </a>
+
+        <h6>Preferences</h6>
+        <a class="tab-btn" data-tab="settings" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.9 19.36a1.7 1.7 0 0 0-1.87.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.54 15a1.7 1.7 0 0 0-1.56-1.04H3v-4h.08A1.7 1.7 0 0 0 4.64 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.54a1.7 1.7 0 0 0 1.04-1.56V3h4v.08A1.7 1.7 0 0 0 15.1 4.64a1.7 1.7 0 0 0 1.87-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.46 9c.2.63.78 1.04 1.56 1.04H21v4h-.08A1.7 1.7 0 0 0 19.4 15z"/></svg>
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <!-- CONTENT VIEW -->
+      <section id="view" class="flush">
+        <div class="vh">
+          <div class="crumb"><span id="stage-crumb">01 / CONVERSATION</span> / <b id="stage-current">CHAT</b></div>
+          <h1 id="stage-title">Conversation</h1>
+          <p id="stage-subtitle"></p>
         </div>
-      </div>
-      <div class="update-banner-actions">
-        <button type="button" class="banner-download-btn" id="btn-banner-download">
-          <i data-lucide="download"></i>
-          <span>Update</span>
-        </button>
-        <button type="button" class="banner-close-btn" id="btn-banner-close" title="Dismiss">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
+
+        <!-- CHAT -->
+        <section class="tab-pane active" id="pane-chat">
+          <div class="chatv">
+            <div class="chatbar">
+              <div class="pet" id="chat-pet-mini"></div>
+              <div class="chatbar-copy">
+                <b id="chat-assistant-name">Pixie Assistant</b>
+                <small id="chat-model-info" title="Current AI model">gemini • gemini-2.0-flash-lite</small>
+              </div>
+              <span class="sp"></span>
+              <div class="st chat-context" id="chat-context-bar" title="Context is attached only when you send">
+                <i></i><span id="chat-context-text">Context: Detecting active desktop app...</span>
+              </div>
+            </div>
+
+            <div id="chat-messages-container"></div>
+
+            <div class="composer">
+              <div class="cb">
+                <textarea id="chat-input-field" rows="1" placeholder="Ask Pixie anything..."></textarea>
+                <button class="go" id="btn-chat-send" title="Send message (Enter)" aria-label="Send">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                </button>
+              </div>
+              <div class="hint">
+                <span class="ac">
+                  <button id="btn-clipboard-chip" title="Clipboard section">Clipboard</button>
+                  <button id="btn-snippet-chip" title="Saved prompts section">Snips</button>
+                  <button id="btn-chat-regenerate" title="Regenerate last answer" disabled>Regenerate</button>
+                  <button id="btn-chat-stop" title="Stop generating" disabled>Stop</button>
+                  <button id="btn-clear-chat" title="Clear conversation">Clear</button>
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TOOL SECTIONS -->
+        <section class="tab-pane" id="pane-flow"><div class="tool-pane-layout" id="tool-pane-flow"></div></section>
+        <section class="tab-pane" id="pane-focus"><div class="tool-pane-layout" id="tool-pane-focus"></div></section>
+        <section class="tab-pane" id="pane-reminders"><div class="tool-pane-layout" id="tool-pane-reminders"></div></section>
+        <section class="tab-pane" id="pane-todo"><div class="tool-pane-layout" id="tool-pane-todo"></div></section>
+        <section class="tab-pane" id="pane-notes"><div class="tool-pane-layout" id="tool-pane-notes"></div></section>
+        <section class="tab-pane" id="pane-calc"><div class="tool-pane-layout" id="tool-pane-calc"></div></section>
+        <section class="tab-pane" id="pane-convert"><div class="tool-pane-layout" id="tool-pane-convert"></div></section>
+        <section class="tab-pane" id="pane-context"><div class="tool-pane-layout" id="tool-pane-context"></div></section>
+        <section class="tab-pane" id="pane-clipboard"><div class="tool-pane-layout" id="tool-pane-clipboard"></div></section>
+        <section class="tab-pane" id="pane-colors"><div class="tool-pane-layout" id="tool-pane-colors"></div></section>
+        <section class="tab-pane" id="pane-markdown"><div class="tool-pane-layout" id="tool-pane-markdown"></div></section>
+        <section class="tab-pane" id="pane-snippets"><div class="tool-pane-layout" id="tool-pane-snippets"></div></section>
+        <section class="tab-pane" id="pane-settings"><div class="tool-pane-layout" id="tool-pane-settings"></div></section>
+      </section>
     </div>
 
-    <!-- 3. Scrollable Tab Contents -->
-    <main class="panel-main-content">
-      <!-- 1. CHAT TAB -->
-      <section class="tab-pane active" id="pane-chat">
-        <div class="chat-pane-layout">
-          <!-- Glass Card Chat Container -->
-          <div class="chat-glass-card">
-            <!-- Chat Card Header -->
-            <div class="chat-card-header">
-              <div class="chat-header-avatar-col">
-                <div class="chat-pet-mini" id="chat-pet-mini">
-                  <!-- Live SVG avatar -->
-                </div>
-              </div>
-              <div class="chat-header-meta">
-                <span class="chat-header-title" id="chat-assistant-name">Bolt Assistant</span>
-                <button type="button" class="chat-header-subtitle" id="chat-model-info" title="Click to change model in Settings">
-                  gemini • gemini-2.0-flash-lite
-                </button>
-              </div>
-              <button class="chat-broom-btn" id="btn-clear-chat" title="Clear Conversation">
-                <i data-lucide="trash-2"></i>
-              </button>
-            </div>
+    <!-- ===================== FOOTER ===================== -->
+    <footer class="ft" id="panel-status-footer">
+      <span><span class="k">Model</span><span id="status-model">gemini</span></span>
+      <span><span class="k">Context</span><span id="status-context">Context on</span></span>
+      <span><span class="k">Focus</span><span id="status-focus">Focus: idle</span></span>
+      <span style="margin-left:auto"><span class="k">Session</span><span id="status-meta">0 msgs</span></span>
+    </footer>
 
-            <!-- Desktop & Browser Context Banner (Requirement H) -->
-            <div class="chat-context-bar" id="chat-context-bar" title="Context is attached only when sending questions">
-              <i data-lucide="compass"></i>
-              <span id="chat-context-text">Context: Detecting active desktop app...</span>
-            </div>
-
-            <!-- Messages Scrollable Body -->
-            <div class="chat-messages-scroll" id="chat-messages-container">
-              <!-- Dynamically populated messages -->
-            </div>
-
-            <!-- Pill Input Bar (No paperclip icon) -->
-            <div class="chat-input-wrapper">
-              <div class="chat-input-bar">
-                <textarea id="chat-input-field" class="chat-input-textarea" rows="1" placeholder="Ask something... (e.g. explain a function, debug code)"></textarea>
-                <button class="chat-send-btn" id="btn-chat-send" title="Send message (Enter)">
-                  <i data-lucide="send"></i>
-                </button>
-              </div>
-            </div>
-          </div>
+    <!-- Guide: all help copy lives here, opened by the ? button -->
+    <div class="guide-overlay" id="guide-overlay" hidden>
+      <div class="guide-panel" role="dialog" aria-modal="true" aria-label="Panel guide">
+        <div class="guide-head">
+          <b id="guide-title">Pixie Guide</b>
+          <button class="sq" id="btn-guide-close" aria-label="Close guide">&#215;</button>
         </div>
-      </section>
-
-      <!-- 2. TO-DO TAB -->
-      <section class="tab-pane" id="pane-todo">
-        <div class="todo-pane-layout">
-          <!-- Progress Bar Card -->
-          <div class="todo-progress-card">
-            <div class="todo-progress-header">
-              <span class="progress-title" id="todo-status-text">Daily Sprint Progress</span>
-              <span class="progress-ratio mono" id="todo-progress-ratio"><span id="todo-percent-text">0%</span></span>
-            </div>
-            <div class="progress-track">
-              <div class="progress-fill" id="todo-progress-fill" style="width: 0%;"></div>
-            </div>
-          </div>
-
-          <!-- Add Task Input Row -->
-          <div class="todo-input-row">
-            <input type="text" id="todo-input-field" class="terminal-input" placeholder="Add a new task (Enter)...">
-            <button class="theme-btn-primary" id="btn-todo-add">
-              <i data-lucide="plus"></i>
-              <span>Add</span>
-            </button>
-          </div>
-
-          <!-- Tasks List -->
-          <div class="todo-list-scroll" id="todo-items-container">
-            <!-- Dynamically populated tasks -->
-          </div>
+        <div class="guide-body" id="guide-body">
+          <h6>Keyboard</h6>
+          <p><span>Enter</span> send · <span>Shift + Enter</span> new line · <span>Esc</span> close this guide</p>
+          <h6>Chat &amp; flow</h6>
+          <p>Context is attached only when you send. Hover a chat message for <span>Edit</span> or <span>Branch</span>. History is capped at 50 messages.</p>
+          <h6>Focus &amp; Reminders</h6>
+          <p>Set custom focus, short-break and long-break minutes. Reminders have their own section with repeat, snooze, popup and alarm sound.</p>
+          <h6>Privacy</h6>
+          <p>Context, clipboard and screenshots are click- or send-only. Screenshot context is off by default. Redaction masks keys, tokens, passwords and emails. <span>Never send</span> blocks matching messages.</p>
+          <h6>Settings</h6>
+          <p>The Settings section and header gear live inside the panel. The welcome screen only appears on a fresh install.</p>
+          <h6>Sections</h6>
+          <p><span>To-Do / Notes</span> local lists and scratchpad · <span>Calc / Convert</span> local math and units</p>
+          <p><span>Clip / Colors / MD / Snips</span> click-to-read clipboard, accent colors, markdown preview and saved prompts</p>
         </div>
-      </section>
-
-      <!-- 3. TIMER TAB -->
-      <section class="tab-pane" id="pane-timer">
-        <div class="timer-pane-layout">
-          <div class="timer-card-glass">
-            <!-- Mode Pills -->
-            <div class="timer-mode-pills">
-              <button class="timer-mode-btn active" data-mode="pomodoro"><i data-lucide="clock"></i><span>Pomodoro</span></button>
-              <button class="timer-mode-btn" data-mode="short-break"><i data-lucide="coffee"></i><span>Short Break</span></button>
-              <button class="timer-mode-btn" data-mode="long-break"><i data-lucide="sun"></i><span>Long Break</span></button>
-              <button class="timer-mode-btn" data-mode="countdown"><i data-lucide="hourglass"></i><span>Countdown</span></button>
-              <button class="timer-mode-btn" data-mode="stopwatch"><i data-lucide="timer"></i><span>Stopwatch</span></button>
-            </div>
-
-            <!-- Circular SVG Ring + Clock Display -->
-            <div class="timer-ring-wrap">
-              <svg class="timer-ring-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Track -->
-                <circle cx="100" cy="100" r="88" stroke-width="10" class="timer-ring-track"/>
-                <!-- Progress arc (stroke-dasharray=553 = 2π×88) -->
-                <circle cx="100" cy="100" r="88" stroke-width="10" class="timer-ring-progress"
-                  id="timer-ring-progress"
-                  stroke-dasharray="553"
-                  stroke-dashoffset="0"
-                  stroke-linecap="round"
-                  transform="rotate(-90 100 100)"/>
-              </svg>
-              <div class="timer-ring-inner">
-                <div class="time-large-text mono" id="timer-time-display">25:00</div>
-                <span class="timer-state-label" id="timer-sublabel">FOCUS SESSION</span>
-              </div>
-            </div>
-
-            <!-- Timer Controls -->
-            <div class="timer-actions-row">
-              <button class="timer-ctl-btn primary" id="btn-timer-toggle">
-                <i data-lucide="play" id="icon-timer-toggle"></i>
-                <span id="text-timer-toggle">Start Focus</span>
-              </button>
-              <button class="timer-ctl-btn secondary hidden" id="btn-timer-lap">
-                <i data-lucide="flag"></i>
-                <span>Lap</span>
-              </button>
-              <button class="timer-ctl-btn secondary" id="btn-timer-reset">
-                <i data-lucide="rotate-ccw"></i>
-                <span>Reset</span>
-              </button>
-            </div>
-
-            <!-- Session Stats & Progress Dots -->
-            <div class="timer-session-row">
-              <div class="timer-stats-pill" id="timer-pet-status">
-                <i data-lucide="award"></i>
-                <span>Completed: <strong class="mono" id="pomodoro-count">0</strong></span>
-              </div>
-              <div class="timer-session-dots" id="timer-session-dots" title="Pomodoro 4-session cycle">
-                <span class="session-dot"></span>
-                <span class="session-dot"></span>
-                <span class="session-dot"></span>
-                <span class="session-dot"></span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Pomodoro Customization Card -->
-          <div class="timer-custom-card" id="timer-config-pomodoro">
-            <div class="timer-custom-card-header">
-              <div class="timer-custom-card-title">
-                <i data-lucide="sliders"></i>
-                <span>Pomodoro Settings</span>
-              </div>
-              <button type="button" class="btn-reset-section" data-section="pomodoro" id="btn-reset-pomodoro" title="Reset Pomodoro settings to default">Reset section</button>
-            </div>
-            <div class="timer-custom-grid">
-              <!-- Focus Minutes -->
-              <div class="timer-custom-row">
-                <div class="timer-custom-label-wrap">
-                  <span class="timer-custom-label">Focus Duration</span>
-                  <span class="timer-custom-sub">1 – 180 min</span>
-                </div>
-                <div class="timer-stepper-wrap">
-                  <button type="button" class="timer-step-btn" data-action="dec" data-target="pomodoro-focus">−</button>
-                  <input type="number" id="pomodoro-focus-input" class="timer-step-input mono" min="1" max="180" value="25">
-                  <button type="button" class="timer-step-btn" data-action="inc" data-target="pomodoro-focus">+</button>
-                  <span class="timer-step-unit">min</span>
-                  <button type="button" class="btn-ctrl-reset" data-ctrl="pomodoro-focus" title="Reset to 25 min"><i data-lucide="rotate-ccw"></i></button>
-                </div>
-              </div>
-              <!-- Short Break Minutes -->
-              <div class="timer-custom-row">
-                <div class="timer-custom-label-wrap">
-                  <span class="timer-custom-label">Short Break</span>
-                  <span class="timer-custom-sub">1 – 180 min</span>
-                </div>
-                <div class="timer-stepper-wrap">
-                  <button type="button" class="timer-step-btn" data-action="dec" data-target="pomodoro-short-break">−</button>
-                  <input type="number" id="pomodoro-short-break-input" class="timer-step-input mono" min="1" max="180" value="5">
-                  <button type="button" class="timer-step-btn" data-action="inc" data-target="pomodoro-short-break">+</button>
-                  <span class="timer-step-unit">min</span>
-                  <button type="button" class="btn-ctrl-reset" data-ctrl="pomodoro-short-break" title="Reset to 5 min"><i data-lucide="rotate-ccw"></i></button>
-                </div>
-              </div>
-              <!-- Long Break Minutes -->
-              <div class="timer-custom-row">
-                <div class="timer-custom-label-wrap">
-                  <span class="timer-custom-label">Long Break</span>
-                  <span class="timer-custom-sub">1 – 180 min</span>
-                </div>
-                <div class="timer-stepper-wrap">
-                  <button type="button" class="timer-step-btn" data-action="dec" data-target="pomodoro-long-break">−</button>
-                  <input type="number" id="pomodoro-long-break-input" class="timer-step-input mono" min="1" max="180" value="15">
-                  <button type="button" class="timer-step-btn" data-action="inc" data-target="pomodoro-long-break">+</button>
-                  <span class="timer-step-unit">min</span>
-                  <button type="button" class="btn-ctrl-reset" data-ctrl="pomodoro-long-break" title="Reset to 15 min"><i data-lucide="rotate-ccw"></i></button>
-                </div>
-              </div>
-              <!-- Sessions Before Long Break -->
-              <div class="timer-custom-row">
-                <div class="timer-custom-label-wrap">
-                  <span class="timer-custom-label">Sessions Before Long Break</span>
-                  <span class="timer-custom-sub">1 – 20 cycles</span>
-                </div>
-                <div class="timer-stepper-wrap">
-                  <button type="button" class="timer-step-btn" data-action="dec" data-target="pomodoro-sessions">−</button>
-                  <input type="number" id="pomodoro-sessions-input" class="timer-step-input mono" min="1" max="20" value="4">
-                  <button type="button" class="timer-step-btn" data-action="inc" data-target="pomodoro-sessions">+</button>
-                  <span class="timer-step-unit"></span>
-                  <button type="button" class="btn-ctrl-reset" data-ctrl="pomodoro-sessions" title="Reset to 4"><i data-lucide="rotate-ccw"></i></button>
-                </div>
-              </div>
-              <!-- Auto-Start Next Phase -->
-              <div class="timer-custom-row">
-                <div class="timer-custom-label-wrap">
-                  <span class="timer-custom-label">Auto-start Next Phase</span>
-                  <span class="timer-custom-sub">Automatically transition focus and break</span>
-                </div>
-                <div class="timer-switch-wrap">
-                  <label class="terminal-switch">
-                    <input type="checkbox" id="pomodoro-autostart-toggle">
-                    <span class="slider round"></span>
-                  </label>
-                  <button type="button" class="btn-ctrl-reset" data-ctrl="pomodoro-autostart" title="Reset to OFF"><i data-lucide="rotate-ccw"></i></button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Standalone Short Break Card -->
-          <div class="timer-custom-card hidden" id="timer-config-short-break">
-            <div class="timer-custom-card-header">
-              <div class="timer-custom-card-title">
-                <i data-lucide="coffee"></i>
-                <span>Short Break Duration</span>
-              </div>
-              <button type="button" class="btn-reset-section" data-section="short-break" id="btn-reset-short-break" title="Reset to default">Reset section</button>
-            </div>
-            <div class="timer-custom-grid">
-              <div class="timer-custom-row">
-                <div class="timer-custom-label-wrap">
-                  <span class="timer-custom-label">Duration</span>
-                  <span class="timer-custom-sub">1 – 180 min</span>
-                </div>
-                <div class="timer-stepper-wrap">
-                  <button type="button" class="timer-step-btn" data-action="dec" data-target="standalone-short-break">−</button>
-                  <input type="number" id="standalone-short-break-input" class="timer-step-input mono" min="1" max="180" value="5">
-                  <button type="button" class="timer-step-btn" data-action="inc" data-target="standalone-short-break">+</button>
-                  <span class="timer-step-unit">min</span>
-                  <button type="button" class="btn-ctrl-reset" data-ctrl="standalone-short-break" title="Reset to 5 min"><i data-lucide="rotate-ccw"></i></button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Standalone Long Break Card -->
-          <div class="timer-custom-card hidden" id="timer-config-long-break">
-            <div class="timer-custom-card-header">
-              <div class="timer-custom-card-title">
-                <i data-lucide="sun"></i>
-                <span>Long Break Duration</span>
-              </div>
-              <button type="button" class="btn-reset-section" data-section="long-break" id="btn-reset-long-break" title="Reset to default">Reset section</button>
-            </div>
-            <div class="timer-custom-grid">
-              <div class="timer-custom-row">
-                <div class="timer-custom-label-wrap">
-                  <span class="timer-custom-label">Duration</span>
-                  <span class="timer-custom-sub">1 – 180 min</span>
-                </div>
-                <div class="timer-stepper-wrap">
-                  <button type="button" class="timer-step-btn" data-action="dec" data-target="standalone-long-break">−</button>
-                  <input type="number" id="standalone-long-break-input" class="timer-step-input mono" min="1" max="180" value="15">
-                  <button type="button" class="timer-step-btn" data-action="inc" data-target="standalone-long-break">+</button>
-                  <span class="timer-step-unit">min</span>
-                  <button type="button" class="btn-ctrl-reset" data-ctrl="standalone-long-break" title="Reset to 15 min"><i data-lucide="rotate-ccw"></i></button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Countdown Customization Card -->
-          <div class="timer-custom-card hidden" id="timer-config-countdown">
-            <div class="timer-custom-card-header">
-              <div class="timer-custom-card-title">
-                <i data-lucide="hourglass"></i>
-                <span>Countdown Configuration</span>
-              </div>
-              <button type="button" class="btn-reset-section" data-section="countdown" id="btn-reset-countdown" title="Reset countdown to default">Reset section</button>
-            </div>
-            <div class="timer-custom-grid">
-              <!-- Steppers for Hours, Minutes, Seconds (no native pickers) -->
-              <div class="timer-custom-row countdown-stepper-triple-row">
-                <div class="timer-custom-label-wrap">
-                  <span class="timer-custom-label">Set Duration</span>
-                  <span class="timer-custom-sub">1s to 99:59:59</span>
-                </div>
-                <div class="countdown-steppers-group">
-                  <div class="countdown-unit-box">
-                    <span class="countdown-unit-label">H</span>
-                    <div class="timer-stepper-mini">
-                      <button type="button" class="timer-step-btn mini" data-action="dec" data-target="countdown-hours">−</button>
-                      <input type="number" id="countdown-hours-input" class="timer-step-input mini mono" min="0" max="99" value="0">
-                      <button type="button" class="timer-step-btn mini" data-action="inc" data-target="countdown-hours">+</button>
-                    </div>
-                  </div>
-                  <div class="countdown-unit-sep">:</div>
-                  <div class="countdown-unit-box">
-                    <span class="countdown-unit-label">M</span>
-                    <div class="timer-stepper-mini">
-                      <button type="button" class="timer-step-btn mini" data-action="dec" data-target="countdown-minutes">−</button>
-                      <input type="number" id="countdown-minutes-input" class="timer-step-input mini mono" min="0" max="59" value="5">
-                      <button type="button" class="timer-step-btn mini" data-action="inc" data-target="countdown-minutes">+</button>
-                    </div>
-                  </div>
-                  <div class="countdown-unit-sep">:</div>
-                  <div class="countdown-unit-box">
-                    <span class="countdown-unit-label">S</span>
-                    <div class="timer-stepper-mini">
-                      <button type="button" class="timer-step-btn mini" data-action="dec" data-target="countdown-seconds">−</button>
-                      <input type="number" id="countdown-seconds-input" class="timer-step-input mini mono" min="0" max="59" value="0">
-                      <button type="button" class="timer-step-btn mini" data-action="inc" data-target="countdown-seconds">+</button>
-                    </div>
-                  </div>
-                  <button type="button" class="btn-ctrl-reset" data-ctrl="countdown-duration" title="Reset to 5 min"><i data-lucide="rotate-ccw"></i></button>
-                </div>
-              </div>
-
-              <!-- Quick Preset Chips -->
-              <div class="timer-custom-row">
-                <div class="timer-custom-label-wrap">
-                  <span class="timer-custom-label">Quick Presets</span>
-                </div>
-                <div class="timer-preset-chips" id="countdown-presets-row">
-                  <button type="button" class="preset-chip" data-mins="5">5m</button>
-                  <button type="button" class="preset-chip" data-mins="10">10m</button>
-                  <button type="button" class="preset-chip" data-mins="15">15m</button>
-                  <button type="button" class="preset-chip" data-mins="25">25m</button>
-                  <button type="button" class="preset-chip" data-mins="45">45m</button>
-                  <button type="button" class="preset-chip" data-mins="60">60m</button>
-                </div>
-              </div>
-
-              <!-- Optional Label -->
-              <div class="timer-custom-row">
-                <div class="timer-custom-label-wrap">
-                  <span class="timer-custom-label">Timer Label</span>
-                  <span class="timer-custom-sub">Shown when timer finishes</span>
-                </div>
-                <div class="timer-label-input-wrap">
-                  <input type="text" id="countdown-label-input" class="terminal-input" placeholder="e.g. Tea, Roast, Meeting" maxlength="50">
-                  <button type="button" class="btn-ctrl-reset" data-ctrl="countdown-label" title="Clear label"><i data-lucide="rotate-ccw"></i></button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Stopwatch Laps Card -->
-          <div class="timer-custom-card hidden" id="timer-config-stopwatch">
-            <div class="timer-custom-card-header">
-              <div class="timer-custom-card-title">
-                <i data-lucide="list-ordered"></i>
-                <span>Recorded Laps</span>
-              </div>
-            </div>
-            <div class="stopwatch-laps-container" id="stopwatch-laps-container">
-              <table class="stopwatch-laps-table">
-                <thead>
-                  <tr>
-                    <th>Lap</th>
-                    <th>Lap Time</th>
-                    <th>Overall Split</th>
-                  </tr>
-                </thead>
-                <tbody id="stopwatch-laps-body">
-                  <tr class="no-laps-row">
-                    <td colspan="3">No laps recorded yet. Press "Lap" while running.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 4. NOTES TAB -->
-      <section class="tab-pane" id="pane-notes">
-        <div class="notes-pane-layout">
-          <div class="notes-top-bar">
-            <div class="search-input-wrap">
-              <i data-lucide="search"></i>
-              <input type="text" id="notes-search-input" class="terminal-input" placeholder="Search notes...">
-            </div>
-            <button class="theme-btn-primary" id="btn-new-note">
-              <i data-lucide="plus"></i>
-              <span>New</span>
-            </button>
-          </div>
-
-          <div class="notes-cards-scroll" id="notes-container">
-            <!-- Dynamically populated notes -->
-          </div>
-        </div>
-      </section>
-
-      <!-- 5. REMINDERS TAB -->
-      <section class="tab-pane" id="pane-reminders">
-        <div class="reminders-pane-layout">
-          <!-- Add Reminder Card -->
-          <div class="reminder-create-card">
-            <div class="create-card-title">
-              <i data-lucide="bell-plus"></i>
-              <span>Create Reminder</span>
-            </div>
-            <div class="reminder-fields-grid">
-              <div class="form-field-group">
-                <label class="form-field-label" for="reminder-text-input"><i data-lucide="type"></i> Reminder Title</label>
-                <input type="text" id="reminder-text-input" class="terminal-input" placeholder="e.g. Standup Meeting, Drink water">
-              </div>
-              <div class="reminder-time-row">
-                <div class="form-field-group" style="flex: 1;">
-                  <label class="form-field-label" for="reminder-time-input"><i data-lucide="clock"></i> Time</label>
-                  <input type="time" id="reminder-time-input" class="terminal-input mono" value="16:00">
-                </div>
-                <div class="form-field-group" style="flex: 1;">
-                  <label class="form-field-label" for="reminder-repeat-select"><i data-lucide="repeat"></i> Repeat</label>
-                  <select id="reminder-repeat-select" class="terminal-select">
-                    <option value="once">Once</option>
-                    <option value="daily">Daily</option>
-                    <option value="every-hour">Every Hour</option>
-                  </select>
-                </div>
-                <div class="form-field-group btn-field-group">
-                  <label class="form-field-label" style="visibility: hidden;">Set</label>
-                  <button class="theme-btn-primary" id="btn-save-reminder">
-                    <i data-lucide="plus"></i>
-                    <span>Set</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Reminders List -->
-          <div class="reminders-list-scroll" id="reminders-list">
-            <!-- Dynamically populated reminders -->
-          </div>
-        </div>
-      </section>
-
-      <!-- 6. CLIPBOARD TAB -->
-      <section class="tab-pane" id="pane-clipboard">
-        <div class="clipboard-pane-layout">
-          <!-- Header Row -->
-          <div class="clipboard-tab-header">
-            <div class="clipboard-tab-title">
-              <i data-lucide="clipboard-list"></i>
-              <span>Clipboard History</span>
-              <span class="clipboard-live-dot"></span>
-            </div>
-            <div class="clipboard-tab-actions">
-              <div class="clipboard-search-wrap">
-                <i data-lucide="search"></i>
-                <input type="text" id="clipboard-search-input" class="terminal-input" placeholder="Search snippets…">
-              </div>
-              <button class="theme-btn-secondary" id="btn-clear-clipboard" title="Clear all history">Clear All</button>
-            </div>
-          </div>
-
-          <!-- History List -->
-          <div class="clipboard-history-list" id="clipboard-history-list">
-            <div class="clipboard-empty">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.35">
-                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-              </svg>
-              <span>Copy any text to track it here automatically.</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 7. SETTINGS TAB (Clean Organized Sections: General, Behavior, Reactions, Appearance, AI Provider, Privacy) -->
-      <section class="tab-pane" id="pane-settings">
-        <div class="settings-pane-layout">
-
-          <!-- SECTION 1: GENERAL -->
-          <div class="settings-group-card">
-            <div class="settings-group-title">
-              <div class="title-with-icon">
-                <i data-lucide="user"></i>
-                <span>General Settings</span>
-              </div>
-              <button type="button" class="btn-reset-section" data-section="general" title="Reset General Settings to default">Reset section</button>
-            </div>
-            
-            <div class="setting-item">
-              <label class="setting-label" for="setting-pet-name">Name your pet (max 20 characters)</label>
-              <input type="text" id="setting-pet-name" class="terminal-input full-width" maxlength="20" placeholder="Pet">
-              <span class="setting-hint">Appears in header, assistant title, speech bubbles, and AI prompt</span>
-            </div>
-
-            <div class="setting-item">
-              <label class="setting-label" for="setting-user-name">What should I call you? (max 20 characters)</label>
-              <input type="text" id="setting-user-name" class="terminal-input full-width" maxlength="20" placeholder="e.g. Alex">
-              <span class="setting-hint">Your pet will address you naturally in reminders, reactions, and chat</span>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Always on Top</div>
-                <div class="toggle-desc">Keep pet floating above other apps</div>
-              </div>
-              <input type="checkbox" id="setting-always-on-top" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Remember Position</div>
-                <div class="toggle-desc">Save desktop location between app restarts</div>
-              </div>
-              <input type="checkbox" id="setting-remember-pos" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Launch at Login</div>
-                <div class="toggle-desc">Start coding companion when computer boots</div>
-              </div>
-              <input type="checkbox" id="setting-launch-login" class="toggle-checkbox">
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Automatic Updates</div>
-                <div class="toggle-desc">Check for new releases in background</div>
-              </div>
-              <input type="checkbox" id="setting-auto-update" class="toggle-checkbox" checked>
-            </div>
-          </div>
-
-          <!-- SECTION 2: BEHAVIOR -->
-          <div class="settings-group-card">
-            <div class="settings-group-title">
-              <div class="title-with-icon">
-                <i data-lucide="sliders"></i>
-                <span>Behavior & Idle Timers</span>
-              </div>
-              <button type="button" class="btn-reset-section" data-section="behavior" title="Reset Behavior Settings to default">Reset section</button>
-            </div>
-
-            <div class="setting-item">
-              <div class="slider-label-row">
-                <label class="setting-label" for="setting-idle-sleepy">Sleepy After Inactivity</label>
-                <span class="slider-val" id="disp-idle-sleepy">2 min</span>
-              </div>
-              <input type="range" id="setting-idle-sleepy" min="1" max="10" step="1" value="2" class="terminal-slider">
-            </div>
-
-            <div class="setting-item">
-              <div class="slider-label-row">
-                <label class="setting-label" for="setting-idle-sleeping">Sleeping (Power-Save) After</label>
-                <span class="slider-val" id="disp-idle-sleeping">5 min</span>
-              </div>
-              <input type="range" id="setting-idle-sleeping" min="3" max="20" step="1" value="5" class="terminal-slider">
-            </div>
-
-            <div class="setting-item">
-              <div class="slider-label-row">
-                <label class="setting-label" for="setting-bubble-duration">Notification Bubble Duration</label>
-                <span class="slider-val" id="disp-bubble-duration">5 sec</span>
-              </div>
-              <input type="range" id="setting-bubble-duration" min="2" max="12" step="1" value="5" class="terminal-slider">
-            </div>
-
-            <!-- Reminder Snooze Length (Item R3) -->
-            <div class="setting-item">
-              <div class="slider-label-row">
-                <label class="setting-label" for="setting-snooze-duration">Reminder Snooze Length</label>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="slider-val" id="disp-snooze-duration">5 min</span>
-                  <button type="button" class="btn-reset-control" id="reset-snooze-duration" title="Reset to 5 min">
-                    <i data-lucide="rotate-ccw"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="snooze-select-row" style="display: flex; gap: 8px; margin-top: 6px;">
-                <select id="setting-snooze-duration" class="terminal-select" style="flex: 1;">
-                  <option value="5">5 minutes (Default)</option>
-                  <option value="10">10 minutes</option>
-                  <option value="15">15 minutes</option>
-                  <option value="30">30 minutes</option>
-                  <option value="custom">Custom...</option>
-                </select>
-                <input type="number" id="setting-snooze-custom" min="1" max="180" value="5" class="terminal-input mono" style="width: 72px; display: none;" title="Custom minutes">
-              </div>
-            </div>
-
-            <!-- Master Sounds Toggle (Item SND1) -->
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Sounds</div>
-                <div class="toggle-desc">Play sounds for reminders, timers and pet reactions</div>
-              </div>
-              <input type="checkbox" id="setting-sounds-enabled" class="toggle-checkbox">
-            </div>
-
-            <!-- Sounds Sub-controls (visible only when Sounds master toggle is ON) -->
-            <div id="sound-sub-controls" class="sound-sub-panel" style="display: none;">
-              <!-- Volume Slider + Test Sound Button -->
-              <div class="setting-slider-row">
-                <div class="slider-header-row">
-                  <span class="setting-label">Sound Volume</span>
-                  <div class="slider-val-wrap">
-                    <span class="slider-value" id="disp-sound-volume">50%</span>
-                    <button type="button" class="btn-sound-test" id="btn-sound-test" title="Play test sound">
-                      <i data-lucide="volume-2"></i>
-                      <span>Test sound</span>
-                    </button>
-                  </div>
-                </div>
-                <input type="range" id="setting-sound-volume" min="0" max="100" step="1" value="50" class="terminal-slider">
-              </div>
-
-              <!-- Sub-toggles -->
-              <div class="setting-toggle-row sound-sub-toggle">
-                <div class="setting-toggle-text">
-                  <div class="toggle-title">Reminders</div>
-                  <div class="toggle-desc">Sound alert when a reminder or posture check is due</div>
-                </div>
-                <input type="checkbox" id="setting-sound-reminders" class="toggle-checkbox" checked>
-              </div>
-
-              <div class="setting-toggle-row sound-sub-toggle">
-                <div class="setting-toggle-text">
-                  <div class="toggle-title">Timer &amp; Pomodoro</div>
-                  <div class="toggle-desc">Sound chime when countdown or focus interval finishes</div>
-                </div>
-                <input type="checkbox" id="setting-sound-timer" class="toggle-checkbox" checked>
-              </div>
-
-              <div class="setting-toggle-row sound-sub-toggle">
-                <div class="setting-toggle-text">
-                  <div class="toggle-title">Pet reactions</div>
-                  <div class="toggle-desc">Play gentle chirps and taps during pet interactions</div>
-                </div>
-                <input type="checkbox" id="setting-sound-reactions" class="toggle-checkbox" checked>
-              </div>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Do Not Disturb (DND)</div>
-                <div class="toggle-desc">Mute speech bubbles and notifications during focus work</div>
-              </div>
-              <input type="checkbox" id="setting-dnd" class="toggle-checkbox">
-            </div>
-          </div>
-
-          <!-- SECTION 3: SYSTEM AWARENESS REACTIONS -->
-          <div class="settings-group-card">
-            <div class="settings-group-title">
-              <div class="title-with-icon">
-                <i data-lucide="zap"></i>
-                <span>SystemSense Reactions</span>
-              </div>
-              <button type="button" class="btn-reset-section" data-section="reactions" title="Reset Reactions to default">Reset section</button>
-            </div>
-            <span class="setting-hint">Pet dynamically reacts to hardware, audio, power, and desktop events</span>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Screen Brightness</div>
-                <div class="toggle-desc">Squints on max brightness, gets cozy/dim on low</div>
-              </div>
-              <input type="checkbox" id="reaction-brightness" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Audio Volume</div>
-                <div class="toggle-desc">Covers ears on max volume, quiet speech when muted</div>
-              </div>
-              <input type="checkbox" id="reaction-volume" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Battery & Charger</div>
-                <div class="toggle-desc">Low battery warning below 20%, energized when plugged in</div>
-              </div>
-              <input type="checkbox" id="reaction-battery" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Music & Media Vibe</div>
-                <div class="toggle-desc">Groovy head-bob and music notes for Spotify & Apple Music</div>
-              </div>
-              <input type="checkbox" id="reaction-media" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Internet & Network</div>
-                <div class="toggle-desc">Notifies if Wi-Fi disconnects or reconnects</div>
-              </div>
-              <input type="checkbox" id="reaction-network" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Headphones Detection</div>
-                <div class="toggle-desc">Enters coding focus mode when headphones are connected</div>
-              </div>
-              <input type="checkbox" id="reaction-headphones" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Welcome on Startup</div>
-                <div class="toggle-desc">Warm greeting once per system boot or login</div>
-              </div>
-              <input type="checkbox" id="reaction-welcome-startup" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Goodbye on Shutdown</div>
-                <div class="toggle-desc">Short goodbye wave on shutdown, logout, or quit</div>
-              </div>
-              <input type="checkbox" id="reaction-goodbye-shutdown" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Heavy CPU / RAM Load</div>
-                <div class="toggle-desc">Stressed expression with sweat drop when load > 85%</div>
-              </div>
-              <input type="checkbox" id="reaction-highload" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Late Night Coder</div>
-                <div class="toggle-desc">Friendly sleepy nudge when coding past midnight</div>
-              </div>
-              <input type="checkbox" id="reaction-latenight" class="toggle-checkbox" checked>
-            </div>
-
-            <!-- Sensor Status Card -->
-            <div class="sensor-status-card" id="sensor-status-card">
-              <div class="sensor-status-header">
-                <div class="sensor-header-left">
-                  <span class="sensor-card-title">Hardware Sensor Diagnostics</span>
-                </div>
-                <div class="sensor-header-actions">
-                  <button type="button" class="btn-sensor-action" id="btn-refresh-sensors" title="Refresh live sensors">
-                    <i data-lucide="refresh-cw"></i>
-                    <span>Refresh</span>
-                  </button>
-                  <button type="button" class="btn-sensor-action" id="btn-open-accessibility" title="Open macOS Security & Privacy">
-                    <i data-lucide="external-link"></i>
-                    <span>Permissions</span>
-                  </button>
-                </div>
-              </div>
-              <div class="sensor-status-list" id="sensor-status-list">
-                <!-- Dynamically populated rows -->
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 3.5: SYSTEM PERMISSIONS (Requirement 4) -->
-          <div class="settings-group-card" id="settings-permissions-card">
-            <div class="settings-group-title">
-              <div class="title-with-icon">
-                <i data-lucide="shield-check"></i>
-                <span>System Permissions</span>
-              </div>
-              <button class="theme-btn-secondary recheck-perm-btn" id="btn-recheck-permissions" title="Re-check permissions">
-                <i data-lucide="refresh-cw"></i>
-                <span>Re-check</span>
-              </button>
-            </div>
-            <div id="perm-dev-notice" class="perm-dev-notice" style="display: none;">
-              <i data-lucide="info"></i>
-              <span>Running in dev mode: macOS assigns permissions to "Electron" or your Terminal application.</span>
-            </div>
-            <div class="permissions-list">
-              <!-- Accessibility -->
-              <div class="perm-item-row" id="perm-row-accessibility">
-                <div class="perm-meta">
-                  <div class="perm-title-row">
-                    <i data-lucide="mouse-pointer"></i>
-                    <span class="perm-name">Accessibility</span>
-                    <span class="perm-badge" id="badge-perm-accessibility">Checking...</span>
-                  </div>
-                  <div class="perm-desc">Required to detect frontmost active window titles and system interactions</div>
-                </div>
-                <div class="perm-actions">
-                  <button class="theme-btn-secondary perm-action-btn" id="btn-open-perm-accessibility">Open Settings</button>
-                  <button class="theme-btn-primary perm-action-btn" id="btn-request-perm-accessibility">Request</button>
-                </div>
-              </div>
-              <!-- Screen Recording -->
-              <div class="perm-item-row" id="perm-row-screen">
-                <div class="perm-meta">
-                  <div class="perm-title-row">
-                    <i data-lucide="monitor"></i>
-                    <span class="perm-name">Screen Recording</span>
-                    <span class="perm-badge" id="badge-perm-screen">Checking...</span>
-                  </div>
-                  <div class="perm-desc">Used for display brightness sensing and full-screen application detection</div>
-                </div>
-                <div class="perm-actions">
-                  <button class="theme-btn-secondary perm-action-btn" id="btn-open-perm-screen">Open Settings</button>
-                  <button class="theme-btn-primary perm-action-btn" id="btn-request-perm-screen">Request</button>
-                </div>
-              </div>
-              <!-- Automation -->
-              <div class="perm-item-row" id="perm-row-automation">
-                <div class="perm-meta">
-                  <div class="perm-title-row">
-                    <i data-lucide="bot"></i>
-                    <span class="perm-name">Automation (Apple Events)</span>
-                    <span class="perm-badge" id="badge-perm-automation">Checking...</span>
-                  </div>
-                  <div class="perm-desc">Senses active browser URLs/tabs and Spotify/Music playback for context</div>
-                </div>
-                <div class="perm-actions">
-                  <button class="theme-btn-secondary perm-action-btn" id="btn-open-perm-automation">Open Settings</button>
-                  <button class="theme-btn-primary perm-action-btn" id="btn-request-perm-automation">Request</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 3.6: PERFORMANCE & RESOURCE BUDGET (Lite Mode Removed) -->
-          <div class="settings-group-card">
-            <div class="settings-group-title">
-              <i data-lucide="gauge"></i>
-              <span>Performance & Resource Budget</span>
-            </div>
-            <span class="setting-hint">Optimized for low-spec machines running all day in the background</span>
-
-            <div class="live-usage-card" id="live-pet-usage">
-              <div class="usage-stat-col">
-                <span class="usage-label">TOTAL APP RAM</span>
-                <span class="usage-val mono" id="disp-live-ram">~95 MB</span>
-              </div>
-              <div class="usage-stat-col">
-                <span class="usage-label">TOTAL CPU</span>
-                <span class="usage-val mono" id="disp-live-cpu">0.2%</span>
-              </div>
-              <div class="usage-stat-col">
-                <span class="usage-label">BUDGET TARGET</span>
-                <span class="usage-val highlight mono" id="disp-live-budget">PASS (&lt;110MB)</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 4: APPEARANCE -->
-          <div class="settings-group-card appearance-group-card">
-            <div class="settings-group-title">
-              <div class="title-with-icon">
-                <i data-lucide="palette"></i>
-                <span>Appearance & Glass Customization</span>
-              </div>
-              <button type="button" class="btn-reset-section" data-section="appearance" id="btn-reset-appearance" title="Reset Appearance to default">Reset section</button>
-            </div>
-
-            <!-- Live 3D Pet Preview -->
-            <div class="appearance-preview-card">
-              <div class="preview-pet-stage" id="settings-pet-preview"></div>
-              <div class="preview-caption-row">
-                <span class="preview-pill-badge">LIVE PREVIEW</span>
-                <span class="preview-caption-hint">Syncs instantly with floating desktop companion</span>
-              </div>
-            </div>
-
-            <div class="appearance-sliders-grid">
-              <!-- Overall Size Scale -->
-              <div class="setting-item">
-                <div class="slider-label-row">
-                  <label class="setting-label" for="setting-pet-scale">Size (Overall Scale)</label>
-                  <span class="slider-val" id="disp-pet-scale">100%</span>
-                </div>
-                <input type="range" id="setting-pet-scale" min="0.5" max="3.0" step="0.05" value="1.0" class="terminal-slider">
-              </div>
-
-              <!-- Body Width -->
-              <div class="setting-item">
-                <div class="slider-label-row">
-                  <label class="setting-label" for="setting-pet-width">Body Width</label>
-                  <span class="slider-val" id="disp-pet-width">136 px</span>
-                </div>
-                <input type="range" id="setting-pet-width" min="60" max="200" step="2" value="136" class="terminal-slider">
-              </div>
-
-              <!-- Body Height -->
-              <div class="setting-item">
-                <div class="slider-label-row">
-                  <label class="setting-label" for="setting-pet-height">Body Height</label>
-                  <span class="slider-val" id="disp-pet-height">120 px</span>
-                </div>
-                <input type="range" id="setting-pet-height" min="60" max="200" step="2" value="120" class="terminal-slider">
-              </div>
-
-              <!-- Corner Roundness -->
-              <div class="setting-item">
-                <div class="slider-label-row">
-                  <label class="setting-label" for="setting-pet-roundness">Roundness</label>
-                  <span class="slider-val" id="disp-pet-roundness">36%</span>
-                </div>
-                <input type="range" id="setting-pet-roundness" min="0" max="50" step="1" value="36" class="terminal-slider">
-              </div>
-
-              <!-- Eye Size -->
-              <div class="setting-item">
-                <div class="slider-label-row">
-                  <label class="setting-label" for="setting-pet-eyesize">Eye Size</label>
-                  <span class="slider-val" id="disp-pet-eyesize">1.0x</span>
-                </div>
-                <input type="range" id="setting-pet-eyesize" min="0.5" max="2.0" step="0.05" value="1.0" class="terminal-slider">
-              </div>
-
-              <!-- Eye Spacing -->
-              <div class="setting-item">
-                <div class="slider-label-row">
-                  <label class="setting-label" for="setting-pet-eyespacing">Eye Spacing</label>
-                  <span class="slider-val" id="disp-pet-eyespacing">44 px</span>
-                </div>
-                <input type="range" id="setting-pet-eyespacing" min="20" max="70" step="1" value="44" class="terminal-slider">
-              </div>
-
-              <!-- Mouth Width -->
-              <div class="setting-item">
-                <div class="slider-label-row">
-                  <label class="setting-label" for="setting-pet-mouthwidth">Mouth Width</label>
-                  <span class="slider-val" id="disp-pet-mouthwidth">14 px</span>
-                </div>
-                <input type="range" id="setting-pet-mouthwidth" min="6" max="28" step="1" value="14" class="terminal-slider">
-              </div>
-
-              <!-- Depth / 3D Intensity -->
-              <div class="setting-item">
-                <div class="slider-label-row">
-                  <label class="setting-label" for="setting-pet-depth">Depth (3D Clay Effect)</label>
-                  <span class="slider-val" id="disp-pet-depth">80%</span>
-                </div>
-                <input type="range" id="setting-pet-depth" min="0" max="100" step="1" value="80" class="terminal-slider">
-              </div>
-
-              <!-- Accent Color Picker -->
-              <div class="setting-item full-width-item accent-color-item">
-                <div class="accent-title-row">
-                  <label class="setting-label" for="setting-accent-color">Accent Color</label>
-                  <button type="button" class="theme-btn-secondary" id="btn-accent-default" title="Reset to default orange">Reset to default</button>
-                </div>
-                <div class="accent-picker-row">
-                  <input type="color" id="setting-accent-color" value="#FF7A2F">
-                  <input type="text" id="disp-accent-color" class="terminal-input mono" value="#FF7A2F" maxlength="7" placeholder="#HEX">
-                  <div class="accent-swatches">
-                    <button type="button" class="swatch-btn active" data-color="#FF7A2F" style="background:#FF7A2F;" title="Classic Amber (Default)"></button>
-                    <button type="button" class="swatch-btn" data-color="#38BDF8" style="background:#38BDF8;" title="Sky Blue"></button>
-                    <button type="button" class="swatch-btn" data-color="#10B981" style="background:#10B981;" title="Emerald Green"></button>
-                    <button type="button" class="swatch-btn" data-color="#A855F7" style="background:#A855F7;" title="Neon Purple"></button>
-                    <button type="button" class="swatch-btn" data-color="#F43F5E" style="background:#F43F5E;" title="Rose Pink"></button>
-                    <button type="button" class="swatch-btn" data-color="#EAB308" style="background:#EAB308;" title="Cyber Yellow"></button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Body Color Picker -->
-              <div class="setting-item full-width-item">
-                <label class="setting-label" for="setting-pet-bodycolor">Body Color (Default White)</label>
-                <div class="color-picker-row">
-                  <input type="color" id="setting-pet-bodycolor" value="#FFFFFF">
-                  <input type="text" id="disp-pet-bodycolor" class="terminal-input mono" value="#FFFFFF" readonly>
-                  <button class="theme-btn-secondary" id="btn-bodycolor-white" title="Reset to White">Pure White</button>
-                </div>
-              </div>
-
-              <!-- Glasses Toggle (Item G1) -->
-              <div class="setting-toggle-row full-width-item" style="margin-top: 4px;">
-                <div class="setting-toggle-text">
-                  <div class="toggle-title">Pet Glasses</div>
-                  <div class="toggle-desc">Cute spectacles centered on eyes</div>
-                </div>
-                <input type="checkbox" id="setting-pet-glasses" class="toggle-checkbox">
-              </div>
-
-              <!-- Glasses Frame Shape -->
-              <div class="setting-item full-width-item" id="setting-glasses-shape-row">
-                <label class="setting-label" for="setting-pet-glasses-shape">Glasses Frame Shape</label>
-                <select id="setting-pet-glasses-shape" class="terminal-select full-width">
-                  <option value="round" selected>Round (Classic Circular)</option>
-                  <option value="square">Square (Retro Geek)</option>
-                  <option value="rectangular">Rectangle (Sleek Modern)</option>
-                  <option value="hexagon">Hexagon (Geometric Chic)</option>
-                  <option value="cateye">Cat-Eye (Chic & Winged)</option>
-                  <option value="oval">Oval (Soft & Friendly)</option>
-                  <option value="aviator">Aviator (Double-Bridge)</option>
-                  <option value="clubmaster">Browline (Clubmaster Vintage)</option>
-                  <option value="semi-rimless">Semi-Rimless (Flat-Top)</option>
-                  <option value="heart">Heart (Sweet & Kawaii)</option>
-                  <option value="star">Star (Fun & Starry)</option>
-                </select>
-              </div>
-
-              <!-- Glasses Frame Color -->
-              <div class="setting-item full-width-item" id="setting-glasses-color-row">
-                <label class="setting-label" for="setting-pet-glasses-color">Glasses Frame Color</label>
-                <div class="color-picker-row">
-                  <input type="color" id="setting-pet-glasses-color" value="#181820">
-                  <input type="text" id="disp-pet-glasses-color" class="terminal-input mono" value="#181820" readonly>
-                  <button type="button" class="theme-btn-secondary" id="btn-glasses-color-dark" title="Classic Dark">Classic Dark</button>
-                  <button type="button" class="theme-btn-secondary" id="btn-glasses-color-accent" title="Match Accent Color">Accent Color</button>
-                </div>
-              </div>
-
-              <!-- Eyes Color Picker -->
-              <div class="setting-item full-width-item">
-                <label class="setting-label" for="setting-pet-eyescolor">Eyes Color</label>
-                <div class="color-picker-row">
-                  <input type="color" id="setting-pet-eyescolor" value="#181820">
-                  <input type="text" id="disp-pet-eyescolor" class="terminal-input mono" value="#181820" readonly>
-                  <button type="button" class="theme-btn-secondary" id="btn-eyescolor-dark" title="Classic Dark">Classic Dark</button>
-                  <button type="button" class="theme-btn-secondary" id="btn-eyescolor-accent" title="Match Accent">Accent</button>
-                </div>
-              </div>
-
-              <!-- Mouth Color Picker -->
-              <div class="setting-item full-width-item">
-                <label class="setting-label" for="setting-pet-mouthcolor">Mouth Color</label>
-                <div class="color-picker-row">
-                  <input type="color" id="setting-pet-mouthcolor" value="#181820">
-                  <input type="text" id="disp-pet-mouthcolor" class="terminal-input mono" value="#181820" readonly>
-                  <button type="button" class="theme-btn-secondary" id="btn-mouthcolor-dark" title="Classic Dark">Classic Dark</button>
-                  <button type="button" class="theme-btn-secondary" id="btn-mouthcolor-accent" title="Match Accent">Accent</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 5: AI PROVIDER CONFIGURATION -->
-          <div class="settings-group-card">
-            <div class="settings-group-title">
-              <div class="title-with-icon">
-                <i data-lucide="cpu"></i>
-                <span>AI Provider Configuration</span>
-              </div>
-              <button type="button" class="btn-reset-section" data-section="ai" title="Reset AI Provider Configuration to default">Reset section</button>
-            </div>
-            
-            <div class="setting-item">
-              <label class="setting-label" for="setting-ai-provider">Active Provider</label>
-              <select id="setting-ai-provider" class="terminal-select full-width">
-                <option value="gemini" selected>Google Gemini (Free Tier / Flash)</option>
-                <option value="groq">Groq Cloud (Fast Llama 3.3)</option>
-                <option value="openai">OpenAI (ChatGPT / GPT-4o)</option>
-                <option value="anthropic">Claude (Anthropic)</option>
-                <option value="deepseek">DeepSeek</option>
-                <option value="openrouter">OpenRouter</option>
-                <option value="qwen">Qwen AI</option>
-                <option value="ollama">Ollama (Local / Private)</option>
-                <option value="custom">Custom (OpenAI-Compatible)</option>
-              </select>
-            </div>
-
-            <div class="setting-item" id="setting-apikey-row">
-              <label class="setting-label" for="setting-ai-key">API Key</label>
-              <input type="password" id="setting-ai-key" class="terminal-input full-width" placeholder="Enter key (stored securely in OS keychain)">
-            </div>
-
-            <div class="setting-item" id="setting-model-row">
-              <div class="setting-label-row">
-                <label class="setting-label" for="setting-ai-model">Model</label>
-                <button type="button" class="btn-refresh-models" id="btn-refresh-models" title="Fetch available models from API">
-                  <i data-lucide="refresh-cw"></i>
-                  <span>Refresh</span>
-                </button>
-              </div>
-              <div class="model-select-wrap">
-                <select id="setting-ai-model" class="terminal-select full-width">
-                  <option value="default">Loading dynamic models...</option>
-                </select>
-              </div>
-              <div class="model-status-hint" id="model-status-hint"></div>
-            </div>
-
-            <div class="setting-item" id="setting-baseurl-row">
-              <label class="setting-label" for="setting-ai-baseurl">Custom Base URL (optional)</label>
-              <input type="text" id="setting-ai-baseurl" class="terminal-input full-width" placeholder="e.g. https://api.groq.com/openai/v1 or http://localhost:11434">
-            </div>
-
-            <!-- Test Connection & Save Action Buttons -->
-            <div class="ai-actions-row">
-              <button class="theme-btn-secondary" id="btn-test-ai-connection">
-                <i data-lucide="activity"></i>
-                <span>Test Connection</span>
-              </button>
-              <button class="theme-btn-primary" id="btn-save-ai-settings">
-                <i data-lucide="check"></i>
-                <span>Save Configuration</span>
-              </button>
-            </div>
-
-            <!-- Test Connection Feedback Box -->
-            <div class="test-feedback-box hidden" id="test-feedback-box">
-              <div class="feedback-badge" id="feedback-badge">PASS</div>
-              <div class="feedback-text" id="feedback-text">Connection successful!</div>
-            </div>
-          </div>
-
-          <!-- SECTION 6: PRIVACY & CONTEXT -->
-          <div class="settings-group-card">
-            <div class="settings-group-title">
-              <div class="title-with-icon">
-                <i data-lucide="shield-check"></i>
-                <span>Privacy & Context Awareness</span>
-              </div>
-              <button type="button" class="btn-reset-section" data-section="privacy" title="Reset Privacy Settings to default">Reset section</button>
-            </div>
-            <span class="setting-hint">Strict privacy: Context is checked ONLY when you send a prompt, never in background.</span>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Desktop & Browser Context Awareness</div>
-                <div class="toggle-desc">Allows companion to read active window title / URL for smart coding answers</div>
-              </div>
-              <input type="checkbox" id="privacy-context" class="toggle-checkbox" checked>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Allow Screen Capture for Vision Queries</div>
-                <div class="toggle-desc">Captures screen thumbnail only when asking "what is on my screen" or visual questions</div>
-              </div>
-              <input type="checkbox" id="privacy-screenshots" class="toggle-checkbox">
-            </div>
-
-            <div class="setting-item">
-              <label class="setting-label">Privacy Blocklist (auto-redacted words)</label>
-              <textarea id="privacy-blocklist" class="terminal-input full-width mono" rows="3" placeholder="1password, bitwarden, bank, login, incognito"></textarea>
-              <span class="setting-hint">Windows or URLs containing these words are never sent to AI providers</span>
-            </div>
-          </div>
-
-          <!-- SECTION 6.2: TIMERS & POMODORO (Item T1) -->
-          <div class="settings-group-card" id="section-settings-timers">
-            <div class="settings-group-title">
-              <div class="title-with-icon">
-                <i data-lucide="timer"></i>
-                <span>Timers & Pomodoro</span>
-              </div>
-              <button type="button" class="btn-reset-section" data-section="timers" id="btn-reset-section-timers" title="Reset Timer Settings to default">Reset section</button>
-            </div>
-            <span class="setting-hint">Configure Pomodoro phase durations and countdown defaults</span>
-
-            <div class="setting-row">
-              <div class="setting-label-wrap">
-                <span class="setting-label">Pomodoro Focus</span>
-                <span class="setting-sub">1 – 180 min</span>
-              </div>
-              <div class="timer-stepper-wrap">
-                <input type="number" id="setting-timer-focus" class="timer-step-input mono" min="1" max="180" value="25">
-                <span class="timer-step-unit">min</span>
-                <button type="button" class="btn-ctrl-reset hidden" data-ctrl="setting-timer-focus" title="Reset to 25"><i data-lucide="rotate-ccw"></i></button>
-              </div>
-            </div>
-
-            <div class="setting-row">
-              <div class="setting-label-wrap">
-                <span class="setting-label">Short Break</span>
-                <span class="setting-sub">1 – 180 min</span>
-              </div>
-              <div class="timer-stepper-wrap">
-                <input type="number" id="setting-timer-shortbreak" class="timer-step-input mono" min="1" max="180" value="5">
-                <span class="timer-step-unit">min</span>
-                <button type="button" class="btn-ctrl-reset hidden" data-ctrl="setting-timer-shortbreak" title="Reset to 5"><i data-lucide="rotate-ccw"></i></button>
-              </div>
-            </div>
-
-            <div class="setting-row">
-              <div class="setting-label-wrap">
-                <span class="setting-label">Long Break</span>
-                <span class="setting-sub">1 – 180 min</span>
-              </div>
-              <div class="timer-stepper-wrap">
-                <input type="number" id="setting-timer-longbreak" class="timer-step-input mono" min="1" max="180" value="15">
-                <span class="timer-step-unit">min</span>
-                <button type="button" class="btn-ctrl-reset hidden" data-ctrl="setting-timer-longbreak" title="Reset to 15"><i data-lucide="rotate-ccw"></i></button>
-              </div>
-            </div>
-
-            <div class="setting-row">
-              <div class="setting-label-wrap">
-                <span class="setting-label">Sessions Before Long Break</span>
-                <span class="setting-sub">1 – 20</span>
-              </div>
-              <div class="timer-stepper-wrap">
-                <input type="number" id="setting-timer-sessions" class="timer-step-input mono" min="1" max="20" value="4">
-                <span class="timer-step-unit"></span>
-                <button type="button" class="btn-ctrl-reset hidden" data-ctrl="setting-timer-sessions" title="Reset to 4"><i data-lucide="rotate-ccw"></i></button>
-              </div>
-            </div>
-
-            <div class="setting-toggle-row">
-              <div class="setting-toggle-text">
-                <div class="toggle-title">Auto-start Next Phase</div>
-                <div class="toggle-desc">Automatically transition between focus and break</div>
-              </div>
-              <div class="timer-switch-wrap">
-                <input type="checkbox" id="setting-timer-autostart" class="toggle-checkbox">
-                <button type="button" class="btn-ctrl-reset hidden" data-ctrl="setting-timer-autostart" title="Reset to OFF"><i data-lucide="rotate-ccw"></i></button>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 6.5: DATA MANAGEMENT (IMPORT / EXPORT - Item I1) -->
-          <div class="settings-group-card" id="section-data-management">
-            <div class="settings-group-title">
-              <div class="title-with-icon">
-                <i data-lucide="database"></i>
-                <span>Data Management</span>
-              </div>
-            </div>
-            <span class="setting-hint">Backup and restore your settings, to-dos, reminders, and notes. API keys and sensitive credentials are never exported.</span>
-
-            <div class="data-actions-row" style="display: flex; gap: 10px; margin-top: 12px;">
-              <button type="button" class="theme-btn-secondary" id="btn-export-data" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 12px;">
-                <i data-lucide="download"></i>
-                <span>Export Data</span>
-              </button>
-              <button type="button" class="theme-btn-secondary" id="btn-import-data" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 12px;">
-                <i data-lucide="upload"></i>
-                <span>Import Data</span>
-              </button>
-            </div>
-
-            <!-- Import Preview Box -->
-            <div id="import-preview-box" class="import-preview-card" style="display: none; margin-top: 14px; padding: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px;">
-              <div style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                <i data-lucide="file-check" style="width: 15px; height: 15px; color: #10B981;"></i>
-                <span>Backup Preview</span>
-              </div>
-              <div id="import-counts-summary" style="font-size: 12px; opacity: 0.85; margin-bottom: 10px; line-height: 1.5;"></div>
-
-              <div id="import-notes-strategy-wrap" style="margin-bottom: 10px; font-size: 12px;">
-                <div style="font-weight: 500; margin-bottom: 4px;">Notes Handling:</div>
-                <div style="display: flex; gap: 16px;">
-                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                    <input type="radio" name="notes-import-strategy" value="merge" checked>
-                    <span>Merge with existing</span>
-                  </label>
-                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                    <input type="radio" name="notes-import-strategy" value="replace">
-                    <span>Replace existing</span>
-                  </label>
-                </div>
-              </div>
-
-              <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button type="button" class="theme-btn-secondary" id="btn-cancel-import" style="padding: 5px 12px; font-size: 12px;">Cancel</button>
-                <button type="button" class="theme-btn-primary" id="btn-confirm-import" style="padding: 5px 14px; font-size: 12px;">Confirm &amp; Apply</button>
-              </div>
-            </div>
-
-            <!-- Status Feedback Message -->
-            <div id="data-status-msg" style="display: none; margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 12px;"></div>
-          </div>
-
-          <!-- SECTION 7: ABOUT DESKTOP PET (Item W1) -->
-          <div class="settings-group-card" id="section-about">
-            <div class="settings-group-title">
-              <i data-lucide="info"></i>
-              <span>About Desktop Pet</span>
-            </div>
-            
-            <div class="about-card-body">
-              <div class="about-author-title">Designed &amp; Developed by Samir Husayn</div>
-              <a href="#" class="about-github-pill" id="btn-about-github" title="Visit GitHub Profile">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-                </svg>
-                <span>samirhusayn28-dev</span>
-              </a>
-
-              <div class="about-meta-row">
-                <span class="about-meta-label">App Version</span>
-                <span class="about-meta-val" id="about-version-display">v1.0.0</span>
-              </div>
-
-              <div class="about-actions-grid">
-                <button type="button" class="theme-btn-secondary" id="btn-about-check-updates">
-                  <i data-lucide="refresh-cw"></i>
-                  <span>Check for updates</span>
-                </button>
-                <button type="button" class="theme-btn-secondary" id="btn-about-show-welcome">
-                  <i data-lucide="sparkles"></i>
-                  <span>Show welcome again</span>
-                </button>
-              </div>
-
-              <div class="about-licenses-box" id="about-licenses-box">
-                <button type="button" class="about-licenses-toggle" id="btn-toggle-licenses">
-                  <div class="licenses-toggle-left">
-                    <i data-lucide="scale"></i>
-                    <span>Open-source licenses</span>
-                  </div>
-                  <i data-lucide="chevron-down" id="licenses-chevron"></i>
-                </button>
-                <div class="about-licenses-list hidden" id="about-licenses-list">
-                  <div class="license-entry">
-                    <span class="license-name">Nunito (SIL Open Font License 1.1)</span>
-                    <span class="license-author">Vernon Adams • Bundled offline Latin &amp; Latin-Ext</span>
-                  </div>
-                  <div class="license-entry">
-                    <span class="license-name">Fredoka (SIL Open Font License 1.1)</span>
-                    <span class="license-author">The Fredoka Project Authors • Tabular digits &amp; titles</span>
-                  </div>
-                  <div class="license-entry">
-                    <span class="license-name">JetBrains Mono (SIL Open Font License 1.1)</span>
-                    <span class="license-author">JetBrains • Code monospace font</span>
-                  </div>
-                  <div class="license-entry">
-                    <span class="license-name">Lucide Icons (ISC License)</span>
-                    <span class="license-author">Lucide Contributors • UI vector icons</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="about-update-status hidden" id="about-update-status"></div>
-            </div>
-          </div>
-
-          <!-- Reset All Settings (Item S1) -->
-          <div class="settings-reset-all-wrap">
-            <button type="button" class="btn-reset-all" id="btn-reset-all-settings" title="Reset all preferences to default values">
-              <i data-lucide="rotate-ccw"></i>
-              <span>Reset all settings</span>
-            </button>
-          </div>
-
-        </div>
-      </section>
-    </main>
+      </div>
+    </div>
   </div>
 
-  <!-- Scripts -->
+  <!-- lucide is used only by the lazy-loaded tool markup -->
   <script src="../node_modules/lucide/dist/umd/lucide.js"></script>
   <script src="../themes/theme-manager.js"></script>
   <script src="../character/pet.js"></script>
   <script src="../audio/sound-effects.js"></script>
   <script src="tabs/chat-tab.js"></script>
-  <script src="tabs/todo-tab.js"></script>
-  <script src="tabs/timer-tab.js"></script>
-  <script src="tabs/notes-tab.js"></script>
-  <script src="tabs/reminders-tab.js"></script>
-  <script src="tabs/clipboard-tab.js"></script>
-  <script src="tabs/settings-tab.js"></script>
   <script src="panel.js"></script>
 </body>
 </html>

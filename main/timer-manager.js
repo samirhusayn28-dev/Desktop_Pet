@@ -469,6 +469,7 @@ class TimerManager {
         // Focus finished -> Break starts
         this.completedSessions++;
         store.set('timers.completedSessions', this.completedSessions);
+        try { require('./companion-features').onFocusSessionComplete({ minutes: this.settings.pomodoro.focusMinutes }); } catch (_) {}
 
         const isThird = (this.completedSessions % 3 === 0);
         const emotion = isThird ? 'excited' : 'laugh';

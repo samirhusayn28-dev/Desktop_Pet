@@ -1,12 +1,12 @@
 /**
  * Comprehensive Verification & Multi-Tab/Multi-Size Screenshot Capture
  * Validates:
- * 1. Real see-through blur transparency over vibrant desktop wallpaper.
- * 2. All tabs in glassmorphic design.
+ * 1. Solid matte panels over a mock desktop wallpaper.
+ * 2. All tabs in the matte iOS design.
  * 3. Tools tab with full live system stats (CPU, RAM, Disks, Network, Battery, Procs, Sparklines).
  * 4. Settings tab with AI dynamic models, single accent color picker, and 45%/30px sliders.
  * 5. Responsive UI at 3 sizes: Small (420x560), Default (520x680), Large (680x800).
- * 6. Popups & speech bubble glassmorphism.
+ * 6. Popups & speech bubble in matte iOS styling.
  */
 
 const { app, BrowserWindow, ipcMain } = require('electron');
@@ -80,9 +80,9 @@ ipcMain.handle('system:get-stats', async () => {
 app.whenReady().then(async () => {
   console.log('--- STARTING VERIFICATION CAPTURE ---');
 
-  // 1. CAPTURE DESKTOP WALLPAPER TRANSPARENCY PROOF
-  // We render the wallpaper directly inside the same DOM behind the glass panel
-  // so CSS backdrop-filter: blur(30px) saturate(150%) visibly blurs the wallpaper code & shapes!
+  // 1. CAPTURE MATTE PANEL OVER A MOCK DESKTOP WALLPAPER
+  // The wallpaper is rendered behind the panel to show the solid matte surfaces
+  // without relying on expensive backdrop filters or glass effects.
   const stageWin = new BrowserWindow({
     width: 1200,
     height: 860,
@@ -141,8 +141,7 @@ app.whenReady().then(async () => {
         width: 380px;
         height: 380px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #FF7A2F, #F43F5E);
-        filter: blur(28px);
+        background: radial-gradient(circle at 35% 35%, #FF7A2F 0%, #F43F5E 45%, rgba(244, 63, 94, 0) 72%);
         opacity: 0.85;
       }
       .art-blob-cyan {
@@ -152,8 +151,7 @@ app.whenReady().then(async () => {
         width: 420px;
         height: 360px;
         border-radius: 40%;
-        background: linear-gradient(135deg, #06B6D4, #3B82F6);
-        filter: blur(35px);
+        background: radial-gradient(circle at 35% 35%, #06B6D4 0%, #3B82F6 45%, rgba(59, 130, 246, 0) 72%);
         opacity: 0.75;
       }
       .art-code-window {
@@ -193,17 +191,15 @@ app.whenReady().then(async () => {
         width: 480px;
       }
       .stage-speech-bubble {
-        background: rgba(20, 20, 24, 0.55);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #ffffff;
+        border: 1px solid #d1d1d6;
         border-radius: 18px;
         padding: 14px 22px;
-        color: #FFFFFF;
+        color: #1c1c1e;
         font-size: 14px;
         font-weight: 500;
         text-align: center;
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+        box-shadow: 0 12px 28px rgba(22, 27, 45, 0.16), 0 2px 6px rgba(22, 27, 45, 0.08);
         position: relative;
         max-width: 320px;
       }
@@ -215,9 +211,9 @@ app.whenReady().then(async () => {
         transform: translateX(-50%) rotate(45deg);
         width: 12px;
         height: 12px;
-        background: rgba(20, 20, 24, 0.75);
-        border-right: 1px solid rgba(255, 255, 255, 0.12);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        background: #ffffff;
+        border-right: 1px solid #d1d1d6;
+        border-bottom: 1px solid #d1d1d6;
       }
       .stage-badge {
         display: inline-flex;

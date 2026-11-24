@@ -9,7 +9,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const store = require('../main/secure-store');
-const systemSense = require('../main/system-sense');
+const systemSense = ({start(){},stop(){},setPetWindow(){},setUserName(){},getSensorStatus:async()=>[],checkAllSensors:async()=>{},injectSensorReading:async()=>({success:false}),state:{},canReact:()=>false});
 const bubble = require('../main/bubble-window');
 
 // Disable unused features for maximum lightness

@@ -9,6 +9,12 @@
  * - Human-friendly error cards with collapsible raw details expander
  */
 
+const CHAT_LIMITS = {
+  messages: 50,
+  contextChars: 8000,
+  rawDetails: 1200
+};
+
 class ChatTab {
   constructor() {
     this.messagesContainer = document.getElementById('chat-messages-container');
@@ -18,11 +24,16 @@ class ChatTab {
     this.modelInfoEl = document.getElementById('chat-model-info');
     this.miniAvatarEl = document.getElementById('chat-pet-mini');
     this.contextTextEl = document.getElementById('chat-context-text');
+    this.stopBtn = document.getElementById('btn-chat-stop');
+    this.regenBtn = document.getElementById('btn-chat-regenerate');
 
     this.isGenerating = false;
     this.messages = [];
     this.petRenderer = new PetRenderer();
     this.currentContext = null;
+    this.activeRequestId = null;
+    this.editingIndex = null;
+    this.lastUserText = '';
 
     this.init();
   }
@@ -34,6 +45,135 @@ class ChatTab {
     this.setupEvents();
     this.updateModelInfo();
     this.updateContextBanner();
+    this.refreshFlowButtons();
+  }
+
+  setting(path, fallback) {
+    if (!window.panelController || typeof window.panelController.getSetting !== 'function') {
+      return fallback;
+    }
+    return window.panelController.getSetting(path, fallback);
+  }
+
+  emitReaction(type, payload) {
+    if (!this.setting('settings.reactions.enabled', true)) return;
+    const events = this.setting('settings.reactions.events', {}) || {};
+    if (events[type] === false) return;
+    if (window.app && typeof window.app.emit === 'function') {
+      window.app.emit(type === 'sent' ? 'chat:sent' : `chat:${type}`, payload);
+    }
+  }
+
+  redactText(text) {
+    let result = String(text == null ? '' : text);
+    if (!this.setting('settings.privacy.redactSecrets', true)) return result;
+
+    result = result
+      .replace(/\b(sk|pk|rk|api|ai)[-_][A-Za-z0-9_-]{16,}/gi, '[REDACTED_KEY]')
+      .replace(/\bgh[pousr]_[A-Za-z0-9_]{16,}/gi, '[REDACTED_TOKEN]')
+      .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, '[REDACTED_JWT]')
+      .replace(/\b(password|passwd|secret|token)\s*[:=]\s*["']?[^\s"',]+/gi, '$1=[REDACTED]')
+      .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[REDACTED_EMAIL]');
+
+    return result;
+  }
+
+  blockedByNeverSend(text) {
+    const raw = this.setting('settings.privacy.neverSend', '');
+    const patterns = String(raw || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (patterns.length === 0) return null;
+    const lower = String(text || '').toLowerCase();
+    return patterns.find((pattern) => lower.includes(pattern)) || null;
+  }
+
+  insertIntoInput(text) {
+    if (!this.inputField) return;
+    this.inputField.value = String(text || '');
+    this.inputField.focus();
+    this.inputField.setSelectionRange(this.inputField.value.length, this.inputField.value.length);
+  }
+
+  focusInput() {
+    if (this.inputField) this.inputField.focus();
+  }
+
+  refreshFlowButtons() {
+    if (this.stopBtn) this.stopBtn.disabled = !this.isGenerating;
+    if (this.regenBtn) {
+      this.regenBtn.disabled = this.isGenerating || !this.messages.some((m) => m.role === 'user' && !m.isError);
+    }
+    if (window.panelController && typeof window.panelController.setHeaderStatus === 'function') {
+      window.panelController.setHeaderStatus(this.isGenerating ? 'Thinking...' : 'Ready', this.isGenerating);
+    }
+    if (window.panelController && typeof window.panelController.refreshStatusFooter === 'function') {
+      window.panelController.refreshStatusFooter();
+    }
+  }
+
+  resizeInput() {
+    if (!this.inputField) return;
+    this.inputField.style.height = 'auto';
+    this.inputField.style.height = `${Math.min(this.inputField.scrollHeight, 140)}px`;
+  }
+
+  // In-app fallback: the main process also listens for keys in every Pixie
+  // window and the macOS helper covers typing in other apps.
+  notifyTyping() {
+    const now = Date.now();
+    if (now - (this.lastTypingSignalAt || 0) < 80) return;
+    this.lastTypingSignalAt = now;
+    if (window.app && typeof window.app.emit === 'function') {
+      window.app.emit('pet:typing', { source: 'panel-chat' });
+    }
+    if (this.miniAvatarEl) {
+      this.miniAvatarEl.classList.add('is-typing');
+      window.clearTimeout(this.typingVisualTimer);
+      this.typingVisualTimer = window.setTimeout(() => {
+        if (this.miniAvatarEl) this.miniAvatarEl.classList.remove('is-typing');
+      }, 1600);
+    }
+  }
+
+  stopGeneration() {
+    if (!this.isGenerating || !this.activeRequestId) return;
+    const ipc = window.panelController && window.panelController.ipcRenderer;
+    if (ipc) {
+      ipc.send('ai:stop-chat', { requestId: this.activeRequestId });
+    }
+  }
+
+  regenerateLast() {
+    if (this.isGenerating) return;
+    const lastUserIndex = this.messages.map((m) => m.role).lastIndexOf('user');
+    if (lastUserIndex < 0) return;
+
+    const text = String(this.messages[lastUserIndex].content || '').trim();
+    if (!text) return;
+
+    this.messages.splice(lastUserIndex);
+    this.insertIntoInput(text);
+    this.editingIndex = null;
+    this.saveHistory();
+    this.renderMessages();
+    this.handleSend();
+  }
+
+  editMessage(index) {
+    if (this.isGenerating) return;
+    const msg = this.messages[index];
+    if (!msg || msg.role !== 'user') return;
+    this.editingIndex = index;
+    this.insertIntoInput(msg.content);
+  }
+
+  branchFrom(index) {
+    if (this.isGenerating) return;
+    if (index < 0 || index >= this.messages.length) return;
+    this.messages = this.messages.slice(0, index + 1).filter((m) => !m.isError);
+    this.editingIndex = null;
+    this.saveHistory();
+    this.renderMessages();
+    this.focusInput();
   }
 
   syncPetAppearance() {
@@ -45,7 +185,7 @@ class ChatTab {
   renderMiniAvatar(emotion = 'happy') {
     if (this.miniAvatarEl) {
       this.syncPetAppearance();
-      this.miniAvatarEl.innerHTML = this.petRenderer.render(emotion, { size: 34, idPrefix: 'chat-header-pet' });
+      this.miniAvatarEl.innerHTML = this.petRenderer.render(emotion, { size: 62, idPrefix: 'chat-header-pet' });
     }
   }
 
@@ -60,7 +200,15 @@ class ChatTab {
   }
 
   async updateContextBanner() {
-    if (!window.panelController || !window.panelController.ipcRenderer || !this.contextTextEl) return;
+    if (!this.contextTextEl) return;
+
+    if (!this.setting('settings.privacy.context', true)) {
+      this.currentContext = null;
+      this.contextTextEl.textContent = 'Context: off';
+      return;
+    }
+
+    if (!window.panelController || !window.panelController.ipcRenderer) return;
 
     try {
       const ctx = await window.panelController.ipcRenderer.invoke('context:get-active');
@@ -69,7 +217,7 @@ class ChatTab {
         let display = `Context: ${ctx.appName}`;
         if (ctx.windowTitle) display += ` — ${ctx.windowTitle}`;
         if (ctx.url) display += ` (${ctx.url})`;
-        this.contextTextEl.textContent = display;
+        this.contextTextEl.textContent = display.slice(0, 160);
       } else {
         this.contextTextEl.textContent = 'Context: Desktop Workspace';
       }
@@ -82,33 +230,54 @@ class ChatTab {
     if (!window.panelController) return;
     const saved = window.panelController.store.get('chatHistory');
     if (saved && Array.isArray(saved) && saved.length > 0) {
-      this.messages = saved;
+      this.messages = saved.slice(-CHAT_LIMITS.messages).map((msg) => {
+        if (!msg || !msg.rawDetails) return msg;
+        return { ...msg, rawDetails: String(msg.rawDetails).slice(0, CHAT_LIMITS.rawDetails) };
+      });
     } else {
-      this.messages = [
-        {
-          role: 'user',
-          content: "Can you show me a clean debounce function in JavaScript?",
-          timestamp: Date.now() - 45000
-        },
-        {
-          role: 'assistant',
-          content: "Here is a clean debounce utility with custom delay:\n\n```js\n// Debounce helper for high-frequency events\nconst debounce = (fn, delay = 250) => {\n  let timerId = null;\n  return (...args) => {\n    clearTimeout(timerId);\n    timerId = setTimeout(() => fn(...args), delay);\n  };\n};\n```\n\nWhat would you like to build or optimize next?",
-          timestamp: Date.now() - 15000
-        }
-      ];
-      this.saveHistory();
+      this.messages = [];
     }
     this.renderMessages();
   }
 
   saveHistory() {
     if (!window.panelController) return;
+    this.messages = this.messages.slice(-CHAT_LIMITS.messages).map((msg) => {
+      if (!msg || !msg.rawDetails) return msg;
+      return { ...msg, rawDetails: String(msg.rawDetails).slice(0, CHAT_LIMITS.rawDetails) };
+    });
     window.panelController.store.set('chatHistory', this.messages);
+    this.refreshFlowButtons();
   }
 
   setupEvents() {
     if (this.sendBtn) {
       this.sendBtn.addEventListener('click', () => this.handleSend());
+    }
+
+    if (this.stopBtn) {
+      this.stopBtn.addEventListener('click', () => this.stopGeneration());
+    }
+
+    if (this.regenBtn) {
+      this.regenBtn.addEventListener('click', () => this.regenerateLast());
+    }
+
+    if (this.messagesContainer) {
+      this.messagesContainer.addEventListener('click', (event) => {
+        const suggestion = event.target.closest('[data-suggestion]');
+        if (suggestion) {
+          this.insertIntoInput(suggestion.dataset.suggestion);
+          this.handleSend();
+          return;
+        }
+        const btn = event.target.closest('[data-msg-action]');
+        if (!btn) return;
+        const index = Number(btn.dataset.msgIndex);
+        if (btn.dataset.msgAction === 'edit') this.editMessage(index);
+        if (btn.dataset.msgAction === 'regenerate') this.regenerateLast();
+        if (btn.dataset.msgAction === 'branch') this.branchFrom(index);
+      });
     }
 
     if (this.inputField) {
@@ -121,30 +290,40 @@ class ChatTab {
       this.inputField.addEventListener('focus', () => {
         this.updateContextBanner();
       });
+      this.inputField.addEventListener('input', () => {
+        this.resizeInput();
+        this.notifyTyping();
+      });
+      this.resizeInput();
     }
 
     if (this.clearBtn) {
       this.clearBtn.addEventListener('click', () => {
-        const petName = window.panelController ? (window.panelController.store.get('settings.general.petName') || 'Pet') : 'Pet';
-        this.messages = [
-          {
-            role: 'assistant',
-            content: `Cleared conversation! I'm ${petName}, your pair programming assistant. Ask me anything!`,
-            timestamp: Date.now()
-          }
-        ];
+        this.messages = [];
+        this.editingIndex = null;
+        this.lastUserText = '';
         this.saveHistory();
         this.renderMessages();
       });
     }
 
-    if (this.modelInfoEl) {
-      this.modelInfoEl.addEventListener('click', () => {
-        if (window.panelController) {
-          window.panelController.switchTab('settings');
-        }
-      });
+    // Model info is display-only in the chat-only panel.
+  }
+
+  buildOutgoingMessages() {
+    const source = this.messages.slice(0, -1).filter((m) => m && !m.isError && m.content);
+    const outgoing = [];
+    let remaining = CHAT_LIMITS.contextChars;
+
+    for (let i = source.length - 1; i >= 0 && remaining > 0; i--) {
+      const clean = this.redactText(source[i].content).trim();
+      if (!clean) continue;
+      const piece = clean.slice(0, remaining);
+      outgoing.unshift({ role: source[i].role === 'assistant' ? 'assistant' : 'user', content: piece });
+      remaining -= piece.length;
     }
+
+    return outgoing;
   }
 
   async handleSend() {
@@ -152,90 +331,101 @@ class ChatTab {
     const text = (this.inputField.value || '').trim();
     if (!text) return;
 
+    const blocked = this.blockedByNeverSend(text);
+    if (blocked) {
+      this.inputField.value = '';
+      this.resizeInput();
+      this.messages.push(
+        { role: 'user', content: text, timestamp: Date.now() },
+        {
+          role: 'assistant',
+          content: `Blocked by your privacy rule: "${blocked}". Remove it in the Context section to allow this message.`,
+          isError: true,
+          timestamp: Date.now()
+        }
+      );
+      this.saveHistory();
+      this.renderMessages();
+      return;
+    }
+
+    if (this.editingIndex !== null && this.messages[this.editingIndex] && this.messages[this.editingIndex].role === 'user') {
+      this.messages.splice(this.editingIndex);
+    }
+    this.editingIndex = null;
     this.inputField.value = '';
+    this.resizeInput();
+    this.lastUserText = text;
+
     this.isGenerating = true;
+    this.activeRequestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-    // 1. Add User Message
-    this.messages.push({
-      role: 'user',
-      content: text,
-      timestamp: Date.now()
-    });
-
-    // 2. Add placeholder Assistant Message
-    const assistantIndex = this.messages.length;
-    this.messages.push({
-      role: 'assistant',
-      content: '',
-      timestamp: Date.now()
-    });
+    this.messages.push({ role: 'user', content: text, timestamp: Date.now() });
+    this.messages.push({ role: 'assistant', content: '', timestamp: Date.now() });
+    const assistantIndex = this.messages.length - 1;
 
     this.renderMessages();
     this.scrollToBottom();
+    this.refreshFlowButtons();
 
-    // USER REQUEST:
-    // - grateful: chat contains thanks, thank you, thx, shukriya, shukria, jazakallah
-    // - love: chat contains love you, i love you, luv u, love u, pyar
-    // - thinking: from the moment a chat message is sent until first streamed token
     const isThanks = /\b(thanks|thank you|thx|shukriya|shukria|jazakallah)\b/i.test(text);
     const isLove = /\b(love you|i love you|luv u|love u|pyar)\b/i.test(text);
-
-    if (isThanks) {
-      this.renderMiniAvatar('grateful');
-      if (window.app) window.app.emit('chat:sent', { text, emotion: 'grateful' });
-    } else if (isLove) {
-      this.renderMiniAvatar('love');
-      if (window.app) window.app.emit('chat:sent', { text, emotion: 'love' });
-    } else {
-      this.renderMiniAvatar('thinking');
-      if (this.miniAvatarEl) this.miniAvatarEl.classList.add('animating');
-      if (window.app) window.app.emit('chat:sent', { text, emotion: 'thinking' });
-    }
+    const sentEmotion = isThanks ? 'grateful' : isLove ? 'love' : 'thinking';
+    this.renderMiniAvatar(sentEmotion);
+    if (sentEmotion === 'thinking' && this.miniAvatarEl) this.miniAvatarEl.classList.add('animating');
+    this.emitReaction('sent', { text, emotion: sentEmotion });
 
     const assistantMsgEl = this.messagesContainer.querySelector(`.chat-msg[data-index="${assistantIndex}"]`);
     const assistantBodyEl = assistantMsgEl ? assistantMsgEl.querySelector('.chat-bubble-content') : null;
 
+    let cleanup = () => {};
+    const finish = () => {
+      cleanup();
+      this.activeRequestId = null;
+      this.isGenerating = false;
+      if (this.miniAvatarEl) this.miniAvatarEl.classList.remove('animating');
+      this.refreshFlowButtons();
+    };
+
     try {
       const store = window.panelController.store;
+      const ipc = window.panelController.ipcRenderer;
       const activeProviderId = store.get('settings.ai.activeProvider') || 'gemini';
       const model = store.get(`settings.ai.models.${activeProviderId}`);
       let apiKey = store.get(`settings.ai.apiKeys.${activeProviderId}`) || store.get(`settings.ai.keys.${activeProviderId}`) || '';
-      if (!apiKey && window.panelController.ipcRenderer) {
+      if (!apiKey && ipc) {
         try {
-          apiKey = await window.panelController.ipcRenderer.invoke('ai:get-key', activeProviderId);
+          apiKey = await ipc.invoke('ai:get-key', activeProviderId);
         } catch (e) {}
       }
-      const petName = store.get('settings.general.petName') || 'Pixie';
       const baseUrl = store.get(`settings.ai.baseUrls.${activeProviderId}`) || '';
 
-      // Refresh desktop context
       await this.updateContextBanner();
 
-      // Check if vision query
       let screenshotBase64 = null;
       const isVision = /(screen|window|look at this|what's on my screen|describe page)/i.test(text);
-      if (isVision && window.panelController.ipcRenderer) {
+      if (isVision && ipc && this.setting('settings.privacy.allowScreenshot', false)) {
         try {
-          screenshotBase64 = await window.panelController.ipcRenderer.invoke('context:capture-screen');
+          screenshotBase64 = await ipc.invoke('context:capture-screen');
         } catch (e) {}
       }
 
-      let fullAnswer = '';
-      let hasReceivedFirstToken = false;
-      const requestId = 'req_' + Date.now();
-      const ipc = window.panelController.ipcRenderer;
-
-      const cleanup = () => {
+      const requestId = this.activeRequestId;
+      cleanup = () => {
+        if (!ipc) return;
         ipc.removeAllListeners(`ai:chunk:${requestId}`);
         ipc.removeAllListeners(`ai:done:${requestId}`);
         ipc.removeAllListeners(`ai:error:${requestId}`);
       };
 
-      ipc.on(`ai:chunk:${requestId}`, (e, chunk) => {
+      let fullAnswer = '';
+      let hasReceivedFirstToken = false;
+
+      ipc.on(`ai:chunk:${requestId}`, (event, chunk) => {
         if (!hasReceivedFirstToken) {
           hasReceivedFirstToken = true;
           this.renderMiniAvatar('reading');
-          if (window.app) window.app.emit('chat:token', { isFirstToken: true });
+          this.emitReaction('token', { isFirstToken: true });
         }
         fullAnswer += chunk;
         this.messages[assistantIndex].content = fullAnswer;
@@ -246,26 +436,35 @@ class ChatTab {
         this.scrollToBottom();
       });
 
-      ipc.on(`ai:done:${requestId}`, (e, finalText) => {
-        cleanup();
+      ipc.on(`ai:done:${requestId}`, (event, finalText) => {
+        finish();
         this.messages[assistantIndex].content = finalText || fullAnswer;
         this.saveHistory();
         if (assistantBodyEl) {
           assistantBodyEl.innerHTML = this.formatMarkdown(this.messages[assistantIndex].content);
         }
         this.setupCopyButtons();
-
         this.renderMiniAvatar('happy');
-        if (this.miniAvatarEl) this.miniAvatarEl.classList.remove('animating');
-        if (window.app) window.app.emit('chat:done', { text: finalText || fullAnswer });
+        this.emitReaction('done', { text: finalText || fullAnswer });
         if (window.soundEffects) window.soundEffects.playHappy();
-        this.isGenerating = false;
       });
 
-      ipc.on(`ai:error:${requestId}`, (e, errData) => {
-        cleanup();
+      ipc.on(`ai:error:${requestId}`, (event, errData) => {
+        finish();
         const friendlyMsg = errData.friendly || 'Could not complete request.';
-        const rawDetails = errData.details || '';
+        const rawDetails = String(errData.details || '').slice(0, CHAT_LIMITS.rawDetails);
+
+        if (errData.status === 499 || /abort|cancel/i.test(friendlyMsg)) {
+          this.messages[assistantIndex].content = 'Generation stopped.';
+          this.messages[assistantIndex].isError = false;
+          delete this.messages[assistantIndex].rawDetails;
+          this.saveHistory();
+          if (assistantBodyEl) {
+            assistantBodyEl.innerHTML = this.formatMarkdown('Generation stopped.');
+          }
+          this.renderMiniAvatar('happy');
+          return;
+        }
 
         this.messages[assistantIndex].content = friendlyMsg;
         this.messages[assistantIndex].isError = true;
@@ -292,30 +491,28 @@ class ChatTab {
           }
         }
 
-        // USER REQUEST: sad: AI error (401/402/429/503/offline)
         this.renderMiniAvatar('sad');
-        if (this.miniAvatarEl) this.miniAvatarEl.classList.remove('animating');
-        if (window.app) window.app.emit('chat:error', { error: friendlyMsg, status: errData.status });
-        this.isGenerating = false;
+        this.emitReaction('error', { error: friendlyMsg, status: errData.status });
       });
 
-      // Dispatch to Electron Node Main Process
       ipc.send('ai:start-chat', {
         requestId,
         provider: activeProviderId,
         apiKey,
         model,
         baseUrl,
-        messages: this.messages.slice(0, -1).filter(m => !m.isError),
-        contextInfo: this.currentContext,
-        screenshotBase64
+        messages: this.buildOutgoingMessages(),
+        contextInfo: this.setting('settings.privacy.context', true) ? this.currentContext : null,
+        screenshotBase64,
+        suppressReactions: !this.setting('settings.reactions.enabled', true)
       });
 
     } catch (err) {
-      const friendly = "Service returned an error. Check Settings -> AI Provider.";
+      finish();
+      const friendly = 'AI service returned an error. Check provider configuration.';
       this.messages[assistantIndex].content = friendly;
       this.messages[assistantIndex].isError = true;
-      this.messages[assistantIndex].rawDetails = String(err);
+      this.messages[assistantIndex].rawDetails = String(err).slice(0, CHAT_LIMITS.rawDetails);
       this.saveHistory();
 
       if (assistantBodyEl) {
@@ -327,7 +524,7 @@ class ChatTab {
             </div>
             <details class="chat-err-details">
               <summary>Details</summary>
-              <pre class="err-pre"><code>${this.escapeHtml(String(err))}</code></pre>
+              <pre class="err-pre"><code>${this.escapeHtml(this.messages[assistantIndex].rawDetails)}</code></pre>
             </details>
           </div>
         `;
@@ -336,9 +533,7 @@ class ChatTab {
         }
       }
       this.renderMiniAvatar('confused');
-      if (this.miniAvatarEl) this.miniAvatarEl.classList.remove('animating');
-      window.panelController.notifyPet('pet:set-state', { state: 'confused', duration: 4500, priority: 5 });
-      this.isGenerating = false;
+      this.emitReaction('error', { error: friendly, status: 0 });
     }
   }
 
@@ -353,6 +548,21 @@ class ChatTab {
   renderMessages() {
     if (!this.messagesContainer) return;
 
+    if (!this.messages.length) {
+      const petName = (window.panelController && window.panelController.store.get('settings.general.petName')) || 'Pixie';
+      const suggestions = ['Explain this code', 'Help me debug an error', 'Summarize some text', 'Who is your creator?'];
+      this.messagesContainer.innerHTML = `
+        <div class="welcome">
+          <div class="big">${this.petRenderer.render('happy', { size: 104, idPrefix: 'welcome-pet' })}</div>
+          <h2>Hi, I'm ${this.escapeHtml(petName)}</h2>
+          <div class="chips">
+            ${suggestions.map((text) => `<button class="chip" data-suggestion="${this.escapeHtml(text)}">${this.escapeHtml(text)}</button>`).join('')}
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     this.messagesContainer.innerHTML = this.messages.map((msg, index) => {
       const isUser = msg.role === 'user';
       const timeStr = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -365,6 +575,10 @@ class ChatTab {
                 <div class="chat-bubble-content">${this.escapeHtml(msg.content)}</div>
               </div>
               <span class="msg-timestamp muted-time">${timeStr}</span>
+              <div class="message-actions">
+                <button class="message-action-btn" data-msg-action="edit" data-msg-index="${index}">Edit</button>
+                <button class="message-action-btn" data-msg-action="branch" data-msg-index="${index}">Branch</button>
+              </div>
             </div>
           </div>
         `;
@@ -393,14 +607,18 @@ class ChatTab {
           <div class="chat-msg assistant" data-index="${index}">
             <div class="msg-avatar-col">
               <div class="msg-mini-pet-avatar">
-                ${this.petRenderer.render(msg.isError ? 'confused' : 'happy', { size: 24, idPrefix: `msg-pet-${index}` })}
+                ${this.petRenderer.render(msg.isError ? 'confused' : 'happy', { size: 34, idPrefix: `msg-pet-${index}` })}
               </div>
             </div>
             <div class="msg-bubble-wrap">
-              <div class="chat-bubble ai-glass-bubble">
+              <div class="chat-bubble ai-solid-bubble">
                 <div class="chat-bubble-content">${contentHtml}</div>
               </div>
               <span class="msg-timestamp muted-time">${timeStr}</span>
+              <div class="message-actions">
+                <button class="message-action-btn" data-msg-action="regenerate" data-msg-index="${index}">Regenerate</button>
+                <button class="message-action-btn" data-msg-action="branch" data-msg-index="${index}">Branch</button>
+              </div>
             </div>
           </div>
         `;
@@ -449,6 +667,10 @@ class ChatTab {
     });
 
     processed = this.escapeHtml(processed);
+    processed = processed.replace(/^(#{1,6})\s+(.+)$/gm, (match, hashes, content) => {
+      const level = hashes.length;
+      return `<h${level}>${content}</h${level}>`;
+    });
     processed = processed.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
     processed = processed.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     processed = processed.replace(/\*([^*]+)\*/g, '<em>$1</em>');

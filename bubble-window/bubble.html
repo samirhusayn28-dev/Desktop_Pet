@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Desktop Pet Bubble</title>
+  <title>Pixie Bubble</title>
   <link rel="stylesheet" href="../assets/fonts/bubble-fonts.css">
   <style>
     * {
@@ -33,15 +33,13 @@
       pointer-events: none;
     }
 
-    .glass-bubble {
+    .matte-bubble {
       position: relative;
-      background: rgba(20, 20, 24, 0.72);
-      backdrop-filter: blur(24px) saturate(150%);
-      -webkit-backdrop-filter: blur(24px) saturate(150%);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #08080a;
+      border: 1px solid #2c2c2e;
       border-radius: 18px;
       padding: 10px 16px;
-      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+      box-shadow: 0 12px 28px rgba(22, 27, 45, 0.16), 0 2px 6px rgba(22, 27, 45, 0.08);
       max-width: 280px;
       text-align: center;
       pointer-events: auto;
@@ -50,7 +48,7 @@
       transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    .glass-bubble.visible {
+    .matte-bubble.visible {
       opacity: 1;
       transform: translateY(0) scale(1);
     }
@@ -58,7 +56,7 @@
     .bubble-text-content {
       font-size: 13px;
       font-weight: 500;
-      color: #FFFFFF;
+      color: #f5f5f7;
       letter-spacing: -0.1px;
       line-height: 1.45;
       display: -webkit-box;
@@ -67,7 +65,6 @@
       overflow: hidden;
       text-overflow: ellipsis;
       word-break: break-word;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
     }
 
     .bubble-badge {
@@ -76,7 +73,7 @@
       text-transform: uppercase;
       font-weight: 700;
       letter-spacing: 0.5px;
-      color: var(--accent, #FF7A2F);
+      color: var(--accent, #007aff);
       margin-bottom: 3px;
     }
 
@@ -87,15 +84,15 @@
       transform: translateX(-50%) rotate(45deg);
       width: 12px;
       height: 12px;
-      background: rgba(20, 20, 24, 0.75);
-      border-right: 1px solid rgba(255, 255, 255, 0.15);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      background: #08080a;
+      border-right: 1px solid #2c2c2e;
+      border-bottom: 1px solid #2c2c2e;
     }
   </style>
 </head>
 <body>
   <div class="bubble-stage">
-    <div class="glass-bubble" id="glass-bubble">
+    <div class="matte-bubble" id="matte-bubble">
       <div class="bubble-badge" id="bubble-badge" style="display: none;"></div>
       <div class="bubble-text-content" id="bubble-text">...</div>
       <div class="bubble-tail"></div>
@@ -105,13 +102,13 @@
   <script>
     const { ipcRenderer } = require('electron');
 
-    const bubbleEl = document.getElementById('glass-bubble');
+    const bubbleEl = document.getElementById('matte-bubble');
     const textEl = document.getElementById('bubble-text');
     const badgeEl = document.getElementById('bubble-badge');
 
     let currentTimeout = null;
 
-    ipcRenderer.on('bubble:display', (e, { text, badge, duration = 5000, accentColor = '#FF7A2F' }) => {
+    ipcRenderer.on('bubble:display', (e, { text, badge, duration = 5000, accentColor = '#007aff' }) => {
       if (currentTimeout) clearTimeout(currentTimeout);
 
       document.documentElement.style.setProperty('--accent', accentColor);

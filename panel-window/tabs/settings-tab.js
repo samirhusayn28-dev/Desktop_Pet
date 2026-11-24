@@ -14,9 +14,6 @@ const DEFAULT_PET_APPEARANCE = {
   mouthWidth: 14,       // 6 - 28 px
   depth: 80,            // 0 - 100 (3D intensity)
   bodyColor: '#FFFFFF', // Hex
-  glassesEnabled: false,
-  glassesShape: 'round',
-  glassesColor: '#181820',
   eyesColor: '#181820',
   mouthColor: '#181820',
   theme: 'default'
@@ -36,39 +33,34 @@ const CENTRAL_DEFAULTS = {
     idleSleepingMinutes: 5,
     bubbleDuration: 5,
     snoozeMinutes: 5,
-    soundsEnabled: false,
-    soundVolume: 50,
+    soundsEnabled: true,
+    soundVolume: 60,
     soundReminders: true,
     soundTimer: true,
     soundReactions: true,
     dnd: false
   },
   reactions: {
-    brightness: true,
-    volume: true,
-    battery: true,
-    media: true,
-    network: true,
-    headphones: true,
     welcomeStartup: true,
-    goodbyeShutdown: true,
-    highLoad: true,
-    lateNight: true
+    goodbyeShutdown: true
+  },
+  companion: {
+    dailyCheckin: true,
+    clipboardBuddy: true,
+    breakReminders: true,
+    wellnessNudges: true
   },
   appearance: {
     scale: 1.0,
-    width: 136,
-    height: 120,
-    roundness: 36,
+    width: 150,
+    height: 150,
+    roundness: 50,
     eyeSize: 1.0,
-    eyeSpacing: 44,
-    mouthWidth: 14,
-    depth: 80,
-    bodyColor: '#FFFFFF',
-    accentColor: '#FF7A2F',
-    glassesEnabled: false,
-    glassesShape: 'round',
-    glassesColor: '#181820',
+    eyeSpacing: 28,
+    mouthWidth: 10,
+    depth: 75,
+    bodyColor: '#17171B',
+    accentColor: '#007AFF',
     eyesColor: '#181820',
     mouthColor: '#181820'
   },
@@ -90,7 +82,7 @@ const CENTRAL_DEFAULTS = {
   }
 };
 
-const DEFAULT_ACCENT_COLOR = '#FF7A2F';
+const DEFAULT_ACCENT_COLOR = '#007aff';
 const DEFAULT_PANEL_TRANSPARENCY = 0.30;
 const DEFAULT_PANEL_BLUR = 24;
 
@@ -129,20 +121,29 @@ class SettingsTab {
     this.dndToggle = document.getElementById('setting-dnd');
 
     // 3. Reactions Settings
-    this.reactionBrightness = document.getElementById('reaction-brightness');
-    this.reactionVolume = document.getElementById('reaction-volume');
-    this.reactionBattery = document.getElementById('reaction-battery');
-    this.reactionMedia = document.getElementById('reaction-media');
-    this.reactionNetwork = document.getElementById('reaction-network');
-    this.reactionHeadphones = document.getElementById('reaction-headphones');
     this.reactionWelcomeStartup = document.getElementById('reaction-welcome-startup');
     this.reactionGoodbyeShutdown = document.getElementById('reaction-goodbye-shutdown');
-    this.reactionHighload = document.getElementById('reaction-highload');
-    this.reactionLatenight = document.getElementById('reaction-latenight');
-
-    this.btnRefreshSensors = document.getElementById('btn-refresh-sensors');
-    this.btnOpenAccessibility = document.getElementById('btn-open-accessibility');
-    this.sensorStatusList = document.getElementById('sensor-status-list');
+    this.companionCheckin = document.getElementById('setting-companion-checkin');
+    this.companionClipboard = document.getElementById('setting-companion-clipboard');
+    this.companionBreaks = document.getElementById('setting-companion-breaks');
+    this.companionWellness = document.getElementById('setting-companion-wellness');
+    this.btnCarePet = document.getElementById('btn-care-pet');
+    this.btnCareFeed = document.getElementById('btn-care-feed');
+    this.btnCarePlay = document.getElementById('btn-care-play');
+    this.btnCareRest = document.getElementById('btn-care-rest');
+    this.btnBreathingStart = document.getElementById('btn-breathing-start');
+    this.btnTrickWave = document.getElementById('btn-trick-wave');
+    this.btnTrickDance = document.getElementById('btn-trick-dance');
+    this.btnCompanionRefresh = document.getElementById('btn-companion-refresh');
+    this.companionMoodSummary = document.getElementById('companion-mood-summary');
+    this.companionCheckinStatus = document.getElementById('companion-checkin-status');
+    this.companionSummary = document.getElementById('companion-summary');
+    this.companionCaptureInput = document.getElementById('companion-capture-input');
+    this.companionCaptureList = document.getElementById('companion-capture-list');
+    this.companionCaptureStatus = document.getElementById('companion-capture-status');
+    this.btnCaptureNote = document.getElementById('btn-capture-note');
+    this.btnCaptureTodo = document.getElementById('btn-capture-todo');
+    this.btnCaptureClipboardSave = document.getElementById('btn-capture-clipboard-save');
 
     // 3.5. System Permissions (Requirement 4)
     this.btnRecheckPermissions = document.getElementById('btn-recheck-permissions');
@@ -165,7 +166,6 @@ class SettingsTab {
     // 4. Appearance Controls
     this.previewContainer = document.getElementById('settings-pet-preview');
     this.resetAppearanceBtn = document.getElementById('btn-reset-appearance');
-    this.glassesToggle = document.getElementById('setting-pet-glasses');
     this.btnResetAll = document.getElementById('btn-reset-all-settings');
 
     this.accentColorInput = document.getElementById('setting-accent-color');
@@ -192,13 +192,6 @@ class SettingsTab {
     this.bodyColorInput = document.getElementById('setting-pet-bodycolor');
     this.dispBodyColor = document.getElementById('disp-pet-bodycolor');
     this.btnPureWhite = document.getElementById('btn-bodycolor-white');
-
-    // Glasses Frame Shape & Colors
-    this.glassesShapeSelect = document.getElementById('setting-pet-glasses-shape');
-    this.glassesColorInput = document.getElementById('setting-pet-glasses-color');
-    this.dispGlassesColor = document.getElementById('disp-pet-glasses-color');
-    this.btnGlassesDark = document.getElementById('btn-glasses-color-dark');
-    this.btnGlassesAccent = document.getElementById('btn-glasses-color-accent');
 
     // Eyes Color
     this.eyesColorInput = document.getElementById('setting-pet-eyescolor');
@@ -279,7 +272,7 @@ class SettingsTab {
     const idleSleepy = store.get('settings.behavior.idleSleepyMinutes') ?? CENTRAL_DEFAULTS.behavior.idleSleepyMinutes;
     const idleSleeping = store.get('settings.behavior.idleSleepingMinutes') ?? CENTRAL_DEFAULTS.behavior.idleSleepingMinutes;
     const bubbleDuration = store.get('settings.behavior.bubbleDuration') ?? CENTRAL_DEFAULTS.behavior.bubbleDuration;
-    const soundsEnabled = store.get('settings.behavior.soundsEnabled') === true;
+    const soundsEnabled = store.get('settings.behavior.soundsEnabled') !== false;
     const soundVolume = store.get('settings.behavior.soundVolume') ?? CENTRAL_DEFAULTS.behavior.soundVolume;
     const soundReminders = store.get('settings.behavior.soundReminders') !== false;
     const soundTimer = store.get('settings.behavior.soundTimer') !== false;
@@ -314,28 +307,22 @@ class SettingsTab {
     if (this.dndToggle) this.dndToggle.checked = dnd;
 
     // 3. Reactions
-    if (this.reactionBrightness) this.reactionBrightness.checked = store.get('settings.reactions.brightness') !== false;
-    if (this.reactionVolume) this.reactionVolume.checked = store.get('settings.reactions.volume') !== false;
-    if (this.reactionBattery) this.reactionBattery.checked = store.get('settings.reactions.battery') !== false;
-    if (this.reactionMedia) this.reactionMedia.checked = store.get('settings.reactions.media') !== false;
-    if (this.reactionNetwork) this.reactionNetwork.checked = store.get('settings.reactions.network') !== false;
-    if (this.reactionHeadphones) this.reactionHeadphones.checked = store.get('settings.reactions.headphones') !== false;
     if (this.reactionWelcomeStartup) this.reactionWelcomeStartup.checked = store.get('settings.reactions.welcomeStartup') !== false;
     if (this.reactionGoodbyeShutdown) this.reactionGoodbyeShutdown.checked = store.get('settings.reactions.goodbyeShutdown') !== false;
-    if (this.reactionHighload) this.reactionHighload.checked = store.get('settings.reactions.highLoad') !== false;
-    if (this.reactionLatenight) this.reactionLatenight.checked = store.get('settings.reactions.lateNight') !== false;
+    if (this.companionCheckin) this.companionCheckin.checked = store.get('settings.companion.dailyCheckin') !== false;
+    if (this.companionClipboard) this.companionClipboard.checked = store.get('settings.companion.clipboardBuddy') !== false;
+    if (this.companionBreaks) this.companionBreaks.checked = store.get('settings.companion.breakReminders') !== false;
+    if (this.companionWellness) this.companionWellness.checked = store.get('settings.companion.wellnessNudges') !== false;
+    this.renderCompanionState();
 
     // Diagnostics & Resource Budget
-    this.renderSensorStatus();
+    this.renderCompanionState();
     this.refreshPermissions();
     this.updateLiveAppMetrics();
 
     // 4. Appearance
     const savedApp = store.get('settings.appearance') || {};
     this.appearance = Object.assign({}, DEFAULT_PET_APPEARANCE, savedApp);
-    if (this.glassesToggle) {
-      this.glassesToggle.checked = !!this.appearance.glassesEnabled;
-    }
 
     const savedAccent = store.get('settings.appearance.accentColor') || DEFAULT_ACCENT_COLOR;
     this.setAccentColor(savedAccent, false);
@@ -783,11 +770,6 @@ class SettingsTab {
     if (this.dispDepth) this.dispDepth.textContent = `${Math.round(a.depth)}%`;
     if (this.bodyColorInput) this.bodyColorInput.value = a.bodyColor || '#FFFFFF';
     if (this.dispBodyColor) this.dispBodyColor.value = (a.bodyColor || '#FFFFFF').toUpperCase();
-    if (this.glassesToggle) this.glassesToggle.checked = !!a.glassesEnabled;
-
-    if (this.glassesShapeSelect) this.glassesShapeSelect.value = a.glassesShape || 'round';
-    if (this.glassesColorInput) this.glassesColorInput.value = a.glassesColor || '#181820';
-    if (this.dispGlassesColor) this.dispGlassesColor.value = (a.glassesColor || '#181820').toUpperCase();
 
     if (this.eyesColorInput) this.eyesColorInput.value = a.eyesColor || '#181820';
     if (this.dispEyesColor) this.dispEyesColor.value = (a.eyesColor || '#181820').toUpperCase();
@@ -1052,18 +1034,9 @@ class SettingsTab {
 
     // 3. Reactions Events
     const reactionToggles = [
-      { el: this.reactionBrightness, key: 'brightness' },
-      { el: this.reactionVolume, key: 'volume' },
-      { el: this.reactionBattery, key: 'battery' },
-      { el: this.reactionMedia, key: 'media' },
-      { el: this.reactionNetwork, key: 'network' },
-      { el: this.reactionHeadphones, key: 'headphones' },
       { el: this.reactionWelcomeStartup, key: 'welcomeStartup' },
-      { el: this.reactionGoodbyeShutdown, key: 'goodbyeShutdown' },
-      { el: this.reactionHighload, key: 'highLoad' },
-      { el: this.reactionLatenight, key: 'lateNight' }
+      { el: this.reactionGoodbyeShutdown, key: 'goodbyeShutdown' }
     ];
-
     reactionToggles.forEach(({ el, key }) => {
       if (el) {
         el.addEventListener('change', (e) => {
@@ -1077,21 +1050,24 @@ class SettingsTab {
       }
     });
 
-    // Sensor Status Buttons
-    if (this.btnRefreshSensors) {
-      this.btnRefreshSensors.addEventListener('click', () => {
-        this.renderSensorStatus();
-        if (window.soundEffects) window.soundEffects.playTap();
-      });
-    }
+    const companionToggles = [
+      { el: this.companionCheckin, key: 'dailyCheckin' },
+      { el: this.companionClipboard, key: 'clipboardBuddy' },
+      { el: this.companionBreaks, key: 'breakReminders' },
+      { el: this.companionWellness, key: 'wellnessNudges' },
+    ];
+    companionToggles.forEach(({ el, key }) => {
+      if (el) {
+        el.addEventListener('change', (e) => {
+          window.panelController.store.set(`settings.companion.${key}`, e.target.checked);
+          if (window.soundEffects) window.soundEffects.playTap();
+        });
+      }
+    });
 
-    if (this.btnOpenAccessibility) {
-      this.btnOpenAccessibility.addEventListener('click', () => {
-        if (window.panelController && window.panelController.ipcRenderer) {
-          window.panelController.ipcRenderer.send('system:open-settings-pane', 'accessibility');
-        }
-      });
-    }
+    this.bindCompanionActions();
+
+
 
     // 3.5. System Permissions Events (Requirement 4)
     if (this.btnRecheckPermissions) {
@@ -1234,54 +1210,6 @@ class SettingsTab {
         this.appearance.bodyColor = '#FFFFFF';
         if (this.bodyColorInput) this.bodyColorInput.value = '#FFFFFF';
         if (this.dispBodyColor) this.dispBodyColor.value = '#FFFFFF';
-        this.broadcastAppearance();
-        if (window.soundEffects) window.soundEffects.playTap();
-      });
-    }
-
-    if (this.glassesToggle) {
-      this.glassesToggle.addEventListener('change', (e) => {
-        const val = e.target.checked;
-        this.appearance.glassesEnabled = val;
-        this.broadcastAppearance();
-        if (window.panelController && window.panelController.store) {
-          window.panelController.store.set('settings.appearance.glassesEnabled', val);
-        }
-      });
-    }
-
-    // Glasses Frame Shape
-    if (this.glassesShapeSelect) {
-      this.glassesShapeSelect.addEventListener('change', (e) => {
-        this.appearance.glassesShape = e.target.value;
-        this.broadcastAppearance();
-      });
-    }
-
-    // Glasses Frame Color
-    if (this.glassesColorInput) {
-      this.glassesColorInput.addEventListener('input', (e) => {
-        const col = e.target.value;
-        this.appearance.glassesColor = col;
-        if (this.dispGlassesColor) this.dispGlassesColor.value = col.toUpperCase();
-        this.broadcastAppearance();
-      });
-    }
-    if (this.btnGlassesDark) {
-      this.btnGlassesDark.addEventListener('click', () => {
-        this.appearance.glassesColor = '#181820';
-        if (this.glassesColorInput) this.glassesColorInput.value = '#181820';
-        if (this.dispGlassesColor) this.dispGlassesColor.value = '#181820';
-        this.broadcastAppearance();
-        if (window.soundEffects) window.soundEffects.playTap();
-      });
-    }
-    if (this.btnGlassesAccent) {
-      this.btnGlassesAccent.addEventListener('click', () => {
-        const accent = this.appearance.primaryColor || this.accentColorInput?.value || DEFAULT_ACCENT_COLOR;
-        this.appearance.glassesColor = accent;
-        if (this.glassesColorInput) this.glassesColorInput.value = accent;
-        if (this.dispGlassesColor) this.dispGlassesColor.value = accent.toUpperCase();
         this.broadcastAppearance();
         if (window.soundEffects) window.soundEffects.playTap();
       });
@@ -1674,7 +1602,7 @@ class SettingsTab {
 
         if (result.status === 'up_to_date') {
           if (isManual) {
-            this.aboutUpdateStatus.innerHTML = `<span style="color:#10B981;">✓ Desktop Pet is up to date (v${result.currentVersion}).</span>`;
+            this.aboutUpdateStatus.innerHTML = `<span style="color:#10B981;">✓ Pixie is up to date (v${result.currentVersion}).</span>`;
           }
         } else if (result.status === 'update_available') {
           this.aboutUpdateStatus.innerHTML = `
@@ -1709,30 +1637,64 @@ class SettingsTab {
     }
   }
 
-  async renderSensorStatus() {
-    if (!this.sensorStatusList) return;
-    try {
-      let list = [];
-      if (window.panelController && window.panelController.ipcRenderer) {
-        list = await window.panelController.ipcRenderer.invoke('system:get-sensor-status');
-      }
-      if (!Array.isArray(list) || list.length === 0) return;
+  bindCompanionActions() {
+    const ipc = window.panelController && window.panelController.ipcRenderer;
+    const tap = () => { if (window.soundEffects) window.soundEffects.playTap(); };
+    const call = async (ch, ...args) => { if (!ipc) return null; const r = await ipc.invoke(ch, ...args); await this.renderCompanionState(); return r; };
+    if (this.btnCarePet) this.btnCarePet.onclick = () => { tap(); call('companion:care-action', 'pet'); };
+    if (this.btnCareFeed) this.btnCareFeed.onclick = () => { tap(); call('companion:care-action', 'feed'); };
+    if (this.btnCarePlay) this.btnCarePlay.onclick = () => { tap(); call('companion:care-action', 'play'); };
+    if (this.btnCareRest) this.btnCareRest.onclick = () => { tap(); call('companion:care-action', 'rest'); };
+    if (this.btnBreathingStart) this.btnBreathingStart.onclick = () => { tap(); call('companion:breathing-start', 45); };
+    if (this.btnTrickWave) this.btnTrickWave.onclick = () => { tap(); call('companion:trick', 'wave'); };
+    if (this.btnTrickDance) this.btnTrickDance.onclick = () => { tap(); call('companion:trick', 'dance'); };
+    if (this.btnCompanionRefresh) this.btnCompanionRefresh.onclick = () => { tap(); this.renderCompanionState(); };
+    document.querySelectorAll('.btn-checkin').forEach(btn => {
+      btn.onclick = () => { tap(); call('companion:checkin', btn.dataset.mood); };
+    });
+    const submitCapture = async (type) => {
+      const text = (this.companionCaptureInput?.value || '').trim();
+      if (!text) return;
+      tap();
+      await call('companion:capture-add', { type, text });
+      if (this.companionCaptureInput) this.companionCaptureInput.value = '';
+    };
+    if (this.btnCaptureNote) this.btnCaptureNote.onclick = () => submitCapture('note');
+    if (this.btnCaptureTodo) this.btnCaptureTodo.onclick = () => submitCapture('todo');
+    if (this.btnCaptureClipboardSave) this.btnCaptureClipboardSave.onclick = async () => { tap(); await call('companion:clipboard-action', 'save'); };
 
-      this.sensorStatusList.innerHTML = list.map(s => {
-        const isWorking = s.status === 'Working';
-        const badgeClass = isWorking ? 'status-pill-ok' : (s.status.includes('Unavailable') ? 'status-pill-muted' : 'status-pill-warn');
-        return `
-          <div class="sensor-status-row">
-            <div class="sensor-meta">
-              <span class="sensor-name">${s.name}</span>
-              <span class="sensor-detail">${s.detail || ''}</span>
-            </div>
-            <span class="status-pill ${badgeClass}">${s.status}</span>
-          </div>
-        `;
-      }).join('');
+    if (ipc) {
+      ipc.on('companion:updated', () => this.renderCompanionState());
+      ipc.on('companion:checkin-due', () => this.renderCompanionState());
+    }
+  }
+
+  async renderCompanionState() {
+    const ipc = window.panelController && window.panelController.ipcRenderer;
+    if (!ipc) return;
+    try {
+      const state = await ipc.invoke('companion:get-state');
+      if (!state) return;
+      const m = state.mood || {};
+      if (this.companionMoodSummary) this.companionMoodSummary.textContent = `😊 ${m.happiness ?? 0}%  ⚡ ${m.energy ?? 0}%  🎯 ${m.focus ?? 0}%`;
+      const checkin = state.checkin || {};
+      if (this.companionCheckinStatus) this.companionCheckinStatus.textContent = checkin.lastMood ? `Last: ${checkin.lastMood}` : 'Not checked in today';
+      const sum = state.summary || {};
+      if (this.companionSummary) this.companionSummary.textContent = `Focus: ${sum.focusSessions || 0} sessions / ${sum.focusMinutes || 0} min · Streak: ${sum.streak || 0} day(s) · Check-in: ${sum.checkin || '—'}`;
+      if (this.companionCaptureList) {
+        const captures = (state.captures || []).slice(0, 8);
+        this.companionCaptureList.innerHTML = captures.length ? captures.map(c => `
+          <div style="display:flex;gap:8px;align-items:center;font-size:12px;padding:6px 8px;border:1px solid var(--border-subtle,rgba(255,255,255,0.08));border-radius:8px;">
+            <button data-cap-toggle="${c.id}" style="cursor:pointer;">${c.done ? '☑' : '☐'}</button>
+            <span style="flex:1;${c.done ? 'opacity:.6;text-decoration:line-through;' : ''}">[${c.type}] ${String(c.text).replace(/</g,'&lt;')}</span>
+            <button data-cap-del="${c.id}" style="cursor:pointer;opacity:.7;">✕</button>
+          </div>`).join('') : '<div style="font-size:11px;opacity:.7;">No captures yet.</div>';
+        this.companionCaptureList.querySelectorAll('[data-cap-toggle]').forEach(b => b.onclick = async () => { await ipc.invoke('companion:capture-toggle', b.getAttribute('data-cap-toggle')); this.renderCompanionState(); });
+        this.companionCaptureList.querySelectorAll('[data-cap-del]').forEach(b => b.onclick = async () => { await ipc.invoke('companion:capture-delete', b.getAttribute('data-cap-del')); this.renderCompanionState(); });
+      }
+      if (this.companionCaptureStatus) this.companionCaptureStatus.textContent = `${(state.captures || []).length} saved`;
     } catch (e) {
-      console.warn('[SettingsTab] Could not render sensor status:', e);
+      console.warn('[SettingsTab] companion render failed', e);
     }
   }
 
@@ -1805,17 +1767,13 @@ class SettingsTab {
       { id: 'setting-sound-reactions', section: 'behavior', key: 'settings.behavior.soundReactions', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.soundReactions },
       { id: 'setting-dnd', section: 'behavior', key: 'settings.behavior.dnd', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.behavior.dnd },
 
-      // 3. Reactions
-      { id: 'reaction-brightness', section: 'reactions', key: 'settings.reactions.brightness', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.brightness },
-      { id: 'reaction-volume', section: 'reactions', key: 'settings.reactions.volume', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.volume },
-      { id: 'reaction-battery', section: 'reactions', key: 'settings.reactions.battery', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.battery },
-      { id: 'reaction-media', section: 'reactions', key: 'settings.reactions.media', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.media },
-      { id: 'reaction-network', section: 'reactions', key: 'settings.reactions.network', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.network },
-      { id: 'reaction-headphones', section: 'reactions', key: 'settings.reactions.headphones', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.headphones },
-      { id: 'reaction-welcome-startup', section: 'reactions', key: 'settings.reactions.welcomeStartup', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.welcomeStartup },
-      { id: 'reaction-goodbye-shutdown', section: 'reactions', key: 'settings.reactions.goodbyeShutdown', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.goodbyeShutdown },
-      { id: 'reaction-highload', section: 'reactions', key: 'settings.reactions.highLoad', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.highLoad },
-      { id: 'reaction-latenight', section: 'reactions', key: 'settings.reactions.lateNight', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.lateNight },
+      // 3. Companion & Lifecycle
+      { id: 'setting-companion-checkin', section: 'companion', key: 'settings.companion.dailyCheckin', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.companion.dailyCheckin },
+      { id: 'setting-companion-clipboard', section: 'companion', key: 'settings.companion.clipboardBuddy', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.companion.clipboardBuddy },
+      { id: 'setting-companion-breaks', section: 'companion', key: 'settings.companion.breakReminders', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.companion.breakReminders },
+      { id: 'setting-companion-wellness', section: 'companion', key: 'settings.companion.wellnessNudges', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.companion.wellnessNudges },
+      { id: 'reaction-welcome-startup', section: 'companion', key: 'settings.reactions.welcomeStartup', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.welcomeStartup },
+      { id: 'reaction-goodbye-shutdown', section: 'companion', key: 'settings.reactions.goodbyeShutdown', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.reactions.goodbyeShutdown },
 
       // 4. Appearance
       { id: 'setting-pet-scale', section: 'appearance', prop: 'scale', type: 'slider', defaultVal: CENTRAL_DEFAULTS.appearance.scale, isFloat: true, dispId: 'disp-pet-scale', suffix: '%' },
@@ -1828,9 +1786,6 @@ class SettingsTab {
       { id: 'setting-pet-depth', section: 'appearance', prop: 'depth', type: 'slider', defaultVal: CENTRAL_DEFAULTS.appearance.depth, dispId: 'disp-pet-depth', suffix: '%' },
       { id: 'setting-accent-color', section: 'appearance', prop: 'accentColor', type: 'accentColor', defaultVal: CENTRAL_DEFAULTS.appearance.accentColor },
       { id: 'setting-pet-bodycolor', section: 'appearance', prop: 'bodyColor', type: 'bodyColor', defaultVal: CENTRAL_DEFAULTS.appearance.bodyColor },
-      { id: 'setting-pet-glasses', section: 'appearance', prop: 'glassesEnabled', type: 'checkbox', defaultVal: CENTRAL_DEFAULTS.appearance.glassesEnabled },
-      { id: 'setting-pet-glasses-shape', section: 'appearance', prop: 'glassesShape', type: 'select', defaultVal: CENTRAL_DEFAULTS.appearance.glassesShape },
-      { id: 'setting-pet-glasses-color', section: 'appearance', prop: 'glassesColor', type: 'color', defaultVal: CENTRAL_DEFAULTS.appearance.glassesColor, dispId: 'disp-pet-glasses-color' },
       { id: 'setting-pet-eyescolor', section: 'appearance', prop: 'eyesColor', type: 'color', defaultVal: CENTRAL_DEFAULTS.appearance.eyesColor, dispId: 'disp-pet-eyescolor' },
       { id: 'setting-pet-mouthcolor', section: 'appearance', prop: 'mouthColor', type: 'color', defaultVal: CENTRAL_DEFAULTS.appearance.mouthColor, dispId: 'disp-pet-mouthcolor' },
 

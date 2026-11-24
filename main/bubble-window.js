@@ -1,7 +1,7 @@
 /**
  * Desktop Pet — Speech Bubble Dispatcher (Embedded inside Pet Window)
  * Zero extra BrowserWindow processes: bubbles are rendered inside the pet's
- * own transparent window with pure glassmorphic styling, auto-dismiss, and queueing.
+ * own transparent window with a solid matte iOS bubble, auto-dismiss, and queueing.
  */
 
 const { ipcMain } = require('electron') || {};
@@ -12,7 +12,7 @@ class BubbleWindowManager {
     this.queue = [];
     this.isShowing = false;
     this.petWindowRef = null;
-    this.accentColor = store.get('settings.appearance.accentColor') || '#FF7A2F';
+    this.accentColor = store.get('settings.appearance.accentColor') || '#007aff';
     this.currentTimeout = null;
 
     this.setupIPC();
@@ -40,6 +40,9 @@ class BubbleWindowManager {
         clearTimeout(this.currentTimeout);
         this.currentTimeout = null;
       }
+      // The old renderer bubble has finished fading. Advance immediately so a
+      // queued panel reaction is not held until the next unrelated event.
+      this.processQueue();
     });
 
     ipcMain.on('pet:update-accent', (e, color) => {
@@ -69,7 +72,11 @@ class BubbleWindowManager {
         clearTimeout(this.currentTimeout);
         this.currentTimeout = null;
       }
-      this.queue.unshift(item);
+      // Drop stale queued reactions so a fresh section/action popup is never
+      // followed by an old one from a previous tab.
+      this.queue = [];
+      this.isShowing = false;
+      this.queue.push(item);
       this.processQueue();
       return;
     }

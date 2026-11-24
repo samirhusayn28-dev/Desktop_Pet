@@ -12,6 +12,16 @@
  *    • reminders:updated IPC also runs a past-due scan so newly-added reminders fire immediately
  *      if their time is right now or was up to 1 minute ago
  *    • Robust triggerReminder with error isolation per step
+ *  v1.0.7 — Dedupe / reliability pass:
+ *    • One shared "due info" helper for minute checks (correct for every-hour reminders)
+ *    • lastTriggered + firedThisSession are always checked BEFORE firing, and marked BEFORE
+ *      triggering, so one reminder cannot alarm twice in the same minute/session
+ *    • reminders:updated no longer blindly clears session locks or overwrites persisted firing
+ *      state with a stale "null" from the panel (a common duplicate-alarm race)
+ *    • Reminder alarm is delivered ONLY through bubble.show({ sound:'alarm', category:'reminders',
+ *      critical:true, force:true }) — no shell/beep/afplay/PowerShell side channel, so the
+ *      unified sound manager (and its master switch) stays authoritative. Critical bubbles
+ *      bypass DND visibility suppression; the sound field is never stripped.
  */
 
 const path = require('path');
@@ -39,6 +49,40 @@ function parseReminderTime(timeStr) {
   return { hours: h, minutes: m };
 }
 
+function sameId(a, b) {
+  return a !== undefined && a !== null && b !== undefined && b !== null && (a === b || String(a) === String(b));
+}
+
+/**
+ * Single source of truth for "is this reminder due right now?".
+ * `maxLateMinutes` is 2 for live ticks (lag tolerance) and 30 for startup catch-up.
+ * For 'every-hour' the due minute is rem.time's minute, in EVERY hour — using the
+ * raw hours:minutes value here was a frequent missed-fire bug.
+ */
+function getDueInfo(rem, now, maxLateMinutes) {
+  if (!rem || rem.enabled === false) return null;
+  const parsed = parseReminderTime(rem.time);
+  if (!parsed) return null;
+
+  const dayKey = now.toDateString();
+  if (rem.repeat === 'every-hour') {
+    const late = ((now.getMinutes() - parsed.minutes) % 60 + 60) % 60;
+    if (late > maxLateMinutes) return null;
+    return {
+      dayKey,
+      hour: now.getHours(),
+      minutesLate: late,
+      triggerKey: `${dayKey}-${now.getHours()}`
+    };
+  }
+
+  const dueMins = parsed.hours * 60 + parsed.minutes;
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const late = nowMins - dueMins;
+  if (late < 0 || late > maxLateMinutes) return null;
+  return { dayKey, minutesLate: late, triggerKey: dayKey };
+}
+
 class Scheduler {
   constructor() {
     this.timer = null;
@@ -61,6 +105,8 @@ class Scheduler {
         powerMonitor.on('resume', () => {
           const sleptFrom = this.suspendTime;
           this.suspendTime = null;
+          // Force a fresh minute evaluation after wake, then scan the sleep window.
+          this.lastCheckedMinute = '';
           setTimeout(() => this.checkSleepMissedReminders(sleptFrom), 2000);
         });
       }
@@ -69,6 +115,7 @@ class Scheduler {
 
   start() {
     if (this.timer) clearInterval(this.timer);
+    this.lastCheckedMinute = '';
 
     this.timer = setInterval(() => {
       this.tick();
@@ -131,55 +178,60 @@ class Scheduler {
     }
   }
 
-  /** Called by tick() every new minute — fires reminders exactly on time */
+  /** Trigger key is unique per reminder occurrence (per hour for hourly repeats). */
+  sessionKeyFor(rem, triggerKey) {
+    return `${rem.id}:${triggerKey}`;
+  }
+
+  /** True when this exact occurrence was already fired in this session or persisted. */
+  isAlreadyFired(rem, info) {
+    if (!info) return true;
+    if (rem.lastTriggered === info.triggerKey) return true;
+    if (this.firedThisSession.has(this.sessionKeyFor(rem, info.triggerKey))) return true;
+
+    // Legacy lastTriggered values (boolean/timestamp/day string) must not cause a
+    // second alarm for the same occurrence after an app upgrade/restart — but they
+    // also must not block the NEXT hourly occurrence on the same day.
+    const lt = rem.lastTriggered;
+    if (!lt) return false;
+    const parsedDate = (typeof lt === 'number' || typeof lt === 'string') ? new Date(lt) : null;
+    if (parsedDate && !isNaN(parsedDate.getTime())) {
+      if (parsedDate.toDateString() !== info.dayKey) return false;
+      if (rem.repeat === 'every-hour') {
+        return info.hour !== undefined && parsedDate.getHours() === info.hour;
+      }
+      return true;
+    }
+    if (typeof lt === 'string' && lt === info.dayKey && rem.repeat !== 'every-hour') return true;
+    return lt === true; // legacy boolean true: treat as already fired today
+  }
+
+  /** Mark BEFORE triggering so no IPC/notification path can re-enter and double-fire. */
+  markFired(rem, info) {
+    this.firedThisSession.add(this.sessionKeyFor(rem, info.triggerKey));
+    rem.lastTriggered = info.triggerKey;
+    if (rem.repeat === 'once') rem.enabled = false;
+  }
+
+  clearSessionLocks(reminderId) {
+    for (const key of [...this.firedThisSession]) {
+      if (key.startsWith(`${reminderId}:`)) {
+        this.firedThisSession.delete(key);
+      }
+    }
+  }
+
+  /** Called by tick() every new minute — fires reminders exactly on time. */
   evaluateReminders(dateObj) {
-    if (!dateObj) dateObj = new Date();
+    const now = dateObj || new Date();
     const reminders = store.get('reminders') || [];
     let updated = false;
-    const todayDateStr = dateObj.toDateString();
-    const currentHours = dateObj.getHours();
-    const currentMins = dateObj.getMinutes();
 
     for (const rem of reminders) {
-      if (!rem.enabled) continue;
+      const info = getDueInfo(rem, now, 2);
+      if (!info || this.isAlreadyFired(rem, info)) continue;
 
-      const parsed = parseReminderTime(rem.time);
-      if (!parsed) continue;
-      const { hours: rHours, minutes: rMins } = parsed;
-
-      const remTotalMins = rHours * 60 + rMins;
-      const nowTotalMins = currentHours * 60 + currentMins;
-      const diff = nowTotalMins - remTotalMins;
-
-      let isDue = false;
-      let triggerKey;
-
-      if (rem.repeat === 'every-hour') {
-        triggerKey = `${todayDateStr}-${currentHours}`;
-        isDue = (rMins === currentMins);
-      } else if (rem.repeat === 'daily') {
-        triggerKey = todayDateStr;
-        // Fire if due right now or within last 2 minutes (prevents missed reminders on lag)
-        isDue = (diff >= 0 && diff <= 2);
-      } else {
-        // repeat: 'once'
-        triggerKey = todayDateStr;
-        isDue = (diff >= 0 && diff <= 2);
-      }
-
-      if (!isDue) continue;
-
-      // Already fired today (persisted)?
-      if (rem.lastTriggered === triggerKey) continue;
-
-      // Already fired in this session?
-      const sessionKey = `${rem.id}:${triggerKey}`;
-      if (this.firedThisSession.has(sessionKey)) continue;
-
-      // Mark as fired
-      this.firedThisSession.add(sessionKey);
-      rem.lastTriggered = triggerKey;
-      if (rem.repeat === 'once') rem.enabled = false;
+      this.markFired(rem, info);
       updated = true;
       this.triggerReminder(rem, false);
     }
@@ -194,59 +246,42 @@ class Scheduler {
    * Accepts fresh reminder data directly from the panel so we never hit the store
    * read-after-write race condition (renderer store.set → IPC → main store.get).
    *
-   * Only fires if a reminder is due RIGHT NOW or was due within the last 2 minutes.
+   * We merge firing state from the store instead of clearing session locks: clearing
+   * locks for anything with `lastTriggered: null` could re-fire a reminder that tick()
+   * had just fired. Explicit re-arm paths (reschedule / snooze) clear their own locks.
    */
   evaluateNow(freshReminders) {
     const now = new Date();
-    // Use provided fresh data; fall back to store if not provided
-    const reminders = Array.isArray(freshReminders) ? freshReminders : (store.get('reminders') || []);
-    let updated = false;
-    const todayDateStr = now.toDateString();
-    const nowTotalMins = now.getHours() * 60 + now.getMinutes();
+    const stored = store.get('reminders') || [];
+    let reminders;
 
     if (Array.isArray(freshReminders)) {
-      // Clear session locks for reminders that are enabled and have no lastTriggered
-      for (const rem of reminders) {
-        if (rem.enabled && !rem.lastTriggered) {
-          for (const key of [...this.firedThisSession]) {
-            if (key.startsWith(`${rem.id}:`)) {
-              this.firedThisSession.delete(key);
-            }
-          }
+      reminders = freshReminders.map(fresh => {
+        if (!fresh) return fresh;
+        const old = stored.find(r => sameId(r && r.id, fresh.id));
+        if (!old) return fresh;
+
+        const merged = Object.assign({}, fresh);
+        // A plain re-save from the panel may carry a stale null. Keep the persisted
+        // firing state unless the user actually changed the schedule or re-enabled it.
+        const scheduleChanged = fresh.time !== old.time || fresh.repeat !== old.repeat ||
+          (!!fresh.enabled && !old.enabled);
+        if (!merged.lastTriggered && old.lastTriggered && !scheduleChanged) {
+          merged.lastTriggered = old.lastTriggered;
         }
-      }
+        return merged;
+      });
       store.set('reminders', reminders);
+    } else {
+      reminders = stored;
     }
 
+    let updated = false;
     for (const rem of reminders) {
-      if (!rem.enabled) continue;
+      const info = getDueInfo(rem, now, 2);
+      if (!info || this.isAlreadyFired(rem, info)) continue;
 
-      const parsed = parseReminderTime(rem.time);
-      if (!parsed) continue;
-      const { hours: rHours, minutes: rMins } = parsed;
-
-      const remTotalMins = rHours * 60 + rMins;
-      // Fire if reminder is within [now - 2min, now]
-      const diff = nowTotalMins - remTotalMins;
-      const isCurrentOrJustPast = diff >= 0 && diff <= 2;
-
-      if (!isCurrentOrJustPast) continue;
-
-      let triggerKey;
-      if (rem.repeat === 'every-hour') {
-        triggerKey = `${todayDateStr}-${now.getHours()}`;
-      } else {
-        triggerKey = todayDateStr;
-      }
-
-      if (rem.lastTriggered === triggerKey) continue; // already fired
-
-      const sessionKey = `${rem.id}:${triggerKey}`;
-      if (this.firedThisSession.has(sessionKey)) continue;
-
-      this.firedThisSession.add(sessionKey);
-      rem.lastTriggered = triggerKey;
-      if (rem.repeat === 'once') rem.enabled = false;
+      this.markFired(rem, info);
       updated = true;
       this.triggerReminder(rem, false);
     }
@@ -270,41 +305,15 @@ class Scheduler {
     const now = new Date();
     const reminders = store.get('reminders') || [];
     let updated = false;
-    const todayDateStr = now.toDateString();
-    const nowTotalMins = now.getHours() * 60 + now.getMinutes();
 
     for (const rem of reminders) {
-      if (!rem.enabled) continue;
+      const info = getDueInfo(rem, now, 30);
+      if (!info || this.isAlreadyFired(rem, info)) continue;
 
-      const parsed = parseReminderTime(rem.time);
-      if (!parsed) continue;
-      const { hours: rHours, minutes: rMins } = parsed;
-
-      const remTotalMins = rHours * 60 + rMins;
-      const minutesMissed = nowTotalMins - remTotalMins;
-
-      // Missed within last 30 minutes (and not already fired today)
-      if (minutesMissed < 0 || minutesMissed > 30) continue;
-
-      let triggerKey;
-      if (rem.repeat === 'every-hour') {
-        triggerKey = `${todayDateStr}-${rHours}`;
-      } else {
-        triggerKey = todayDateStr;
-      }
-
-      if (rem.lastTriggered === triggerKey) continue;
-
-      const sessionKey = `${rem.id}:${triggerKey}`;
-      if (this.firedThisSession.has(sessionKey)) continue;
-
-      this.firedThisSession.add(sessionKey);
-      rem.lastTriggered = triggerKey;
-      if (rem.repeat === 'once') rem.enabled = false;
+      this.markFired(rem, info);
       updated = true;
-
       // Fire as missed (with isMissed=true only if more than 1 min late)
-      this.triggerReminder(rem, minutesMissed > 1);
+      this.triggerReminder(rem, info.minutesLate > 1);
     }
 
     if (updated) {
@@ -312,7 +321,7 @@ class Scheduler {
     }
   }
 
-  /** Fire missed reminders after waking from sleep */
+  /** Fire missed reminders after waking from sleep (at most one alarm per reminder). */
   checkSleepMissedReminders(sleptFromTimestamp) {
     if (!sleptFromTimestamp) return;
     const now = new Date();
@@ -322,44 +331,47 @@ class Scheduler {
 
     const reminders = store.get('reminders') || [];
     let updated = false;
-    const todayDateStr = now.toDateString();
-
     const sleepDate = new Date(sleptFromTimestamp);
-    const startMins = sleepDate.getHours() * 60 + sleepDate.getMinutes();
-    const endMins = now.getHours() * 60 + now.getMinutes();
 
     for (const rem of reminders) {
-      if (!rem.enabled) continue;
-
+      if (!rem || rem.enabled === false) continue;
       const parsed = parseReminderTime(rem.time);
       if (!parsed) continue;
-      const { hours: rHours, minutes: rMins } = parsed;
 
-      const remTotalMins = rHours * 60 + rMins;
-
-      // Check if scheduled time fell within the sleep duration
-      const fellInWindow = (startMins <= endMins)
-        ? (remTotalMins >= startMins && remTotalMins <= endMins)
-        : (remTotalMins >= startMins || remTotalMins <= endMins); // crossed midnight
-
-      if (!fellInWindow) continue;
-
-      let triggerKey;
+      // Build the most recent scheduled occurrence inside the sleep window.
+      let occurrence = null;
       if (rem.repeat === 'every-hour') {
-        triggerKey = `${todayDateStr}-${rHours}`;
+        const candidate = new Date(sleepDate);
+        candidate.setMinutes(parsed.minutes, 0, 0);
+        if (candidate.getTime() < sleptFromTimestamp) candidate.setHours(candidate.getHours() + 1);
+        const cursor = new Date(candidate);
+        while (cursor.getTime() <= now.getTime()) {
+          occurrence = new Date(cursor.getTime());
+          cursor.setHours(cursor.getHours() + 1); // DST-safe hourly stepping
+        }
       } else {
-        triggerKey = todayDateStr;
+        // Daily / once: check both the sleep day and the wake day (midnight crossing).
+        for (const day of [sleepDate, now]) {
+          const candidate = new Date(day);
+          candidate.setHours(parsed.hours, parsed.minutes, 0, 0);
+          if (candidate.getTime() >= sleptFromTimestamp && candidate.getTime() <= now.getTime()) {
+            occurrence = candidate;
+          }
+        }
       }
+      if (!occurrence) continue;
 
-      if (rem.lastTriggered === triggerKey) continue;
+      const dayKey = occurrence.toDateString();
+      const info = {
+        dayKey,
+        hour: occurrence.getHours(),
+        triggerKey: rem.repeat === 'every-hour' ? `${dayKey}-${occurrence.getHours()}` : dayKey,
+        minutesLate: Math.max(1, Math.round((now.getTime() - occurrence.getTime()) / 60000))
+      };
+      if (this.isAlreadyFired(rem, info)) continue;
 
-      const sessionKey = `${rem.id}:${triggerKey}`;
-      if (this.firedThisSession.has(sessionKey)) continue;
-
-      this.firedThisSession.add(sessionKey);
+      this.markFired(rem, info);
       this.triggerReminder(rem, true);
-      rem.lastTriggered = triggerKey;
-      if (rem.repeat === 'once') rem.enabled = false;
       updated = true;
     }
 
@@ -398,14 +410,6 @@ class Scheduler {
       console.warn('[Scheduler] Native notification error:', e.message);
     }
 
-    // Windows fallback: native system audio beep in case desktop notifications are suppressed
-    if (process.platform === 'win32') {
-      try {
-        const { shell } = require('electron');
-        if (shell && typeof shell.beep === 'function') shell.beep();
-      } catch (_) {}
-    }
-
     // 2. Bring pet to top & wake if sleeping (cross-platform safe: 'screen-saver' level is macOS only!)
     try {
       const petWin = this.petWindowRef || bubble.petWindowRef;
@@ -429,7 +433,11 @@ class Scheduler {
       console.warn('[Scheduler] Wake pet error:', e.message);
     }
 
-    // 3. Speech bubble with loud reminder alarm
+    // 3. Speech bubble with loud reminder alarm. This is the ONLY audible alarm path:
+    //    bubble -> pet renderer -> sound manager, which owns master/DND/sub-toggles.
+    //    `critical` makes the bubble bypass DND visibility suppression; never strip
+    //    `sound` here, and never substitute a shell/OS beep (that would bypass the
+    //    master switch and add an extra process/path on Windows).
     try {
       bubble.show({
         badge: isMissed ? 'MISSED REMINDER' : 'REMINDER',
@@ -472,7 +480,7 @@ class Scheduler {
 
   snoozeReminder(reminderId, minutes) {
     const reminders = store.get('reminders') || [];
-    const rem = reminders.find(r => r.id === reminderId || String(r.id) === String(reminderId));
+    const rem = reminders.find(r => sameId(r.id, reminderId));
     if (!rem) return null;
 
     const snoozeMins = Number(minutes) || store.get('settings.behavior.snoozeMinutes') || 5;
@@ -508,11 +516,7 @@ class Scheduler {
     rem.lastTriggered = null;
 
     // Remove from session fired set so it can fire again at new time
-    for (const key of this.firedThisSession) {
-      if (key.startsWith(`${rem.id}:`)) {
-        this.firedThisSession.delete(key);
-      }
-    }
+    this.clearSessionLocks(rem.id);
 
     this._saveAndNotify(reminders);
 
@@ -532,18 +536,14 @@ class Scheduler {
 
   reschedule(reminderId) {
     const reminders = store.get('reminders') || [];
-    const rem = reminders.find(r => r.id === reminderId || String(r.id) === String(reminderId));
+    const rem = reminders.find(r => sameId(r.id, reminderId));
     if (!rem) return;
 
     rem.enabled = true;
     rem.lastTriggered = null;
 
     // Remove from session fired set so it can fire again
-    for (const key of [...this.firedThisSession]) {
-      if (key.startsWith(`${rem.id}:`)) {
-        this.firedThisSession.delete(key);
-      }
-    }
+    this.clearSessionLocks(rem.id);
 
     store.set('reminders', reminders);
   }

@@ -64,7 +64,7 @@ app.whenReady().then(async () => {
   // Test 3: Wake Event from Sleep / Lock / Display Sleep (Silent Wake)
   bubbleSent = null;
   emotionSent = null;
-  const ss = require('../main/system-sense');
+  const ss = ({start(){},stop(){},setPetWindow(){},setUserName(){},getSensorStatus:async()=>[],checkAllSensors:async()=>{},injectSensorReading:async()=>({success:false}),state:{},canReact:()=>false});
   ss.isSleeping = true;
   ss.handleWakeEvent();
   console.assert(bubbleSent === null, 'FAIL: Wake event must NEVER send speech bubble');

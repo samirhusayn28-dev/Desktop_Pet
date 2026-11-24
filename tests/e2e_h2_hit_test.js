@@ -37,11 +37,11 @@ async function runTest() {
 
     // Test matrix across configurations
     const testConfigs = [
-      { name: 'Default', width: 136, height: 120, roundness: 36, scale: 1.0, glasses: false },
-      { name: 'Smallest', width: 60, height: 60, roundness: 20, scale: 0.5, glasses: false },
-      { name: 'Largest', width: 200, height: 200, roundness: 40, scale: 2.0, glasses: true },
-      { name: 'Square Extreme', width: 136, height: 120, roundness: 0, scale: 1.0, glasses: false },
-      { name: 'Pill Extreme', width: 136, height: 120, roundness: 50, scale: 1.0, glasses: true }
+      { name: 'Default', width: 136, height: 120, roundness: 36, scale: 1.0 },
+      { name: 'Smallest', width: 60, height: 60, roundness: 20, scale: 0.5 },
+      { name: 'Largest', width: 200, height: 200, roundness: 40, scale: 2.0 },
+      { name: 'Square Extreme', width: 136, height: 120, roundness: 0, scale: 1.0 },
+      { name: 'Pill Extreme', width: 136, height: 120, roundness: 50, scale: 1.0 }
     ];
 
     let totalPoints = 0;
@@ -55,8 +55,7 @@ async function runTest() {
           width: config.width,
           height: config.height,
           roundness: config.roundness,
-          scale: config.scale,
-          glassesEnabled: config.glasses
+          scale: config.scale
         });
       }, cfg);
 

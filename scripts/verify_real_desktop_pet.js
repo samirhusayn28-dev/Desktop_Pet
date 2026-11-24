@@ -31,7 +31,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('pet:set-ignore-mouse-events', () => {});
-  ipcMain.on('pet:get-sound-settings', (e) => { e.returnValue = { soundsEnabled: false }; });
+  ipcMain.on('pet:get-sound-settings', (e) => { e.returnValue = { soundsEnabled: true, soundVolume: 60 }; });
   ipcMain.on('app:get-version', (e) => { e.returnValue = '1.0.9'; });
   ipcMain.on('pet:update-appearance', (e, appearance) => {
     store.set('settings.appearance', appearance);

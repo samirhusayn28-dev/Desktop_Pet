@@ -4,7 +4,7 @@
  * Removed per-provider auto-theming as requested.
  */
 
-const DEFAULT_ACCENT = '#FF7A2F';
+const DEFAULT_ACCENT = '#007aff';
 
 class ThemeManager {
   static getDefaultAccent() {

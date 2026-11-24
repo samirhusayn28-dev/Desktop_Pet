@@ -1,12 +1,12 @@
 /**
  * Test Suite: v1.0.9 Fixes Verification
  * 1. Bulb glow removal verified (pet.css & pet-controller.js)
- * 2. 11 Glasses frames verified (character/pet.js & panel.html)
+ * 2. Pet renders with no glasses and a black (#111111) mouth (character/pet.js & panel.html)
  * 3. Windows Reminders:
  *    - parseReminderTime handles 24h, 12h AM/PM, seconds, whitespace
  *    - 2-minute tolerance window prevents missed reminders on system lag
  *    - Cross-platform safe setAlwaysOnTop (never passes 'screen-saver' on Windows)
- *    - Windows shell beep audio fallback
+ *    - Audible alarm is routed through the shared bubble/sound manager
  * 4. Windows System Sense:
  *    - Unified 300ms fast polling loop for volume, headphones, battery, brightness
  *    - Direct kernel32 GetSystemPowerStatus replaces slow WMI battery query
@@ -30,8 +30,8 @@ assert(!petCtrl.includes('setBulbActive'), 'pet-controller.js must not have setB
 assert(!petCtrl.includes('pet:bulb-glow'), 'pet-controller.js must not have pet:bulb-glow');
 console.log('✓ Electric bulb glow completely removed from stylesheet and controller.');
 
-// TEST 2: Glasses Frames
-console.log('\n[2/4] Verifying All 11 Glasses Frame Shapes...');
+// TEST 2: Pixie Face Rig — No Glasses, Black Mouth
+console.log('\n[2/4] Verifying pet renders with no glasses and a black mouth...');
 const petJs = fs.readFileSync(path.join(__dirname, '../character/pet.js'), 'utf8');
 const vm = require('vm');
 const context = { window: {}, console };
@@ -40,23 +40,18 @@ vm.runInContext(petJs, context);
 const PetRenderer = context.window.PetRenderer;
 const renderer = new PetRenderer();
 
-const expectedShapes = [
-  'round', 'square', 'rectangular', 'hexagon', 'cateye',
-  'oval', 'aviator', 'clubmaster', 'semi-rimless', 'heart', 'star'
-];
-
-expectedShapes.forEach(shape => {
-  renderer.updateConfig({ glassesEnabled: true, glassesShape: shape, glassesColor: '#123456' });
-  const svg = renderer.render('happy');
-  assert(svg.includes(`shape-${shape}`), `SVG must render shape-${shape}`);
-  assert(svg.includes('#123456'), `SVG must use glasses color #123456`);
-});
+for (const emotion of ['happy', 'neutral', 'sleepy']) {
+  const svg = renderer.render(emotion);
+  assert(svg.includes('data-character="coucou"'), `${emotion} SVG must keep the Coucou character hook`);
+  assert(!svg.includes('glasses'), `${emotion} SVG must not render a glasses overlay`);
+  const mouth = svg.match(/<path class="coucou-mouth"[^>]*>/);
+  assert(mouth, `${emotion} SVG must render a mouth path`);
+  assert(mouth[0].includes('stroke="#111111"'), `${emotion} mouth must be black (#111111)`);
+}
 
 const panelHtml = fs.readFileSync(path.join(__dirname, '../panel-window/panel.html'), 'utf8');
-expectedShapes.forEach(shape => {
-  assert(panelHtml.includes(`value="${shape}"`), `panel.html select must contain option for ${shape}`);
-});
-console.log(`✓ All ${expectedShapes.length} glasses frame shapes render valid SVGs and exist in settings UI.`);
+assert(!panelHtml.includes('setting-pet-glasses'), 'panel.html must not expose glasses settings');
+console.log('✓ Pet renders without glasses and with a black (#111111) mouth; no glasses settings remain.');
 
 // TEST 3: Windows Reminders Fixes
 console.log('\n[3/4] Verifying Windows Reminders Engine...');
@@ -98,28 +93,28 @@ console.log('✓ parseReminderTime handles 24h, 12h AM/PM, seconds, and invalid 
 assert(schedulerJs.includes("if (process.platform === 'darwin')"), 'scheduler.js must check platform before setting screen-saver level');
 assert(schedulerJs.includes("petWin.setAlwaysOnTop(true, 'screen-saver')"), 'macOS gets screen-saver level');
 assert(schedulerJs.includes("petWin.setAlwaysOnTop(true)"), 'Windows gets safe setAlwaysOnTop(true)');
-assert(schedulerJs.includes("shell.beep()"), 'Windows has shell beep audio feedback');
-console.log('✓ Platform-safe window hierarchy and audio alert verified.');
+assert(!schedulerJs.includes('shell.beep()'), 'Reminders must not bypass the master sound switch');
+assert(schedulerJs.includes("sound: 'alarm'"), 'Reminders route an audible alarm through the bubble');
+assert(schedulerJs.includes("category: 'reminders'"), 'Reminder alarm uses the reminders sound category');
+console.log('✓ Platform-safe window hierarchy and unified audio alert verified.');
 
 // C. Tolerance Window
-assert(schedulerJs.includes('diff >= 0 && diff <= 2'), 'scheduler.js must evaluate 2-minute tolerance window so lag never drops a reminder');
-console.log('✓ 2-minute tolerance window verified.');
+assert(schedulerJs.includes('maxLateMinutes'), 'scheduler.js must keep a late-minute tolerance window so lag never drops a reminder');
+assert(schedulerJs.includes('late > maxLateMinutes'), 'scheduler.js must enforce the late-minute tolerance window');
+console.log('✓ Late-minute tolerance window verified.');
 
-// TEST 4: Windows System Sense Latency Fixes
-console.log('\n[4/4] Verifying Windows System Sense Zero-Latency Optimization...');
-const sysSenseJs = fs.readFileSync(path.join(__dirname, '../main/system-sense.js'), 'utf8');
-
-// Fast unified polling loop
-assert(sysSenseJs.includes('Get-PixieFastAudio'), 'system-sense.js must use Get-PixieFastAudio');
-assert(sysSenseJs.includes('[PixieAudio]::BatteryState()'), 'system-sense.js must query fast C# GetSystemPowerStatus');
-assert(sysSenseJs.includes('$audio;$isHp;$batt;$br'), 'Get-PixieFastAudio must return audio, headphones, battery, and brightness in one fast 300ms query');
-assert(sysSenseJs.includes('this.processBatteryState(pct, isCharging)'), 'checkVolume must process battery state immediately on Windows');
-assert(sysSenseJs.includes('this._applyBrightnessBandLogic(brPct)'), 'checkVolume must process brightness immediately on Windows');
-
-// Pet Window backgroundThrottling: false
+// TEST 4: Companion features module exists (SystemSense replaced)
+console.log('\n[4/4] Verifying Companion Features module...');
+const companionPath = path.join(__dirname, '../main/companion-features.js');
+assert(fs.existsSync(companionPath), 'companion-features.js must exist');
+const companionJs = fs.readFileSync(companionPath, 'utf8');
+for (const fn of ['onFocusSessionComplete','careAction','submitCheckin','addCapture','startBreathing','clipboardAction','getPublicState']) {
+  assert(companionJs.includes(fn), `companion-features.js missing ${fn}`);
+}
 const indexJs = fs.readFileSync(path.join(__dirname, '../main/index.js'), 'utf8');
 assert(indexJs.includes('backgroundThrottling: false'), 'main/index.js must have backgroundThrottling: false for petWindow');
-console.log('✓ Unified 300ms fast polling loop & zero-delay background throttling verified.');
+assert(!indexJs.includes('system-sense'), 'SystemSense should be removed from index.js');
+console.log('✓ Companion features present and SystemSense removed.');
 
 console.log('\n============================================================');
 console.log('🎉 ALL v1.0.9 REQUIREMENTS VERIFIED 100% SUCCESFULLY!');

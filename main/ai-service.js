@@ -719,7 +719,18 @@ class AIService {
    * - Retries once without streaming on streaming failure
    * - Auto-falls back to next chat model (max 2) on terms/404/not-supported/access-denied
    */
+  abortStream(requestId) {
+    const controller = this.activeStreams.get(requestId);
+    if (!controller) return false;
+    controller.abort();
+    return true;
+  }
+
   async streamChat(requestId, params, onChunk, onDone, onError) {
+    const controller = new AbortController();
+    this.activeStreams.set(requestId, controller);
+    const signal = controller.signal;
+
     const {
       provider,
       messages,
@@ -736,7 +747,7 @@ class AIService {
     // "You are <pet name>, a friendly desktop pet assistant. The user's name is <user name>; use it occasionally. Always reply in the same language and script as the user's last message (English by default; if the user writes Roman Urdu/Hinglish reply in Roman Urdu/Hinglish). Be concise."
     // Fetch live personality from GitHub (cached 10 min — no release needed to update)
     const personality = await this.fetchPersonality();
-    const petName = store.get('settings.general.petName') || 'Desktop Pet';
+    const petName = store.get('settings.general.petName') || 'Pixie';
     const userName = (store.get('settings.general.userName') || '').trim();
     let fullSystemPrompt = `You are ${petName}, a friendly desktop pet AI assistant that lives on the user's desktop.`;
 
@@ -817,7 +828,8 @@ class AIService {
             messages: cleanedMessages,
             systemPrompt: fullSystemPrompt,
             enableStreaming,
-            screenshotBase64
+            screenshotBase64,
+            signal
           }, filteredOnChunk);
         } else if (provider === 'groq' || provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'qwen' || provider === 'custom') {
           result = await this.streamOpenAICompatible(requestId, {
@@ -828,7 +840,8 @@ class AIService {
             messages: cleanedMessages,
             systemPrompt: fullSystemPrompt,
             enableStreaming,
-            screenshotBase64
+            screenshotBase64,
+            signal
           }, filteredOnChunk);
         } else if (provider === 'anthropic') {
           result = await this.streamAnthropic(requestId, {
@@ -838,7 +851,8 @@ class AIService {
             messages: cleanedMessages,
             systemPrompt: fullSystemPrompt,
             enableStreaming,
-            screenshotBase64
+            screenshotBase64,
+            signal
           }, filteredOnChunk);
         } else if (provider === 'ollama') {
           result = await this.streamOllama(requestId, {
@@ -846,7 +860,8 @@ class AIService {
             baseUrl,
             messages: cleanedMessages,
             systemPrompt: fullSystemPrompt,
-            enableStreaming
+            enableStreaming,
+            signal
           }, filteredOnChunk);
         } else {
           result = `I'm your desktop pet companion! Configure an active AI provider in Settings -> AI Provider.`;
@@ -871,6 +886,11 @@ class AIService {
       } catch (err) {
         const errMsg = String(err.message || err.body || err).toLowerCase();
         const status = err.status || 0;
+
+        // User pressed Stop — do not retry or auto-switch models.
+        if (signal.aborted || status === 499 || errMsg.includes('aborted')) {
+          throw err;
+        }
 
         // 503 busy: backoff retry 1s/3s/7s
         const is503 = status === 503 || errMsg.includes('503') || errMsg.includes('overloaded') || errMsg.includes('service unavailable');
@@ -941,23 +961,29 @@ class AIService {
     };
 
     try {
-      const fullText = await executeAttempt(activeModel, true, 1);
-      if (typeof onDone === 'function') onDone(fullText);
-    } catch (err) {
-      const mapped = this.mapFriendlyError(err, err.status);
-      if (typeof onError === 'function') {
-        onError({
-          friendly: mapped.friendly,
-          details: mapped.details,
-          status: err.status || 0
-        });
+      try {
+        const fullText = await executeAttempt(activeModel, true, 1);
+        if (typeof onDone === 'function') onDone(fullText);
+      } catch (err) {
+        const mapped = this.mapFriendlyError(err, err.status);
+        if (typeof onError === 'function') {
+          onError({
+            friendly: mapped.friendly,
+            details: mapped.details,
+            status: err.status || 0
+          });
+        }
+      }
+    } finally {
+      if (this.activeStreams.get(requestId) === controller) {
+        this.activeStreams.delete(requestId);
       }
     }
   }
 
   // --- GEMINI DRIVER (streamGenerateContent with alt=sse, systemInstruction, role "model") ---
   async streamGemini(requestId, opts, onChunk) {
-    const { apiKey, model, baseUrl, messages, systemPrompt, enableStreaming, screenshotBase64 } = opts;
+    const { apiKey, model, baseUrl, messages, systemPrompt, enableStreaming, screenshotBase64, signal } = opts;
     if (!apiKey) throw new Error('Gemini API key is required');
 
     const root = (baseUrl || 'https://generativelanguage.googleapis.com').replace(/\/+$/, '');
@@ -992,7 +1018,8 @@ class AIService {
 
     await this.makeRequest(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      signal
     }, payload, (chunk) => {
       if (!enableStreaming) return;
 
@@ -1029,7 +1056,7 @@ class AIService {
 
   // --- OPENAI-COMPATIBLE DRIVER (OpenAI, Groq, DeepSeek, Qwen, OpenRouter, Custom) ---
   async streamOpenAICompatible(requestId, opts, onChunk) {
-    const { provider, apiKey, model, baseUrl, messages, systemPrompt, enableStreaming, screenshotBase64 } = opts;
+    const { provider, apiKey, model, baseUrl, messages, systemPrompt, enableStreaming, screenshotBase64, signal } = opts;
     if (!apiKey) throw new Error(`${provider} API key is required`);
 
     let defaultBase = 'https://api.openai.com/v1';
@@ -1088,7 +1115,8 @@ class AIService {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
         'User-Agent': 'Desktop-Pet/1.0'
-      }
+      },
+      signal
     }, payload, (chunk) => {
       if (!enableStreaming) return;
 
@@ -1128,7 +1156,7 @@ class AIService {
   // --- ANTHROPIC MESSAGES API DRIVER ---
   // (x-api-key, anthropic-version header, top-level system, required max_tokens, SSE event types)
   async streamAnthropic(requestId, opts, onChunk) {
-    const { apiKey, model, baseUrl, messages, systemPrompt, enableStreaming, screenshotBase64 } = opts;
+    const { apiKey, model, baseUrl, messages, systemPrompt, enableStreaming, screenshotBase64, signal } = opts;
     if (!apiKey) throw new Error('Anthropic API key is required');
 
     const root = (baseUrl || 'https://api.anthropic.com/v1').replace(/\/+$/, '');
@@ -1174,7 +1202,8 @@ class AIService {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
-      }
+      },
+      signal
     }, payload, (chunk) => {
       if (!enableStreaming) return;
 
@@ -1209,7 +1238,7 @@ class AIService {
 
   // --- OLLAMA /api/chat NDJSON DRIVER ---
   async streamOllama(requestId, opts, onChunk) {
-    const { model, baseUrl, messages, systemPrompt, enableStreaming } = opts;
+    const { model, baseUrl, messages, systemPrompt, enableStreaming, signal } = opts;
     const root = (baseUrl || 'http://localhost:11434').replace(/\/+$/, '');
 
     const formattedMessages = [{ role: 'system', content: systemPrompt }, ...messages];
@@ -1224,7 +1253,8 @@ class AIService {
 
     await this.makeRequest(`${root}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      signal
     }, payload, (chunk) => {
       if (!enableStreaming) return;
 

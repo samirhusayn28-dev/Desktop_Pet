@@ -1,7 +1,7 @@
 /**
  * Desktop Pet — Notes Tab Controller
  * Quick sticky notes with create/edit/delete/search/pinning/copy
- * Matches Chat glass design system, JetBrains Mono timestamps, and empty states
+ * Matches the solid matte Pixie design system, JetBrains Mono timestamps, and empty states
  */
 
 class NotesTab {

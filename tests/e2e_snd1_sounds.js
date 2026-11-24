@@ -41,21 +41,16 @@ async function runSoundTests() {
     await petWin.waitForLoadState('domcontentloaded');
     await sleep(2000);
 
-    // Initial check: ensure sounds are OFF by default
-    console.log('\n--- Test 1: Default Sound State (OFF by default) ---');
-    await petWin.evaluate(() => {
-      const { ipcRenderer } = require('electron');
-      ipcRenderer.send('settings:sound-changed', { soundsEnabled: false });
-    });
-    await sleep(200);
+    // Initial check: sounds are ON by default at volume 60
+    console.log('\n--- Test 1: Default Sound State (ON by default, volume 60) ---');
     const initialSettings = await petWin.evaluate(() => {
       const { ipcRenderer } = require('electron');
       return ipcRenderer.sendSync('pet:get-sound-settings');
     });
-    if (initialSettings.soundsEnabled === false) {
-      pass('soundsEnabled is false by default');
+    if (initialSettings.soundsEnabled === true && initialSettings.soundVolume === 60) {
+      pass('soundsEnabled is true and soundVolume is 60 by default');
     } else {
-      fail(`soundsEnabled default is ${initialSettings.soundsEnabled}, expected false`);
+      fail(`sound defaults are soundsEnabled=${initialSettings.soundsEnabled}, soundVolume=${initialSettings.soundVolume}; expected true/60`);
     }
 
     // Phase 1: Sounds OFF -> Trigger due reminder, timer end, volume reaction, welcome, goodbye
@@ -100,7 +95,7 @@ async function runSoundTests() {
       const { ipcRenderer } = require('electron');
       ipcRenderer.send('settings:sound-changed', {
         soundsEnabled: true,
-        soundVolume: 50,
+        soundVolume: 60,
         soundReminders: true,
         soundTimer: true,
         soundReactions: true,
@@ -394,10 +389,10 @@ async function runSoundTests() {
         await resetBehaviorBtn.click();
         await sleep(500);
 
-        const isSoundsOffAfterReset = !(await masterToggle.isChecked());
-        const isSubHiddenAfterReset = !(await subPanel.isVisible());
-        if (isSoundsOffAfterReset && isSubHiddenAfterReset) {
-          pass('Reset section behavior returns Sounds to OFF and hides sub-controls');
+        const isSoundsOnAfterReset = await masterToggle.isChecked();
+        const isSubVisibleAfterReset = await subPanel.isVisible();
+        if (isSoundsOnAfterReset && isSubVisibleAfterReset) {
+          pass('Reset section behavior returns Sounds to ON (default) and shows sub-controls');
         } else {
           fail(`Reset section failed: isChecked=${await masterToggle.isChecked()}, subVisible=${await subPanel.isVisible()}`);
         }
@@ -423,14 +418,16 @@ async function runSoundTests() {
 
       const welcomeSoundsToggle = welcomeWin.locator('#toggle-sounds');
       const isWelcomeSoundsChecked = await welcomeSoundsToggle.isChecked();
-      if (!isWelcomeSoundsChecked) {
-        pass('Welcome window Sounds toggle is default OFF');
+      if (isWelcomeSoundsChecked) {
+        pass('Welcome window Sounds toggle is ON by default');
       } else {
-        fail('Welcome window Sounds toggle was ON by default');
+        fail('Welcome window Sounds toggle was not checked by default');
       }
 
-      // Toggle ON in welcome window -> verify sync to store
-      await welcomeSoundsToggle.click();
+      // Toggle OFF then ON in welcome window -> verify sync to store
+      await welcomeSoundsToggle.uncheck();
+      await sleep(200);
+      await welcomeSoundsToggle.check();
       await sleep(400);
       const syncedOn = await petWin.evaluate(() => {
         const { ipcRenderer } = require('electron');
@@ -442,7 +439,7 @@ async function runSoundTests() {
         fail('Toggling in Welcome window did not sync to settings');
       }
 
-      // Click Skip -> verify Skip keeps/sets Sounds OFF
+      // Click Skip -> verify Skip preserves the ON sound setting
       const btnSkip = welcomeWin.locator('#btn-skip');
       await btnSkip.click();
       await sleep(600);
@@ -451,10 +448,10 @@ async function runSoundTests() {
         const { ipcRenderer } = require('electron');
         return ipcRenderer.sendSync('pet:get-sound-settings');
       });
-      if (afterSkipSettings.soundsEnabled === false) {
-        pass('Clicking Skip in Welcome window sets/keeps Sounds OFF');
+      if (afterSkipSettings.soundsEnabled === true) {
+        pass('Clicking Skip in Welcome window keeps Sounds ON');
       } else {
-        fail(`Skip failed to keep Sounds OFF: soundsEnabled=${afterSkipSettings.soundsEnabled}`);
+        fail(`Skip failed to keep Sounds ON: soundsEnabled=${afterSkipSettings.soundsEnabled}`);
       }
     }
 
@@ -485,8 +482,8 @@ async function runSoundTests() {
       return ipcRenderer.sendSync('pet:get-sound-settings');
     });
 
-    if (migratedSettings.soundsEnabled === false) {
-      pass('Migration from legacy backup sets soundsEnabled to OFF');
+    if (migratedSettings.soundsEnabled === true) {
+      pass('Migration from legacy backup defaults soundsEnabled to ON');
     } else {
       fail(`Legacy migration failed: soundsEnabled=${migratedSettings.soundsEnabled}`);
     }
@@ -546,8 +543,8 @@ async function runSoundTests() {
     await newPetWin.evaluate(() => {
       const { ipcRenderer } = require('electron');
       ipcRenderer.send('settings:sound-changed', {
-        soundsEnabled: false,
-        soundVolume: 50,
+        soundsEnabled: true,
+        soundVolume: 60,
         soundReminders: true,
         soundTimer: true,
         soundReactions: true,

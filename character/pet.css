@@ -1,144 +1,94 @@
 /**
- * Desktop Pet — Minimal Face-Bot Styling & Smooth Micro-Animations (60fps)
+ * Pixie character animations — code-driven. Internal Coucou hooks preserved.
+ * Transform/opacity only; no external images or static assets.
  */
 
-:root {
-  --facebot-feature-color: #181820;
-  --facebot-body-white: #FFFFFF;
-}
-
-.facebot-svg {
+.devpet-svg,
+.facebot-svg,
+.coucou-svg {
   display: block;
-  user-select: none;
   overflow: visible;
+  user-select: none;
+  shape-rendering: geometricPrecision;
 }
 
-.facebot-root {
-  transform-origin: 110px 112px;
+/* Fixed view-box origins from the shared geometry constants. No bbox-based
+   origins on groups whose contents change (hidden mouth, alternate eyes). */
+.coucou-shadow {
+  transform-box: view-box;
+  transform-origin: var(--coucou-face-x, 176px) var(--coucou-shadow-y, 173px);
+  animation: coucou-shadow-pulse 3.6s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
-/* Face tracking group */
-.facebot-face {
-  transform-origin: 110px 110px;
+.coucou-all {
+  animation: coucou-float 3.6s ease-in-out infinite;
+  will-change: transform;
 }
 
-/* 1. Idle Body Surface — Static at idle (breathing is handled at compositor layer on viewport) */
-.emotion-neutral .facebot-body-wrap {
-  transform-origin: 110px 172px;
-  transform: scale(1, 1);
+.coucou-blob {
+  transform-box: view-box;
+  transform-origin: var(--coucou-face-x, 176px) var(--coucou-body-bottom, 158px);
 }
 
-/* 2. Happy Tiny Body Bounce */
-.emotion-happy .facebot-body-wrap {
-  transform-origin: 110px 172px;
-  animation: facebotHappyBounce 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) infinite alternate;
+.coucou-blob.squash {
+  animation: coucou-squash 0.5s ease-out;
 }
 
-@keyframes facebotHappyBounce {
-  0% { transform: translateY(0px) scale(1, 1); }
-  100% { transform: translateY(-5px) scale(0.99, 1.02); }
+/* Blink is a separate SVG transform attribute on .coucou-eye-blink, written by
+   the animator around the eye's local (0,0). Mood scale lives on the face rig. */
+.coucou-arcs {
+  opacity: 0;
 }
 
-/* 3. Laugh Joyful Body Wiggle */
-.emotion-laugh .facebot-body-wrap {
-  transform-origin: 110px 112px;
-  animation: facebotLaughWiggle 0.32s ease-in-out infinite alternate;
+.coucou-face-rig.arc .coucou-eye-blink,
+.coucou-eyes.arc .coucou-eye-blink {
+  opacity: 0;
 }
 
-@keyframes facebotLaughWiggle {
-  0% { transform: rotate(-2.5deg) scale(1.02); }
-  100% { transform: rotate(2.5deg) scale(1.03); }
+.coucou-face-rig.arc .coucou-arcs,
+.coucou-eyes.arc .coucou-arcs {
+  opacity: 1;
 }
 
-/* 4. Surprised Jump */
-.emotion-surprised .facebot-body-wrap {
-  animation: facebotPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 1;
+.coucou-blush {
+  pointer-events: none;
 }
 
-@keyframes facebotPop {
-  0% { transform: scale(0.95); }
-  50% { transform: scale(1.05) translateY(-6px); }
-  100% { transform: scale(1); }
+.coucou-kb {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
 }
 
-/* 5. Sad Droop */
-.emotion-sad .facebot-body-wrap {
-  transform: translateY(3px) scale(0.99);
-  transition: transform 0.4s ease;
+.coucou-kb.on {
+  opacity: 1;
 }
 
-/* 6. Love Heart Gentle Pulse */
-.emotion-love .facebot-face .eye-left,
-.emotion-love .facebot-face .eye-right {
-  transform-origin: center;
-  animation: heartPulse 1.2s ease-in-out infinite;
+@keyframes coucou-shadow-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(0.85); opacity: 0.3; }
 }
 
-@keyframes heartPulse {
-  0% { transform: scale(1); }
-  30% { transform: scale(1.18); }
-  50% { transform: scale(1); }
-  70% { transform: scale(1.12); }
-  100% { transform: scale(1); }
+@keyframes coucou-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
-/* 7. Sleeping: Still Body & Low-FPS Calm Z's */
-.emotion-sleeping .facebot-body-wrap {
-  transform: translateY(1px);
+@keyframes coucou-squash {
+  0% { transform: scale(1, 1); }
+  30% { transform: scale(1.08, 0.9); }
+  60% { transform: scale(0.96, 1.06); }
+  100% { transform: scale(1, 1); }
 }
 
-.sleep-z-drift text {
-  animation: zDriftFloat 4.8s steps(12) infinite;
+/* Sleeping: calm the idle motion, keep the shape visible. */
+.sleeping .coucou-all,
+.emotion-sleepy .coucou-all {
+  animation-duration: 5.4s;
 }
 
-.sleep-z-drift text:nth-child(1) { animation-delay: 0s; }
-.sleep-z-drift text:nth-child(2) { animation-delay: 1.6s; }
-.sleep-z-drift text:nth-child(3) { animation-delay: 3.2s; }
-
-@keyframes zDriftFloat {
-  0% { opacity: 0.2; transform: translateY(0px) scale(0.85); }
-  50% { opacity: 0.95; }
-  100% { opacity: 0; transform: translateY(-18px) scale(1.15); }
+.sleeping .coucou-shadow,
+.emotion-sleepy .coucou-shadow {
+  animation-duration: 5.4s;
 }
-
-/* 8. Thinking Side-to-Side Scanning Eyes & Floating Bubble */
-.emotion-thinking .thinking-eye {
-  animation: eyeScan 2.4s ease-in-out infinite alternate;
-}
-
-@keyframes eyeScan {
-  0% { transform: translateX(0px); }
-  50% { transform: translateX(6px) translateY(2px); }
-  100% { transform: translateX(-4px) translateY(-1px); }
-}
-
-.emotion-thinking .thought-dots-bubble {
-  animation: thoughtBubbleFloat 2.2s ease-in-out infinite alternate;
-}
-
-@keyframes thoughtBubbleFloat {
-  0% { transform: translate(142px, 42px); }
-  100% { transform: translate(144px, 35px); }
-}
-
-/* 9. Focus Mode Calm Hover */
-.emotion-focus .facebot-body-wrap {
-  transform: translateY(1px);
-}
-
-/* 10. Reading & Talking Mouth (Streaming Chat) */
-.emotion-reading .reading-eye {
-  animation: readingScan 1.6s ease-in-out infinite alternate;
-}
-@keyframes readingScan {
-  0% { transform: translateX(-3px); }
-  100% { transform: translateX(3px); }
-}
-.emotion-reading .talking-mouth {
-  animation: talkingMouth 0.4s ease-in-out infinite alternate;
-}
-@keyframes talkingMouth {
-  0% { transform: scaleY(0.7); }
-  100% { transform: scaleY(1.3); }
-}
-

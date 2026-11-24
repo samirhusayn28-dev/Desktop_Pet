@@ -1,7 +1,7 @@
 {
   "name": "desktop-pet",
   "productName": "Pixie",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Pixie – Your adorable desktop companion",
   "main": "main/index.js",
   "scripts": {
@@ -12,7 +12,8 @@
     "preview:emotions": "electron facebot_preview.html",
     "verify": "electron scripts/verify_real_desktop_pet.js",
     "build:mac": "electron-builder --mac --x64",
-    "build:win": "electron-builder --win",
+    "build:win": "electron-builder --win --x64",
+    "build:all": "electron-builder --mac --x64 --win --x64",
     "build:linux": "electron-builder --linux",
     "dist": "electron-builder --mac --x64"
   },
@@ -29,9 +30,9 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "NSAppleEventsUsageDescription": "Desktop Pet needs Automation permissions to detect current browser tabs, media playback, and active applications for context awareness.",
-        "NSScreenCaptureUsageDescription": "Desktop Pet needs Screen Recording permissions to sense display brightness, full-screen apps, and active windows.",
-        "NSAccessibilityUsageDescription": "Desktop Pet needs Accessibility permissions to detect active window titles and system interactions."
+        "NSAppleEventsUsageDescription": "Pixie needs Automation permissions to detect current browser tabs, media playback, and active applications for context awareness.",
+        "NSScreenCaptureUsageDescription": "Pixie needs Screen Recording permissions to sense display brightness, full-screen apps, and active windows.",
+        "NSAccessibilityUsageDescription": "Pixie needs Accessibility permissions to animate while you type anywhere and to detect active window titles and system interactions."
       },
       "target": [
         {
@@ -85,7 +86,10 @@
       "artifactName": "Pixie-${version}-win-x64.exe"
     },
     "asarUnpack": [
-      "audio/**/*"
+      "audio/**/*",
+      "main/typing-helper",
+      "main/typing-helper.ps1",
+      "main/context-helper.ps1"
     ],
     "files": [
       "assets/**/*",

@@ -4,7 +4,7 @@
  */
 
 :root {
-  --accent: #FF7A2F;
+  --accent: #007aff;
   --theme-on-accent: #FFFFFF;
   --accent-contrast: #FFFFFF;
   --accent-glow: color-mix(in srgb, var(--accent) 75%, transparent);
@@ -12,7 +12,7 @@
   --accent-strong: color-mix(in srgb, var(--accent) 32%, transparent);
   --accent-light: color-mix(in srgb, var(--accent) 70%, white);
   --accent-border: color-mix(in srgb, var(--accent) 32%, transparent);
-  --accent-card-tint: color-mix(in srgb, var(--accent) 7%, #1B1B22);
+  --accent-card-tint: color-mix(in srgb, var(--accent) 7%, #2c2c2e);
 
   /* Legacy mappings */
   --theme-primary: var(--accent);
@@ -74,9 +74,9 @@
 }
 
 .theme-btn-secondary {
-  background: rgba(255, 255, 255, 0.07);
+  background: #3a3a3c;
   color: #FFFFFF;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid #48484a;
   font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 600;
@@ -93,7 +93,7 @@
 }
 
 .theme-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: #48484a;
   transform: translateY(-1px);
 }
 

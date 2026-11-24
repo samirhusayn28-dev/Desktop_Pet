@@ -44,6 +44,7 @@ class SecureStore {
 
     this.defaults = {
       isFirstRun: true,
+      themeMigrationVersion: 2,
       window: {
         petX: 200,
         petY: 200,
@@ -61,10 +62,10 @@ class SecureStore {
           autoUpdateCheck: true
         },
         behavior: {
-          idleSleepyMinutes: 2,
-          idleSleepingMinutes: 5,
-          soundsEnabled: false,
-          soundVolume: 50,
+          idleSleepyMinutes: 6,
+          idleSleepingMinutes: 8,
+          soundsEnabled: true,
+          soundVolume: 60,
           soundReminders: true,
           soundTimer: true,
           soundReactions: true,
@@ -72,32 +73,29 @@ class SecureStore {
           bubbleDuration: 5
         },
         reactions: {
-          brightness: true,
-          volume: true,
-          battery: true,
-          media: true,
-          highLoad: true,
-          network: true,
-          lateNight: true,
           welcomeStartup: true,
           goodbyeShutdown: true
         },
+        companion: {
+          dailyCheckin: true,
+          clipboardBuddy: true,
+          breakReminders: true,
+          wellnessNudges: true,
+          breathingEnabled: true
+        },
         appearance: {
           scale: 1.0,
-          width: 136,
-          height: 120,
-          roundness: 36,
+          width: 150,
+          height: 150,
+          roundness: 50,
           eyeSize: 1.0,
-          eyeSpacing: 44,
-          mouthWidth: 14,
-          depth: 80,
-          bodyColor: '#FFFFFF',
-          accentColor: '#FF7A2F',
-          glassesEnabled: false,
-          glassesShape: 'round',
-          glassesColor: '#181820',
-          eyesColor: '#181820',
-          mouthColor: '#181820',
+          eyeSpacing: 28,
+          mouthWidth: 10,
+          depth: 75,
+          bodyColor: '#17171B',
+          accentColor: '#007AFF',
+          eyesColor: '#FF8A1F',
+          mouthColor: '#111111',
           panelTransparency: 0.30,
           panelBlur: 24,
           theme: 'default'
@@ -126,7 +124,11 @@ class SecureStore {
         },
         privacy: {
           contextAwareness: true,
+          allowClipboard: true,
+          clipboardWatch: true,
           allowScreenshots: false,
+          neverSend: '',
+          redactSecrets: true,
           blocklist: [
             '1password',
             'bitwarden',
@@ -147,13 +149,26 @@ class SecureStore {
       notes: [],
       reminders: [],
       clipboardHistory: [],
-      chatHistory: [
-        { role: 'assistant', content: "Hello! I'm your desktop coding companion. Ask me anything, or let me know what you're working on!", timestamp: Date.now() }
-      ]
+      chatHistory: []
     };
 
     this.lastLoadedMtime = 0;
     this.data = this.loadData();
+  }
+
+  normalizeThemeData(data = this.data, force = false) {
+    const target = data || this.data;
+    if (!target || !target.settings) return;
+    const current = String(target.settings?.appearance?.accentColor || '').toLowerCase();
+    const legacyAccents = ['#e8a84a', '#ff7a1a', '#ff7a2f'];
+    const version = Number(target.themeMigrationVersion || 0);
+    if (force || version < 2) {
+      if (legacyAccents.includes(current) && target.settings.appearance) {
+        target.settings.appearance.accentColor = '#007AFF';
+      }
+      target.themeMigrationVersion = 2;
+      if (target === this.data) this.saveData();
+    }
   }
 
   loadData() {
@@ -163,7 +178,9 @@ class SecureStore {
         const fileContent = fs.readFileSync(this.filePath, 'utf8');
         const parsed = JSON.parse(fileContent);
         this.lastLoadedMtime = stats.mtimeMs;
-        return this.deepMerge(this.defaults, parsed);
+        const data = this.deepMerge(this.defaults, parsed);
+        this.normalizeThemeData(data, false);
+        return data;
       }
     } catch (err) {
       console.warn('Failed to load store, using defaults:', err);
@@ -223,8 +240,58 @@ class SecureStore {
     this.saveData();
   }
 
+  // Whole-store snapshot support for full backup/restore.
+  getAllData() {
+    this.reloadIfChanged();
+    return JSON.parse(JSON.stringify(this.data));
+  }
+
+  replaceAllData(data) {
+    const incoming = (data && typeof data === 'object' && !Array.isArray(data)) ? data : {};
+    const next = this.deepMerge(this.defaults, JSON.parse(JSON.stringify(incoming)));
+    this.normalizeThemeData(next, true);
+    this.data = next;
+    this.saveData();
+    return this.getAllData();
+  }
+
+  getProviderNames() {
+    const models = this.get('settings.ai.models') || {};
+    return Object.keys(models || {});
+  }
+
+  getAllProviderNames() {
+    const providers = new Set(this.getProviderNames());
+    try {
+      if (fs.existsSync(this.secureKeysPath)) {
+        Object.keys(JSON.parse(fs.readFileSync(this.secureKeysPath, 'utf8')) || {})
+          .forEach((provider) => providers.add(provider));
+      }
+    } catch (e) {}
+    for (const path of ['settings.ai.apiKeys', 'settings.ai.keys']) {
+      const stored = this.get(path) || {};
+      Object.keys(stored || {}).forEach((provider) => providers.add(provider));
+    }
+    return Array.from(providers).filter(Boolean);
+  }
+
+  getAllApiKeys() {
+    const keys = {};
+    for (const provider of this.getAllProviderNames()) {
+      const value = this.getApiKey(provider);
+      if (value) keys[provider] = value;
+    }
+    return keys;
+  }
+
   // Secure API Key Storage using safeStorage
   getApiKey(provider) {
+    // A plaintext fallback is written beside every stored key. Prefer it so a
+    // locked or unavailable OS keychain never blocks ordinary reads (including
+    // safety-backup creation during import).
+    const plain = this.get(`settings.ai.apiKeys.${provider}`) || this.get(`settings.ai.keys.${provider}`);
+    if (typeof plain === 'string' && plain) return plain;
+
     try {
       if (fs.existsSync(this.secureKeysPath)) {
         const creds = JSON.parse(fs.readFileSync(this.secureKeysPath, 'utf8'));
@@ -244,8 +311,7 @@ class SecureStore {
     } catch (e) {
       console.warn(`[SecureStore] Failed to decrypt key for ${provider}:`, e.message);
     }
-    // Fallback to store settings
-    return this.get(`settings.ai.apiKeys.${provider}`) || this.get(`settings.ai.keys.${provider}`) || '';
+    return '';
   }
 
   setApiKey(provider, plainKey) {
@@ -284,6 +350,30 @@ class SecureStore {
       }
       return false;
     }
+  }
+
+  /**
+   * Full-backup restore path: clear every previously encrypted credential
+   * without touching the OS keychain, then write the restored plain values.
+   * Only providers with a real key are encrypted later by the caller, so a
+   * locked keychain can never hang an import that has no keys to restore.
+   */
+  restoreApiKeys(apiKeys = {}) {
+    const keys = (apiKeys && typeof apiKeys === 'object' && !Array.isArray(apiKeys)) ? apiKeys : {};
+    try {
+      fs.mkdirSync(path.dirname(this.secureKeysPath), { recursive: true });
+      fs.writeFileSync(this.secureKeysPath, '{}', 'utf8');
+    } catch (e) {
+      console.warn('[SecureStore] Failed to clear stored credentials:', e.message);
+    }
+
+    const providers = new Set([...this.getAllProviderNames(), ...Object.keys(keys)]);
+    for (const provider of providers) {
+      const key = typeof keys[provider] === 'string' ? keys[provider] : String(keys[provider] || '');
+      this.set(`settings.ai.apiKeys.${provider}`, key);
+      this.set(`settings.ai.keys.${provider}`, key);
+    }
+    return true;
   }
 
   hasApiKey(provider) {

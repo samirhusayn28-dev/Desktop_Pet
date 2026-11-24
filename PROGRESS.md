@@ -1,6 +1,25 @@
-# Desktop Pet — Fix Progress Tracker
+# Pixie — Fix Progress Tracker
 
-Branch: `fix-optimize-solid-ui`  
+## Current release: v1.2.0 — Black Matte UI & macOS/Windows parity
+
+- [x] Solid black matte panel, pet bubble, quick menu, standalone bubble, and welcome surface
+- [x] Removed the active Panel alpha and Panel blur controls; no runtime blur/glass variables remain
+- [x] macOS and Windows share panel sections, reactions, sounds, reminders, notes, clipboard history, backup/import, and privacy rules
+- [x] Windows low-level typing hook and foreground-context helper added
+- [x] Windows Settings deep links and macOS always-on-top restoration added
+- [x] Reminders moved into their own visible section; notification clicks route to Reminders on both platforms
+- [x] Panel reactions made immediate (pre-load reaction, forced bubbles, queue unblock, forced emotion override)
+- [x] Short random idle activities added with clamped hops and one chained timer
+- [x] OS-wide typing repaired (bounded tap retry, Settings permission request, status errors, Windows message pump)
+- [x] Version set to 1.2.0; macOS DMG/ZIP and Windows x64 NSIS installers rebuilt
+- [ ] Runtime verification on a Windows machine (installer builds on macOS, but cannot be executed there)
+- [ ] Signed / notarized installers (requires Apple Developer and Windows code-signing credentials)
+
+The checklists below are historical records from earlier versions and may reference the old product name "Desktop Pet" or older version numbers.
+
+---
+
+Historical branch: `fix-optimize-solid-ui`  
 Resume any time: check boxes below, pick up from first unchecked item.
 
 ---
@@ -110,12 +129,10 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] 11 new emotions using eye/mouth vector morphs + static SVG overlays (transform/opacity only, max 3s): yawn, dizzy, blush, excited, scared, annoyed, bored, proud, worried, grateful, goodbye
 - [x] Rate limits and individual toggles in Settings -> Reactions; test via triggers and hidden `--emotion=<name>` CLI flag
 
-## Item G1 — GLASSES FOR THE PET
-- [x] Static black round-frame glasses SVG (#111111, transparent fill) centered on eyes, derived from pet size/eye size/eye spacing, clamped to body
-- [x] Part of face layer (tilts & breathes with face, doesn't follow cursor); eye-follow clamped inside lenses
-- [x] Layer order: body -> blush -> eyes/mouth -> glasses frame -> overlays/bubbles; all emotions & blink clearly visible
-- [x] Setting `glassesEnabled` (default OFF), toggle in Welcome screen, Settings -> Appearance, reset, export/import
-- [x] Re-measure idle with glasses ON (GPU helper < 3% & < 10 wake-ups/s, renderer < 1%, main < 1%)
+## Item G1 — NO GLASSES ON THE PET
+- [x] Pixie renders without any glasses overlay; code-driven Coucou-compatible SVG face with black (#111111) eyes and mouth
+- [x] No glasses settings, toggles, selectors or IPC messages remain in the pet, panel or welcome screen
+- [x] All emotions and blinking remain visible on the bare face; idle budgets unchanged (GPU helper < 3% & < 10 wake-ups/s, renderer < 1%, main < 1%)
 
 ## Item I1 — IMPORT / EXPORT SETTINGS AND NOTES
 - [x] Settings -> Data: Export JSON with version via native save dialog (API keys excluded)
@@ -140,7 +157,7 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Test via `--simulate-boot`, `--simulate-shutdown`, powerMonitor events, `pmset displaysleepnow`
 
 ## Item R1 — FINAL RELEASE
-- [x] All gates passed: all items in PROGRESS.md verified on packaged app, idle numbers met with glasses OFF & ON, --selftest passes, secrets scan clean, README updated, working tree clean
+- [x] All gates passed: all items in PROGRESS.md verified on packaged app, idle numbers met with no glasses, --selftest passes, secrets scan clean, README updated, working tree clean
 - [x] Version 1.0.1 in package.json & CHANGELOG, asset names `Desktop-Pet-${version}-mac-x64.dmg` & `Desktop-Pet-${version}-win-x64.exe`
 - [x] Release workflow with smoke test + build jobs, merge to main, tag v1.0.1, push and monitor CI
 
@@ -153,10 +170,10 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] Defense in depth: renderer `pointer-events: none` on html/body/container and `auto` ONLY on pet body shape
 - [x] Main process DIP rounded-rect hit-test with 2px hysteresis and `setIgnoreMouseEvents(!inside, { forward: true })`
 - [x] Drive hover/click/drag strictly by `insidePet` state; panel toggles only if mousedown and mouseup are inside
-- [x] Test via hook: 1px inside, 1px/5px/20px outside across sizes, pill/square roundness, glasses on, bubbles visible
+- [x] Test via hook: 1px inside, 1px/5px/20px outside across sizes, pill/square roundness, no glasses, bubbles visible
 
 ## Item E2 — EMOTIONS DO NOT WORK
-- [x] Add `--emotion=<name>` hook; test each of 25 emotions via e2e screenshot inspection (glasses OFF and ON)
+- [x] Add `--emotion=<name>` hook; test each of 25 emotions via e2e screenshot inspection (no glasses, black mouth)
 - [x] Fix triggers and define strict priority order: error/AI > user interaction > reminder > system reactions > idle
 - [x] Ensure all temporary emotions return to correct baseline (neutral / sleepy / sleeping)
 - [x] Test event injection via hook: volume, brightness, battery, media, network, headphones, high CPU, etc.
@@ -178,11 +195,11 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [ ] Run `--selftest` and e2e test suite against unpacked app; upload logs/screenshots as artifacts
 - [ ] Add `--selftest --idle-metrics 60` reporting CPU & memory for Windows & macOS CI logs
 
-## Item SND1 — SOUND ON/OFF OPTION (SOUNDS OFF BY DEFAULT)
-- [x] Unify all existing sound settings/locations under `soundsEnabled` (default false), remove old duplicate toggles
-- [x] One-time migration for existing installs to OFF + small notification bubble on first start
-- [x] Settings -> Behavior -> Sounds: master toggle, volume slider (0-100, default 50) + "Test sound", sub-toggles (Reminders, Timer & Pomodoro, Pet reactions) with reset icons, export/import validation
-- [x] First-launch welcome screen: Sounds toggle (default OFF) synced with Settings
+## Item SND1 — SOUND ON/OFF OPTION (SOUNDS ON BY DEFAULT)
+- [x] Unify all existing sound settings/locations under `soundsEnabled` (default true), remove old duplicate toggles
+- [x] One-time migration for existing installs to ON + small notification bubble on first start
+- [x] Settings -> Behavior -> Sounds: master toggle, volume slider (0-100, default 60) + "Test sound", sub-toggles (Reminders, Timer & Pomodoro, Pet reactions) with reset icons, export/import validation
+- [x] First-launch welcome screen: Sounds toggle (default ON) synced with Settings
 - [x] When OFF: ZERO audio element/AudioContext, no files loaded, no external process spawned, silent bubbles/reactions, instant stop on toggle OFF
 - [x] When ON: play through pet window renderer, lazy Audio element creation, bundled audio files (<50KB), DND mute, release audio resources
 - [x] Comprehensive E2E tests on packaged app with Playwright & `--test-hooks` (ZERO plays with sounds OFF, categories, sub-toggles, volume scale, DND, persistence, reset, export/import, migration)
@@ -208,7 +225,7 @@ Resume any time: check boxes below, pick up from first unchecked item.
   - [x] squint: brightness >= 95% (hysteresis to 90%)
   - [x] dull: brightness <= 25% (hysteresis to 30%)
   - [x] vibing: audio playing 5+ seconds system-wide (pmset -g assertions on mac / Core Audio helper, SMTC/peak on win), stopped 5s
-- [x] Rendering: verify SVG shape/CSS exists and differs from neutral with glasses ON & OFF
+- [x] Rendering: verify SVG shape/CSS exists and differs from neutral with no glasses and a black (#111111) mouth
 - [x] Real UI action tests for all 13 emotions with Playwright on packaged app, output table, re-run full emotion regression
 
 ## Item T1 — ALL TIMERS MUST BE CUSTOMIZABLE
@@ -229,7 +246,7 @@ Resume any time: check boxes below, pick up from first unchecked item.
 - [x] CSS: `max-width: 280px; overflow-wrap: anywhere; word-break: break-word; line-clamp: 4` with ellipsis
 - [x] Clamped affordance: hover/click to see full text in panel
 - [x] Dynamic sizing from MEASURED rendered height (render, measure, setBounds); clamp to display work area, flip to side with room; hit-test pet + bubble
-- [x] Tests: long reminder title, 300-char AI error, long word without spaces, emoji, RTL text, screen edges, max pet size, glasses ON
+- [x] Tests: long reminder title, 300-char AI error, long word without spaces, emoji, RTL text, screen edges, max pet size, no glasses
 
 ## Item V1 — VERSION SHOWN IN THE APP = RELEASE VERSION
 - [x] Single source of truth: `package.json` "version" across git tag, file names, `app.getVersion()`, Settings -> About, tray tooltip, update checker

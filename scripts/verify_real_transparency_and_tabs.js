@@ -143,16 +143,15 @@ app.whenReady().then(async () => {
           <p style="color:#7C3AED; font-weight:bold;">import { DesktopPet } from './companion';</p>
           <p style="color:#3B82F6;">const pet = new DesktopPet({</p>
           <p style="color:#10B981;">  name: 'Bolt',</p>
-          <p style="color:#F59E0B;">  theme: 'dark-glass',</p>
-          <p style="color:#EC4899;">  transparency: 0.50,</p>
-          <p style="color:#6366F1;">  blur: '32px'</p>
+          <p style="color:#F59E0B;">  theme: 'matte-ios',</p>
+          <p style="color:#EC4899;">  surface: 'solid',</p>
+          <p style="color:#6366F1;">  blur: 0</p>
           <p style="color:#3B82F6;">});</p>
           <br>
-          <p style="color:#E2E8F0;">// Notice how this text, colorful gradients and</p>
-          <p style="color:#E2E8F0;">// background shapes are clearly blurred through</p>
-          <p style="color:#E2E8F0;">// the glassmorphic panel overlay!</p>
+          <p style="color:#E2E8F0;">// The colorful gradients and wallpaper shapes stay</p>
+          <p style="color:#E2E8F0;">// crisp behind the fully opaque matte panel.</p>
           <br>
-          <div style="width:120px; height:120px; background:radial-gradient(circle, #FF7A2F, #EF4444); border-radius:50%; filter:blur(10px);"></div>
+          <div style="width:120px; height:120px; background:radial-gradient(circle at 35% 35%, #FF7A2F 0%, #EF4444 55%, rgba(239, 68, 68, 0) 75%); border-radius:50%;"></div>
         </div>
 
         <div class="panel-mount-area">

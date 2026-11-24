@@ -12,7 +12,7 @@ const screenshotsDir = path.join(__dirname, '../screenshots');
 if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir, { recursive: true });
 
 const store = require('../main/secure-store');
-const systemSense = require('../main/system-sense');
+const systemSense = ({start(){},stop(){},setPetWindow(){},setUserName(){},getSensorStatus:async()=>[],checkAllSensors:async()=>{},injectSensorReading:async()=>({success:false}),state:{},canReact:()=>false});
 const contextSensor = require('../main/context-sensor');
 const aiService = require('../main/ai-service');
 

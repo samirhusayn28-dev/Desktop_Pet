@@ -8,7 +8,7 @@
  * 4. Emoji -> rendered cleanly without overflow.
  * 5. RTL text (Arabic/Urdu) -> rendered cleanly without overflow.
  * 6. Screen edges -> near top flips below, clamped to work area.
- * 7. Max pet size (scale 3.0) with glasses ON.
+ * 7. Max pet size (scale 3.0) with no glasses and a black mouth.
  * 8. Hit-test pet + bubble -> bubble area is interactive.
  */
 
@@ -228,31 +228,37 @@ function sleep(ms) {
     await sleep(600);
 
     // -------------------------------------------------------------
-    // TEST 7: Max Pet Size (Scale 3.0) with Glasses ON
+    // TEST 7: Max Pet Size (Scale 3.0) with no glasses
     // -------------------------------------------------------------
-    console.log('\n--- Test 7: Max Pet Size (Scale 3.0) with Glasses ON ---');
+    console.log('\n--- Test 7: Max Pet Size (Scale 3.0) with No Glasses ---');
     await petWin.evaluate(() => {
       const { ipcRenderer } = require('electron');
-      ipcRenderer.send('pet:update-glasses', true);
-      ipcRenderer.send('pet:apply-appearance', { scale: 3.0, glassesEnabled: true });
+      ipcRenderer.send('pet:apply-appearance', { scale: 3.0 });
     });
     await sleep(700);
 
+    const render7 = await petWin.evaluate(() => {
+      const svg = document.querySelector('.facebot-svg');
+      const hasGlasses = !!document.getElementById('facebot-glasses') || !!svg?.querySelector('[class*="glasses"]');
+      const mouth = svg?.querySelector('.coucou-mouth');
+      const mouthColor = mouth ? (mouth.getAttribute('stroke') || '').toLowerCase() : null;
+      return { hasSvg: !!svg, hasGlasses, mouthColor };
+    });
+
     const m7 = await triggerBubbleAndMeasure({
       badge: 'BIG PET',
-      text: 'Even at 3x scale with stylish glasses, the speech bubble fits comfortably!',
+      text: 'Even at 3x scale, the speech bubble fits comfortably!',
       duration: 10000
     });
 
     console.log(`Max scale bubble: width=${m7.width}px, height=${m7.height}px`);
-    const t7Passed = m7.width <= 280;
-    record('Max Scale 3.0 & Glasses ON', t7Passed, `w=${m7.width}px, h=${m7.height}px`);
+    const t7Passed = m7.width <= 280 && render7.hasSvg && !render7.hasGlasses && render7.mouthColor === '#111111';
+    record('Max Scale 3.0 & No Glasses (black mouth)', t7Passed, `w=${m7.width}px, h=${m7.height}px`);
 
     // Restore standard scale
     await petWin.evaluate(() => {
       const { ipcRenderer } = require('electron');
-      ipcRenderer.send('pet:update-glasses', false);
-      ipcRenderer.send('pet:apply-appearance', { scale: 1.0, glassesEnabled: false });
+      ipcRenderer.send('pet:apply-appearance', { scale: 1.0 });
     });
     await sleep(600);
 

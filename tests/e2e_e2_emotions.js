@@ -2,7 +2,7 @@
  * Desktop Pet — Item E2 E2E Emotions Verification Suite
  * Tests:
  * 1. CLI flag --emotion=<name> and rendering of all emotions
- * 2. Visual rendering of all 32 emotions with glasses OFF and glasses ON
+ * 2. Visual rendering of all 32 emotions with no glasses and a black (#111111) mouth
  * 3. Strict priority-based emotion state machine (ERROR_AI 5 > USER_INTERACTION 4 > REMINDER 3 > SYSTEM_REACTION 2 > IDLE_BASELINE 1)
  * 4. Return to baseline (neutral / sleepy / sleeping) after timeout
  * 5. Event injection: volume, brightness, battery, media, network, headphones, high CPU, idle
@@ -84,11 +84,11 @@ async function runTests() {
     const petWin = await app.firstWindow();
     await petWin.waitForTimeout(1000);
 
-    // Verify all 32 emotions render correctly with glasses OFF
-    console.log('\n--- Phase 3: Visual rendering of all 32 emotions (Glasses OFF) ---');
+    // Verify all 32 emotions render correctly with no glasses
+    console.log('\n--- Phase 3: Visual rendering of all 32 emotions (No Glasses) ---');
     await petWin.evaluate(async () => {
       const { ipcRenderer } = require('electron');
-      await ipcRenderer.invoke('test:set-appearance', { glassesEnabled: false, scale: 1.0 });
+      await ipcRenderer.invoke('test:set-appearance', { scale: 1.0 });
     });
 
     for (const emo of ALL_EMOTIONS) {
@@ -105,51 +105,19 @@ async function runTests() {
         const svg = document.querySelector('.facebot-svg');
         const hasSvgClass = svg ? svg.classList.contains(`emotion-${emotionName}`) : false;
         const svgAttr = svg ? svg.getAttribute('data-emotion') : null;
-        const hasGlasses = !!document.getElementById('facebot-glasses');
-        return { state, hasSvgClass, svgAttr, hasGlasses };
+        const hasGlasses = !!document.getElementById('facebot-glasses') || !!svg?.querySelector('[class*="glasses"]');
+        const mouth = svg?.querySelector('.coucou-mouth');
+        const mouthColor = mouth ? (mouth.getAttribute('stroke') || '').toLowerCase() : null;
+        return { state, hasSvgClass, svgAttr, hasGlasses, mouthColor };
       }, emo);
 
       assert(
-        status.state?.currentEmotion === emo && status.svgAttr === emo && !status.hasGlasses,
-        `Emotion '${emo}' rendered without glasses (SVG class & data-emotion verified)`
+        status.state?.currentEmotion === emo && status.svgAttr === emo && !status.hasGlasses && status.mouthColor === '#111111',
+        `Emotion '${emo}' rendered with no glasses and a black (#111111) mouth (SVG class & data-emotion verified)`
       );
 
       // Save screenshot to temp directory
-      const screenshotPath = path.join(TEMP_SCREENSHOT_DIR, `${emo}_glasses_off.png`);
-      await petWin.screenshot({ path: screenshotPath });
-    }
-
-    // Verify all 32 emotions render correctly with glasses ON
-    console.log('\n--- Phase 4: Visual rendering of all 32 emotions (Glasses ON) ---');
-    await petWin.evaluate(async () => {
-      const { ipcRenderer } = require('electron');
-      await ipcRenderer.invoke('test:set-appearance', { glassesEnabled: true, scale: 1.0 });
-    });
-
-    for (const emo of ALL_EMOTIONS) {
-      await petWin.evaluate(async (emotionName) => {
-        const { ipcRenderer } = require('electron');
-        await ipcRenderer.invoke('test:force-emotion', emotionName, 10000, 5);
-      }, emo);
-
-      await petWin.waitForTimeout(120);
-
-      const status = await petWin.evaluate(async (emotionName) => {
-        const { ipcRenderer } = require('electron');
-        const state = await ipcRenderer.invoke('test:get-pet-emotion');
-        const svg = document.querySelector('.facebot-svg');
-        const hasSvgClass = svg ? svg.classList.contains(`emotion-${emotionName}`) : false;
-        const svgAttr = svg ? svg.getAttribute('data-emotion') : null;
-        const hasGlasses = !!document.getElementById('facebot-glasses');
-        return { state, hasSvgClass, svgAttr, hasGlasses };
-      }, emo);
-
-      assert(
-        status.state?.currentEmotion === emo && status.svgAttr === emo && status.hasGlasses,
-        `Emotion '${emo}' rendered WITH glasses (Glasses overlay #facebot-glasses active)`
-      );
-
-      const screenshotPath = path.join(TEMP_SCREENSHOT_DIR, `${emo}_glasses_on.png`);
+      const screenshotPath = path.join(TEMP_SCREENSHOT_DIR, `${emo}_no_glasses.png`);
       await petWin.screenshot({ path: screenshotPath });
     }
 

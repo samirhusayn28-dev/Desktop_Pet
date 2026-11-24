@@ -1,6 +1,7 @@
-const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, powerMonitor, systemPreferences, desktopCapturer, shell, dialog } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, powerMonitor, systemPreferences, desktopCapturer, shell, dialog, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 let _si = null;
 function getSi() {
@@ -12,8 +13,8 @@ const store = require('./secure-store');
 const aiService = require('./ai-service');
 const bubble = require('./bubble-window');
 const scheduler = require('./scheduler');
-const systemSense = require('./system-sense');
 const contextSensor = require('./context-sensor');
+const companion = require('./companion-features');
 const UpdateChecker = require('./update-checker');
 const BootLifecycle = require('./boot-lifecycle');
 const timerManager = require('./timer-manager');
@@ -24,10 +25,10 @@ app.commandLine.appendSwitch('js-flags', '--max-old-space-size=128');
 
 // Global Error Handlers
 process.on('uncaughtException', (err) => {
-  console.error('[Desktop Pet] Uncaught Exception:', err);
+  console.error('[Pixie] Uncaught Exception:', err);
 });
 process.on('unhandledRejection', (reason) => {
-  console.error('[Desktop Pet] Unhandled Rejection:', reason);
+  console.error('[Pixie] Unhandled Rejection:', reason);
 });
 
 let petWindow = null;
@@ -43,10 +44,24 @@ let petIdleState = 'neutral';
 let updateChecker = null;
 let bootLifecycle = null;
 let isPomodoroFocusActive = false;
+let typingHelper = null;
+let typingHelperRetryTimer = null;
+let typingHelperRetryAttempts = 0;
+let typingHelperErrorLogged = false;
+let typingHelperTapFailed = false;
+let typingHelperReady = false;
+let typingHelperPromptAttempted = false;
+let typingHelperLastError = '';
+let typingHelperLastPulseAt = 0;
+let lastTypingPulseAt = 0;
+
+let clipboardWatchTimer = null;
+let lastWatchedClipboardText = '';
+let lastClipboardCopiedAt = 0;
 
 // App naming & branding
-const defaultPetName = store.get('settings.general.petName') || 'Desktop Pet';
-app.setName(defaultPetName);
+const defaultPetName = store.get('settings.general.petName') || 'Pixie';
+app.setName('Pixie');
 
 if (process.platform === 'win32') {
   app.setAppUserModelId('com.antigravity.desktoppet');
@@ -57,7 +72,7 @@ const isCliTestRun = process.argv.some(arg => arg.startsWith('--test-') || arg =
 if (!isCliTestRun) {
   const gotTheLock = app.requestSingleInstanceLock();
   if (!gotTheLock) {
-    console.log('[Desktop Pet] Another instance is already running.');
+    console.log('[Pixie] Another instance is already running.');
     app.quit();
   } else {
     app.on('second-instance', () => {
@@ -79,7 +94,7 @@ function getAppIconPath() {
 
 function createTray() {
   try {
-    const petName = store.get('settings.general.petName') || 'Pet';
+    const petName = store.get('settings.general.petName') || 'Pixie';
     const iconPath = path.join(__dirname, '..', 'assets', 'tray-icon.png');
     let icon = null;
     if (fs.existsSync(iconPath)) {
@@ -141,7 +156,7 @@ function createTray() {
       togglePanel();
     });
   } catch (err) {
-    console.warn('[Desktop Pet] Could not create system tray icon:', err);
+    console.warn('[Pixie] Could not create system tray icon:', err);
   }
 }
 
@@ -243,7 +258,7 @@ function createPetWindow() {
 
   // Link components to pet window
   bubble.setPetWindow(petWindow);
-  systemSense.setPetWindow(petWindow);
+  companion.setWindows(petWindow, panelWindow);
 
   // Start throttled cursor tracking & idle detection
   startThrottledCursorTracking();
@@ -266,18 +281,23 @@ let activeBubbleMetrics = null;
 function getPetBodyRect(winW, winH) {
   const appConfig = store.get('settings.appearance') || {};
   const scale = appConfig.scale || 1.0;
-  const cfgW = Math.max(60, Math.min(200, appConfig.width !== undefined ? appConfig.width : 136));
-  const cfgH = Math.max(60, Math.min(200, appConfig.height !== undefined ? appConfig.height : 120));
-  const roundness = appConfig.roundness !== undefined ? appConfig.roundness : 36;
+  // Pixie body geometry from the code guide viewBox (324x182), fitted into 220x220.
+  const cfgW = Math.max(60, Math.min(200, appConfig.width !== undefined ? appConfig.width : 132));
+  const cfgH = Math.max(60, Math.min(200, appConfig.height !== undefined ? appConfig.height : 90));
+  const roundness = appConfig.roundness !== undefined ? appConfig.roundness : 50;
 
   const size = Math.round(180 * scale);
   const k = size / 220; // SVG viewBox to screen scale factor
+  const fit = 220 / 324;
+  const fitY = (220 - 182 * fit) / 2;
 
-  const cx = 110;
-  const cy = 110;
-  const vx = cx - cfgW / 2;
-  const vy = cy - cfgH / 2;
-  const maxR = Math.min(cfgW, cfgH) / 2;
+  const bodyCenterX = 176 * fit;
+  const bodyCenterY = 113 * fit + fitY;
+  const guideBodyW = cfgW * fit;
+  const guideBodyH = cfgH * fit;
+  const vx = bodyCenterX - guideBodyW / 2;
+  const vy = bodyCenterY - guideBodyH / 2;
+  const maxR = Math.min(guideBodyW, guideBodyH) / 2;
   const vrx = Math.max(0, Math.min(maxR, maxR * (roundness / 50)));
 
   // SVG position inside window:
@@ -288,8 +308,8 @@ function getPetBodyRect(winW, winH) {
   // Real pet body rounded rect in window coordinates:
   const bodyX = svgX + vx * k;
   const bodyY = svgY + vy * k;
-  const bodyW = cfgW * k;
-  const bodyH = cfgH * k;
+  const bodyW = guideBodyW * k;
+  const bodyH = guideBodyH * k;
   const bodyR = vrx * k;
 
   return { bodyX, bodyY, bodyW, bodyH, bodyR, size, k, cfgW, cfgH, roundness, scale };
@@ -450,9 +470,10 @@ function stopCursorTracking() {
 /**
  * Event-Driven Idle Monitoring using Electron powerMonitor.getSystemIdleTime
  * Triggers:
- * - Idle >= 2 min -> sleepy
- * - Idle >= 5 min -> sleeping
- * - Any activity -> wakes up (surprised -> neutral)
+ * - Idle >= 3 min -> random boredom-relief activities (hops, reactions, roaming)
+ * - Idle >= sleepySec (default 6 min) -> sleepy/tired
+ * - Idle >= sleepySec + 30s -> sleeping
+ * - Any activity -> stops play and wakes up (surprised -> neutral)
  */
 function startIdleMonitoring() {
   if (idlePollInterval) clearInterval(idlePollInterval);
@@ -462,8 +483,10 @@ function startIdleMonitoring() {
 
     try {
       const idleSec = powerMonitor.getSystemIdleTime();
-      const sleepySec = (store.get('settings.behavior.idleSleepyMinutes') || 2) * 60;
-      const sleepingSec = (store.get('settings.behavior.idleSleepingMinutes') || 5) * 60;
+      const playSec = 180; // 3 minutes of inactivity before random play starts
+      const sleepySec = Math.max(240, (store.get('settings.behavior.idleSleepyMinutes') || 6) * 60);
+      // Sleep follows shortly after sleepy/tired, matching "after a few seconds he sleeps".
+      const sleepingSec = sleepySec + 30;
 
       if (timerManager.isFocusActive() || isPomodoroFocusActive) {
         // Pet does not fall asleep during Pomodoro focus
@@ -473,28 +496,29 @@ function startIdleMonitoring() {
       if (idleSec >= sleepingSec) {
         if (petIdleState !== 'sleeping') {
           petIdleState = 'sleeping';
-          systemSense.setSleeping(true);
           stopCursorTracking();
+          petWindow.webContents.send('pet:idle-stop');
           petWindow.webContents.send('pet:set-state', { state: 'sleeping' });
         }
       } else if (idleSec >= sleepySec) {
         if (petIdleState !== 'sleepy' && petIdleState !== 'sleeping') {
           petIdleState = 'sleepy';
+          petWindow.webContents.send('pet:idle-stop');
           petWindow.webContents.send('pet:set-state', { state: 'sleepy' });
         }
-      } else if (idleSec >= 60) {
-        // Bored at 1 min idle
-        if (petIdleState !== 'bored' && petIdleState !== 'sleepy' && petIdleState !== 'sleeping') {
-          petIdleState = 'bored';
-          petWindow.webContents.send('pet:set-state', { state: 'bored' });
+      } else if (idleSec >= playSec) {
+        // After 3+ minutes inactive, Pixie plays around to cure boredom.
+        if (petIdleState !== 'playing') {
+          petIdleState = 'playing';
+          petWindow.webContents.send('pet:idle-play');
         }
       } else {
         // User is active
-        if (petIdleState === 'sleeping' || petIdleState === 'sleepy' || petIdleState === 'bored') {
+        if (petIdleState === 'sleeping' || petIdleState === 'sleepy' || petIdleState === 'playing') {
           const wasSleepingOrSleepy = (petIdleState === 'sleeping' || petIdleState === 'sleepy');
           petIdleState = 'neutral';
-          systemSense.setSleeping(false);
           startThrottledCursorTracking();
+          petWindow.webContents.send('pet:idle-stop');
           if (wasSleepingOrSleepy) {
             petWindow.webContents.send('pet:set-state', { state: 'surprised', duration: 450 });
             setTimeout(() => {
@@ -510,37 +534,37 @@ function startIdleMonitoring() {
     } catch (e) {}
   }, 3000);
 
-  // Pause animations & sensors when screen is locked or system is suspended
+  // Pause animations when screen is locked or system is suspended
   try {
     powerMonitor.on('lock-screen', () => {
       petIdleState = 'sleeping';
-      systemSense.setSleeping(true);
       stopCursorTracking();
       if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:idle-stop');
         petWindow.webContents.send('pet:set-state', { state: 'sleeping' });
       }
     });
     powerMonitor.on('suspend', () => {
       petIdleState = 'sleeping';
-      systemSense.setSleeping(true);
       stopCursorTracking();
       if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:idle-stop');
         petWindow.webContents.send('pet:set-state', { state: 'sleeping' });
       }
     });
     powerMonitor.on('unlock-screen', () => {
       petIdleState = 'neutral';
-      systemSense.setSleeping(false);
       startThrottledCursorTracking();
       if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:idle-stop');
         petWindow.webContents.send('pet:set-state', { state: 'neutral' });
       }
     });
     powerMonitor.on('resume', () => {
       petIdleState = 'neutral';
-      systemSense.setSleeping(false);
       startThrottledCursorTracking();
       if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:idle-stop');
         petWindow.webContents.send('pet:set-state', { state: 'neutral' });
       }
     });
@@ -568,11 +592,22 @@ function createPanelWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const workArea = primaryDisplay.workArea; // { x, y, width, height }
   
-  const savedW = store.get('window.panelWidth') || 520;
-  const savedH = store.get('window.panelHeight') || 680;
+  // Keep the panel genuinely compact. Older saved bounds are capped so an
+  // existing install does not reopen at the previous oversized 620x720 box.
+  const PANEL_MIN_W = 360;
+  const PANEL_MIN_H = 440;
+  const PANEL_DEFAULT_W = 440;
+  const PANEL_DEFAULT_H = 540;
+  const PANEL_MAX_RESTORE_W = 480;
+  const PANEL_MAX_RESTORE_H = 600;
 
-  const width = Math.min(Math.max(420, savedW), workArea.width - 32);
-  const height = Math.min(Math.max(560, savedH), workArea.height - 32);
+  const savedW = Math.min(store.get('window.panelWidth') || PANEL_DEFAULT_W, PANEL_MAX_RESTORE_W);
+  const savedH = Math.min(store.get('window.panelHeight') || PANEL_DEFAULT_H, PANEL_MAX_RESTORE_H);
+  const availableW = Math.max(PANEL_MIN_W, workArea.width - 32);
+  const availableH = Math.max(PANEL_MIN_H, workArea.height - 32);
+
+  const width = Math.min(Math.max(PANEL_MIN_W, savedW), availableW);
+  const height = Math.min(Math.max(PANEL_MIN_H, savedH), availableH);
 
   // Position adjacent to pet, strictly clamped within workArea
   let targetX = Math.round(workArea.x + (workArea.width - width) / 2);
@@ -602,12 +637,12 @@ function createPanelWindow() {
     height,
     x: targetX,
     y: targetY,
-    minWidth: 420,
-    minHeight: 560,
+    minWidth: PANEL_MIN_W,
+    minHeight: PANEL_MIN_H,
     show: false,
     transparent: false,
     frame: false,
-    backgroundColor: '#141418',
+    backgroundColor: '#0b0b0f',
     hasShadow: true,
     roundedCorners: true,
     resizable: true,
@@ -626,6 +661,7 @@ function createPanelWindow() {
   panelWindow.loadFile(path.join(__dirname, '..', 'panel-window', 'panel.html'));
   timerManager.setWindows(petWindow, panelWindow);
   scheduler.setWindows(petWindow, panelWindow);
+  companion.setWindows(petWindow, panelWindow);
 
   panelWindow.once('ready-to-show', () => {
     if (panelWindow && !panelWindow.isDestroyed()) {
@@ -647,8 +683,8 @@ function createPanelWindow() {
       updateChecker.notifyPetOfCachedUpdate();
     }
 
-    // Deliver any queued tab switch with a small delay so PanelController
-    // is fully initialized in the renderer before the IPC arrives
+    // did-finish-load runs after panel.js, so only one short turn is needed
+    // for the renderer to finish constructing PanelController.
     if (pendingPanelTab) {
       const tabToSwitch = pendingPanelTab;
       pendingPanelTab = null;
@@ -656,7 +692,7 @@ function createPanelWindow() {
         if (panelWindow && !panelWindow.isDestroyed()) {
           panelWindow.webContents.send('panel:switch-tab', tabToSwitch);
         }
-      }, 350);
+      }, 60);
     }
   });
 
@@ -675,6 +711,7 @@ function createPanelWindow() {
 let pendingPanelTab = null;
 
 function showPanel(tab) {
+  // Settings is a normal in-panel section, alongside the other 13 sections.
   if (tab) pendingPanelTab = tab;
   if (!panelWindow || panelWindow.isDestroyed()) {
     createPanelWindow();
@@ -718,9 +755,12 @@ function handleAppEvent(type, payload = {}) {
     }
 
     case 'todo:completed': {
-      // USER REQUEST: wink: to-do completed
+      // To-do completion gets its own organized, tidy reaction.
       if (petWindow && !petWindow.isDestroyed()) {
-        petWindow.webContents.send('pet:set-state', { state: 'wink', duration: 2500, priority: 4, force: true });
+        petWindow.webContents.send('pet:set-state', { state: 'organizing', duration: 2500, priority: 4, force: true });
+        petWindow.webContents.send('pet:show-bubble', {
+          text: 'Task done. Nice work!', duration: 2200, emotion: 'organizing', badge: 'TO-DO', bounce: false
+        });
       }
       break;
     }
@@ -737,9 +777,12 @@ function handleAppEvent(type, payload = {}) {
     }
 
     case 'note:saved': {
-      // USER REQUEST: wink: note saved
+      // Writing has its own expression so Notes does not reuse the to-do reaction.
       if (petWindow && !petWindow.isDestroyed()) {
-        petWindow.webContents.send('pet:set-state', { state: 'wink', duration: 2500, priority: 4, force: true });
+        petWindow.webContents.send('pet:set-state', { state: 'writing', duration: 2500, priority: 4, force: true });
+        petWindow.webContents.send('pet:show-bubble', {
+          text: 'Note saved.', duration: 2200, emotion: 'writing', badge: 'NOTE', bounce: false
+        });
       }
       break;
     }
@@ -762,11 +805,40 @@ function handleAppEvent(type, payload = {}) {
       break;
     }
 
+    case 'settings:exported': {
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'reviewing', duration: 2800, priority: 4, force: true });
+        petWindow.webContents.send('pet:show-bubble', {
+          text: 'Full backup saved. Keep it private!', duration: 3200, emotion: 'reviewing', badge: 'BACKUP'
+        });
+      }
+      break;
+    }
+
     case 'settings:imported': {
-      // USER REQUEST: excited: successful settings import
       if (petWindow && !petWindow.isDestroyed()) {
         petWindow.webContents.send('pet:set-state', { state: 'excited', duration: 4000, priority: 4, force: true });
-        petWindow.webContents.send('pet:show-bubble', { text: 'Settings imported successfully!', duration: 3500, emotion: 'excited', badge: 'SETTINGS' });
+        petWindow.webContents.send('pet:show-bubble', {
+          text: 'Everything is restored. Welcome back!', duration: 3500, emotion: 'excited', badge: 'RESTORED'
+        });
+        petWindow.webContents.send('pet:play-sound', { sound: 'chirp', category: 'reactions' });
+      }
+      break;
+    }
+
+    case 'backup:exported': {
+      handleAppEvent('settings:exported', payload);
+      break;
+    }
+
+    case 'backup:imported': {
+      handleAppEvent('settings:imported', payload);
+      break;
+    }
+
+    case 'clipboard:watched': {
+      if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.webContents.send('pet:set-state', { state: 'clipping', duration: 2200, priority: 3, force: true });
       }
       break;
     }
@@ -824,19 +896,23 @@ function handleAppEvent(type, payload = {}) {
     }
 
     case 'pomodoro:start': {
-      // USER REQUEST: focus: while a Pomodoro focus session runs
       isPomodoroFocusActive = true;
       if (petWindow && !petWindow.isDestroyed()) {
-        petWindow.webContents.send('pet:set-state', { state: 'focus', duration: 0, priority: 4, held: true, force: true });
+        petWindow.webContents.send('pet:set-state', { state: 'focusing', duration: 0, priority: 4, held: true, force: true });
+        petWindow.webContents.send('pet:show-bubble', {
+          text: 'Focus mode on. You got this!', duration: 2800, emotion: 'focusing', badge: 'FOCUS'
+        });
       }
       break;
     }
 
     case 'pomodoro:break': {
-      // USER REQUEST: relaxed during breaks
       isPomodoroFocusActive = false;
       if (petWindow && !petWindow.isDestroyed()) {
-        petWindow.webContents.send('pet:set-state', { state: 'happy', duration: 3500, priority: 4, force: true });
+        petWindow.webContents.send('pet:set-state', { state: 'relaxed', duration: 4000, priority: 4, force: true });
+        petWindow.webContents.send('pet:show-bubble', {
+          text: 'Break time — breathe with me.', duration: 3200, emotion: 'relaxed', badge: 'BREAK'
+        });
       }
       break;
     }
@@ -844,10 +920,17 @@ function handleAppEvent(type, payload = {}) {
     case 'pomodoro:finish': {
       isPomodoroFocusActive = false;
       const count = (payload && payload.completedCount) || 1;
-      // USER REQUEST: excited: every 3rd completed Pomodoro of the day; laugh: when a Pomodoro finishes
       const emo = (count % 3 === 0) ? 'excited' : 'laugh';
       if (petWindow && !petWindow.isDestroyed()) {
         petWindow.webContents.send('pet:set-state', { state: emo, duration: 4500, priority: 3, force: true });
+        petWindow.webContents.send('pet:show-bubble', {
+          text: count % 3 === 0 ? 'Three focus blocks! Amazing!' : 'Focus block complete!',
+          duration: 3600,
+          emotion: emo,
+          badge: 'TIMER',
+          sound: 'alarm',
+          category: 'timer'
+        });
       }
       break;
     }
@@ -872,6 +955,364 @@ function handleAppEvent(type, payload = {}) {
 function relayToPet(channel, data) {
   handleAppEvent(channel, data);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Global typing animation                                                     */
+/* -------------------------------------------------------------------------- */
+
+function signalPetTyping(source) {
+  const now = Date.now();
+  if (source === 'os-key') typingHelperLastPulseAt = now;
+  if (now - lastTypingPulseAt < 70) return;
+  lastTypingPulseAt = now;
+  handleAppEvent('pet:typing', { source });
+}
+
+function getAccessibilityGranted() {
+  // Windows uses a low-level keyboard hook and does not require macOS Accessibility.
+  if (process.platform === 'win32') return true;
+  if (process.platform !== 'darwin') return true;
+  try {
+    if (typeof systemPreferences.isTrustedAccessibilityClient !== 'function') return true;
+    return !!systemPreferences.isTrustedAccessibilityClient(false);
+  } catch (error) {
+    return false;
+  }
+}
+
+function getTypingHelperPath() {
+  const relativePath = process.platform === 'win32'
+    ? path.join('main', 'typing-helper.ps1')
+    : path.join('main', 'typing-helper');
+  if (app.isPackaged && process.resourcesPath) {
+    const unpacked = path.join(process.resourcesPath, 'app.asar.unpacked', relativePath);
+    if (fs.existsSync(unpacked)) return unpacked;
+  }
+  return path.join(__dirname, relativePath);
+}
+
+function scheduleTypingHelperRetry() {
+  if (typingHelperRetryTimer || app.isQuitting || isCliTestRun) return;
+  typingHelperRetryAttempts += 1;
+  const delay = [5000, 15000, 30000][Math.min(typingHelperRetryAttempts - 1, 2)];
+  typingHelperRetryTimer = setTimeout(() => {
+    typingHelperRetryTimer = null;
+    startTypingHelper();
+  }, delay);
+}
+
+function startTypingHelper(force = false) {
+  const isWindows = process.platform === 'win32';
+  if (!(isWindows || process.platform === 'darwin') || isCliTestRun || app.isQuitting) return;
+  if (typingHelper) {
+    if (!force) return;
+    stopTypingHelper();
+  }
+
+  const helperPath = getTypingHelperPath();
+  if (!fs.existsSync(helperPath)) {
+    typingHelperLastError = 'Typing helper is missing from this installation.';
+    if (!typingHelperErrorLogged) {
+      console.warn(`[Pixie] ${typingHelperLastError} In-app typing signals still work.`);
+      typingHelperErrorLogged = true;
+    }
+    return;
+  }
+
+  // macOS needs an Accessibility grant. Ask from the app itself (not from a
+  // detached helper) so TCC attributes the prompt to Pixie. Auto retries do
+  // not re-prompt; the Settings button or Restart helper can do that.
+  if (process.platform === 'darwin') {
+    const granted = getAccessibilityGranted();
+    if (!granted && (force || !typingHelperPromptAttempted)) {
+      typingHelperPromptAttempted = true;
+      try {
+        if (systemPreferences.isTrustedAccessibilityClient) {
+          systemPreferences.isTrustedAccessibilityClient(true);
+        }
+      } catch (error) {
+        // Older Electron versions may not expose this.
+      }
+    }
+  }
+
+  typingHelperTapFailed = false;
+  typingHelperReady = false;
+  typingHelperLastError = '';
+
+  try {
+    if (isWindows) {
+      typingHelper = spawn('powershell.exe', [
+        '-NoProfile', '-NoLogo', '-NonInteractive',
+        '-ExecutionPolicy', 'Bypass', '-File', helperPath
+      ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    } else {
+      typingHelper = spawn(helperPath, [], { stdio: ['ignore', 'pipe', 'pipe'] });
+    }
+  } catch (error) {
+    typingHelperLastError = error.message || 'Could not start helper.';
+    console.warn('[Pixie] Could not start global typing helper:', typingHelperLastError);
+    scheduleTypingHelperRetry();
+    return;
+  }
+
+  let stdoutBuffer = '';
+  let stderrBuffer = '';
+  const handleHelperLine = (line) => {
+    const trimmed = line.trim();
+    if (trimmed === 'K') {
+      typingHelperReady = true;
+      typingHelperTapFailed = false;
+      typingHelperLastError = '';
+      typingHelperRetryAttempts = 0;
+      signalPetTyping('os-key');
+    }
+    if (trimmed === 'READY') {
+      typingHelperReady = true;
+      typingHelperTapFailed = false;
+      typingHelperLastError = '';
+      typingHelperRetryAttempts = 0;
+      typingHelperErrorLogged = false;
+    }
+    if (trimmed === 'TAP_FAILED') {
+      typingHelperReady = false;
+      typingHelperTapFailed = true;
+      if (process.platform === 'win32') {
+        typingHelperLastError = 'Windows keyboard hook could not be installed. Close apps that block low-level hooks, then use Restart helper.';
+        if (!typingHelperErrorLogged) {
+          console.warn('[Pixie] Windows global typing hook failed. Use Restart helper after closing apps that block low-level hooks.');
+          typingHelperErrorLogged = true;
+        }
+      } else {
+        typingHelperLastError = 'Accessibility permission is required for OS-wide typing. Grant it to Pixie, then use Restart helper.';
+        if (!typingHelperErrorLogged) {
+          console.warn('[Pixie] Global typing needs Accessibility permission. Enable Pixie in System Settings > Privacy & Security > Accessibility, then use Restart helper.');
+          typingHelperErrorLogged = true;
+        }
+      }
+    }
+  };
+
+  typingHelper.stdout.on('data', (chunk) => {
+    stdoutBuffer += chunk.toString();
+    const lines = stdoutBuffer.split('\n');
+    stdoutBuffer = lines.pop() || '';
+    lines.forEach(handleHelperLine);
+  });
+
+  typingHelper.stderr.on('data', (chunk) => {
+    stderrBuffer = `${stderrBuffer}${chunk.toString()}`.slice(-2000);
+    const lines = stderrBuffer.split('\n');
+    stderrBuffer = lines.pop() || '';
+    lines.forEach(handleHelperLine);
+  });
+
+  typingHelper.on('error', (error) => {
+    typingHelperReady = false;
+    typingHelperLastError = error.message || 'Helper process error.';
+    if (!typingHelperErrorLogged) {
+      console.warn('[Pixie] Global typing helper error:', typingHelperLastError);
+      typingHelperErrorLogged = true;
+    }
+    scheduleTypingHelperRetry();
+  });
+
+  typingHelper.once('exit', () => {
+    typingHelper = null;
+    typingHelperReady = false;
+    if (app.isQuitting || isCliTestRun) return;
+    // A tap failure is recoverable after Accessibility is granted, so retry
+    // with bounded backoff instead of disabling OS-wide typing forever.
+    scheduleTypingHelperRetry();
+  });
+}
+
+function stopTypingHelper() {
+  if (typingHelperRetryTimer) {
+    clearTimeout(typingHelperRetryTimer);
+    typingHelperRetryTimer = null;
+  }
+  if (typingHelper && !typingHelper.killed) {
+    try { typingHelper.kill(); } catch (error) {}
+  }
+  typingHelper = null;
+  typingHelperReady = false;
+}
+
+function getTypingStatus() {
+  const isWindows = process.platform === 'win32';
+  return {
+    platform: process.platform,
+    mode: isWindows ? 'windows-low-level-hook' : (process.platform === 'darwin' ? 'macos-accessibility' : 'in-app-only'),
+    running: !!typingHelper,
+    ready: !!typingHelperReady,
+    tapFailed: !!typingHelperTapFailed,
+    lastPulseAt: typingHelperLastPulseAt || null,
+    accessibility: getAccessibilityGranted() ? 'granted' : 'denied',
+    helperPath: getTypingHelperPath(),
+    error: typingHelperLastError || null
+  };
+}
+
+ipcMain.handle('typing:get-status', () => getTypingStatus());
+
+ipcMain.handle('typing:restart', () => {
+  if (!(process.platform === 'darwin' || process.platform === 'win32')) {
+    return getTypingStatus();
+  }
+  typingHelperErrorLogged = false;
+  startTypingHelper(true);
+  return getTypingStatus();
+});
+
+// Called by the Settings "Accessibility" button while Pixie is frontmost, so
+// macOS attributes the prompt to Pixie instead of an anonymous child process.
+ipcMain.handle('typing:request-permission', async () => {
+  if (process.platform === 'darwin') {
+    try {
+      if (systemPreferences.isTrustedAccessibilityClient) {
+        systemPreferences.isTrustedAccessibilityClient(true);
+      }
+    } catch (error) {}
+    if (getAccessibilityGranted()) startTypingHelper(true);
+  }
+  return getTypingStatus();
+});
+
+/* -------------------------------------------------------------------------- */
+/* Clipboard history (local only)                                              */
+/* -------------------------------------------------------------------------- */
+
+const CLIPBOARD_HISTORY_LIMIT = 50;
+
+function readClipboardHistory() {
+  const history = store.get('tools.clipboardHistory');
+  return Array.isArray(history) ? history : [];
+}
+
+function getClipboardTextSafe() {
+  try {
+    const text = clipboard.readText();
+    return typeof text === 'string' ? text : '';
+  } catch (error) {
+    return '';
+  }
+}
+
+function clipboardWatchEnabled() {
+  return store.get('settings.privacy.allowClipboard') !== false &&
+    store.get('settings.privacy.clipboardWatch') !== false;
+}
+
+function broadcastClipboardChange(payload) {
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    panelWindow.webContents.send('clipboard:changed', payload);
+  }
+}
+
+function rememberClipboardText(value, options = {}) {
+  const text = String(value || '').trim();
+  if (!text || text.length > 20000) return null;
+
+  const history = readClipboardHistory();
+  if (history.length && history[0] && history[0].text === text) {
+    lastWatchedClipboardText = text;
+    lastClipboardCopiedAt = history[0].copiedAt || Date.now();
+    return history[0];
+  }
+
+  const copiedAt = Date.now();
+  const entry = { text, copiedAt };
+  store.set('tools.clipboardHistory', [entry, ...history].slice(0, CLIPBOARD_HISTORY_LIMIT));
+  lastWatchedClipboardText = text;
+  lastClipboardCopiedAt = copiedAt;
+
+  const payload = { text, copiedAt };
+  // The panel renderer owns the visual clipboard reaction; main only stores
+  // the entry and broadcasts it so there is one bubble/state change per copy.
+  broadcastClipboardChange(payload);
+  return entry;
+}
+
+function stopClipboardWatcher() {
+  if (clipboardWatchTimer) {
+    clearInterval(clipboardWatchTimer);
+    clipboardWatchTimer = null;
+  }
+}
+
+function startClipboardWatcher() {
+  if (!clipboardWatchEnabled()) {
+    stopClipboardWatcher();
+    return;
+  }
+  if (clipboardWatchTimer) return;
+
+  // Seed with the current clipboard so an old copy is not replayed as new.
+  lastWatchedClipboardText = getClipboardTextSafe();
+  lastClipboardCopiedAt = Date.now();
+
+  clipboardWatchTimer = setInterval(() => {
+    if (!clipboardWatchEnabled()) {
+      stopClipboardWatcher();
+      return;
+    }
+    const text = getClipboardTextSafe();
+    if (text && text !== lastWatchedClipboardText) {
+      rememberClipboardText(text);
+    }
+  }, 1200);
+}
+
+function syncClipboardWatcher() {
+  if (clipboardWatchEnabled()) startClipboardWatcher();
+  else stopClipboardWatcher();
+}
+
+ipcMain.handle('clipboard:read', () => {
+  if (store.get('settings.privacy.allowClipboard') === false) {
+    return { text: '', copiedAt: null };
+  }
+  const text = getClipboardTextSafe();
+  const normalized = text.trim();
+  const known = normalized
+    ? readClipboardHistory().find((entry) => entry && entry.text === normalized)
+    : null;
+  return { text, copiedAt: known ? known.copiedAt : null };
+});
+
+ipcMain.handle('clipboard:write', (event, value) => {
+  if (store.get('settings.privacy.allowClipboard') === false) return { success: false };
+  try {
+    clipboard.writeText(String(value || ''));
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('clipboard:record', (event, value) => {
+  if (store.get('settings.privacy.allowClipboard') === false) return { success: false };
+  const entry = rememberClipboardText(value);
+  return { success: !!entry };
+});
+
+ipcMain.handle('clipboard:clear-history', () => {
+  store.set('tools.clipboardHistory', []);
+  lastWatchedClipboardText = getClipboardTextSafe();
+  lastClipboardCopiedAt = Date.now();
+  broadcastClipboardChange({ text: '', copiedAt: 0, cleared: true });
+  return { success: true };
+});
+
+ipcMain.handle('clipboard:get-history', () => readClipboardHistory());
+
+ipcMain.handle('clipboard:set-watch', (event, enabled) => {
+  const next = !!enabled;
+  store.set('settings.privacy.clipboardWatch', next);
+  syncClipboardWatcher();
+  return { success: true, enabled: next };
+});
 
 // Single Event Bus Entry Point (Item E3)
 ipcMain.on('app:emit', (event, { type, payload } = {}) => {
@@ -930,16 +1371,6 @@ ipcMain.on('pet:drag-move', (e, { screenX, screenY }) => {
       offsetX: screenX - winX,
       offsetY: screenY - winY
     };
-
-    if (panelWindow && !panelWindow.isDestroyed() && panelWindow.isVisible()) {
-      const [panX, panY] = panelWindow.getPosition();
-      panelDragOffset = {
-        diffX: panX - winX,
-        diffY: panY - winY
-      };
-    } else {
-      panelDragOffset = null;
-    }
   }
 
   const display = (petWindow && !petWindow.isDestroyed() && screen.getDisplayMatching(petWindow.getBounds())) ||
@@ -966,17 +1397,7 @@ ipcMain.on('pet:drag-move', (e, { screenX, screenY }) => {
   petWindow.setPosition(newPetX, newPetY);
   bubble.syncPosition();
 
-  // Follow panel if open
-  if (panelDragOffset && panelWindow && !panelWindow.isDestroyed() && panelWindow.isVisible()) {
-    const [panW, panH] = panelWindow.getSize();
-    let newPanX = newPetX + panelDragOffset.diffX;
-    let newPanY = newPetY + panelDragOffset.diffY;
-
-    newPanX = Math.max(workArea.x, Math.min(workArea.x + workArea.width - panW, newPanX));
-    newPanY = Math.max(workArea.y, Math.min(workArea.y + workArea.height - panH, newPanY));
-
-    panelWindow.setPosition(newPanX, newPanY);
-  }
+  // Panel and pet move independently — dragging one must not move the other.
 });
 
 ipcMain.on('pet:drag-end', () => {
@@ -1042,12 +1463,12 @@ ipcMain.on('pet:bubble-shown', (e, { width, height, isClamped }) => {
     unexpandedPetBounds = { x: curX, y: curY, width: baseW, height: baseH };
   }
 
-  const bW = Math.max(120, Math.min(280, width || 220));
-  const bH = Math.max(40, height || 60);
+  const bW = Math.max(96, Math.min(230, width || 190));
+  const bH = Math.max(32, Math.min(120, height || 70));
 
-  // Compute exact pet body top (in base window coords) so bubble tail sits 8px above pet head
+  // Compute exact pet body top (in base window coords) so the tiny tail sits just above the pet head
   const { bodyY } = getPetBodyRect(baseW, baseH);
-  const TAIL_GAP = 8; // px gap between bubble tail tip and pet body top
+  const TAIL_GAP = 6; // px gap between bubble tail tip and pet body top
 
   const display = screen.getDisplayNearestPoint({
     x: unexpandedPetBounds.x + baseW / 2,
@@ -1059,15 +1480,15 @@ ipcMain.on('pet:bubble-shown', (e, { width, height, isClamped }) => {
   const spaceBelow = (workArea.y + workArea.height) - (unexpandedPetBounds.y + baseH);
 
   // Flip below if not enough room above and more room below
-  const neededBubbleSpace = bH + TAIL_GAP + 6; // 6 = tail height
+  const neededBubbleSpace = bH + TAIL_GAP + 5; // 5 = tail diamond half-height
   const shouldFlipBelow = (spaceAbove < neededBubbleSpace) && (spaceBelow >= spaceAbove);
 
   petWindow.webContents.send('pet:bubble-position', { flipped: shouldFlipBelow });
 
-  const totalW = Math.max(baseW, bW + 24);
+  const totalW = Math.max(baseW, bW + 16);
 
-  // Exact height: base window + bubble height + gap so tail is TAIL_GAP above pet body top
-  const extraH = bH + TAIL_GAP + 6; // 6px for tail diamond half-height
+  // Exact height: base window + bubble height + gap so the tail meets the pet body
+  const extraH = bH + TAIL_GAP + 5; // 5px for tail diamond half-height
   const totalH = baseH + extraH;
 
   let newX = unexpandedPetBounds.x - Math.round((totalW - baseW) / 2);
@@ -1149,16 +1570,24 @@ ipcMain.on('ai:start-chat', async (event, params) => {
       if (!event.sender.isDestroyed()) {
         event.sender.send(`ai:error:${requestId}`, errorData);
       }
-      // On error, show sad pet face (USER REQUEST: sad: AI error (401/402/429/503/offline))
-      relayToPet('pet:set-state', { state: 'sad', duration: 5000, priority: 5, force: true });
-      bubble.show({
-        badge: 'AI ERROR',
-        text: errorData.friendly || 'Could not complete request.',
-        sound: 'tap',
-        emotion: 'sad'
-      });
+      const cancelled = errorData.status === 499 || /abort|cancel/i.test(errorData.friendly || '');
+      const suppress = params.suppressReactions === true;
+      if (!cancelled && !suppress) {
+        // On error, show sad pet face (USER REQUEST: sad: AI error (401/402/429/503/offline))
+        relayToPet('pet:set-state', { state: 'sad', duration: 5000, priority: 5, force: true });
+        bubble.show({
+          badge: 'AI ERROR',
+          text: errorData.friendly || 'Could not complete request.',
+          sound: 'tap',
+          emotion: 'sad'
+        });
+      }
     }
   );
+});
+
+ipcMain.on('ai:stop-chat', (event, { requestId } = {}) => {
+  if (requestId) aiService.abortStream(requestId);
 });
 
 // Secure API Key Management
@@ -1199,7 +1628,6 @@ ipcMain.on('pet:update-appearance', (e, appearance) => {
 
 ipcMain.on('pet:update-name', (e, name) => {
   store.set('settings.general.petName', name);
-  app.setName(name);
   createTray();
   relayToPet('pet:update-name', name);
   if (panelWindow && !panelWindow.isDestroyed()) {
@@ -1218,29 +1646,22 @@ ipcMain.on('pet:update-accent', (e, color) => {
 ipcMain.on('pet:get-appearance', (e) => {
   const defaults = {
     scale: 1.0,
-    width: 136,
-    height: 120,
-    roundness: 36,
+    width: 150,
+    height: 150,
+    roundness: 50,
     eyeSize: 1.0,
-    eyeSpacing: 44,
-    mouthWidth: 14,
-    depth: 80,
-    bodyColor: '#FFFFFF',
-    glassesEnabled: false
+    eyeSpacing: 28,
+    mouthWidth: 10,
+    depth: 75,
+    bodyColor: '#17171B',
+    accentColor: '#007AFF',
+    primaryGlow: '#FF4D1A',
+    eyesColor: '#FF8A1F',
+    mouthColor: '#111111'
   };
   const currentAppearance = Object.assign({}, defaults, store.get('settings.appearance') || {});
-  if (store.get('settings.appearance.glassesEnabled') !== undefined) {
-    currentAppearance.glassesEnabled = !!store.get('settings.appearance.glassesEnabled');
-  }
+  currentAppearance.mouthColor = '#111111';
   e.returnValue = currentAppearance;
-});
-
-ipcMain.on('pet:update-glasses', (e, enabled) => {
-  store.set('settings.appearance.glassesEnabled', !!enabled);
-  relayToPet('pet:update-glasses', !!enabled);
-  if (panelWindow && !panelWindow.isDestroyed()) {
-    panelWindow.webContents.send('panel:update-glasses', !!enabled);
-  }
 });
 
 ipcMain.on('reminders:snooze', (e, { id, minutes }) => {
@@ -1262,8 +1683,15 @@ ipcMain.on('reminders:updated', (e, freshReminders) => {
 });
 
 ipcMain.on('window:set-always-on-top', (e, val) => {
-  if (petWindow) petWindow.setAlwaysOnTop(val);
-  if (panelWindow) panelWindow.setAlwaysOnTop(val);
+  if (petWindow && !petWindow.isDestroyed()) {
+    if (process.platform === 'darwin' && val) {
+      petWindow.setAlwaysOnTop(true, 'screen-saver');
+      petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    } else {
+      petWindow.setAlwaysOnTop(!!val);
+    }
+  }
+  if (panelWindow && !panelWindow.isDestroyed()) panelWindow.setAlwaysOnTop(!!val);
 });
 
 ipcMain.on('window:set-pos', (e, { x, y }) => {
@@ -1274,6 +1702,36 @@ ipcMain.on('window:set-pos', (e, { x, y }) => {
       unexpandedPetBounds.y = Math.round(y);
     }
   }
+});
+
+// Bounded idle hop. The renderer asks for a small delta; main clamps it to the
+// visible work area and moves the panel by the same applied amount when open.
+ipcMain.on('pet:idle-hop', (e, { dx, dy } = {}) => {
+  if (!petWindow || petWindow.isDestroyed() || app.isQuitting) return;
+
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+  // Allow larger roam hops for boredom play, but still bounded per move.
+  const stepX = clamp(Math.round(Number(dx) || 0), -220, 220);
+  const stepY = clamp(Math.round(Number(dy) || 0), -140, 140);
+  if (!stepX && !stepY) return;
+
+  const display = screen.getDisplayMatching(petWindow.getBounds()) || screen.getPrimaryDisplay();
+  const area = display.workArea;
+  const [x, y] = petWindow.getPosition();
+  const [w, h] = petWindow.getSize();
+  const nextX = Math.round(clamp(x + stepX, area.x, area.x + area.width - w));
+  const nextY = Math.round(clamp(y + stepY, area.y, area.y + area.height - h));
+  const appliedX = nextX - x;
+  const appliedY = nextY - y;
+  if (!appliedX && !appliedY) return;
+
+  petWindow.setPosition(nextX, nextY);
+  if (unexpandedPetBounds) {
+    unexpandedPetBounds.x = nextX;
+    unexpandedPetBounds.y = nextY;
+  }
+
+  // Panel stays independent; do not move it with pet idle roaming.
 });
 
 ipcMain.on('window:set-launch-login', (e, openAtLogin) => {
@@ -1289,23 +1747,240 @@ ipcMain.on('window:set-launch-login', (e, openAtLogin) => {
       app.setLoginItemSettings({ openAtLogin: !!openAtLogin });
     }
   } catch (err) {
-    console.error('[Desktop Pet] Failed to set launch at login:', err);
+    console.error('[Pixie] Failed to set launch at login:', err);
   }
 });
 
-// Helper for scrubbing sensitive keys on export / import
-function deepStripKeys(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) {
-    return obj.map(deepStripKeys);
+/* -------------------------------------------------------------------------- */
+/* Full backup / restore                                                      */
+/* -------------------------------------------------------------------------- */
+
+const FULL_BACKUP_FORMAT = 'pixie-full-backup';
+const FULL_BACKUP_VERSION = 2;
+
+function countBackupItems(data) {
+  const settings = (data && data.settings && typeof data.settings === 'object') ? data.settings : {};
+  const tools = (data && data.tools && typeof data.tools === 'object') ? data.tools : {};
+  return {
+    settings: Object.keys(settings).length,
+    notes: Array.isArray(tools.notes) ? tools.notes.length : Array.isArray(data.notes) ? data.notes.length : 0,
+    todos: Array.isArray(tools.todo) ? tools.todo.length : Array.isArray(data.todos) ? data.todos.length : 0,
+    reminders: Array.isArray(data.reminders) ? data.reminders.length : 0,
+    clipboard: Array.isArray(tools.clipboardHistory) ? tools.clipboardHistory.length : Array.isArray(data.clipboardHistory) ? data.clipboardHistory.length : 0
+  };
+}
+
+function createFullBackup(reason = 'manual-export') {
+  const data = store.getAllData();
+  return {
+    format: FULL_BACKUP_FORMAT,
+    version: FULL_BACKUP_VERSION,
+    app: 'Pixie',
+    exportedAt: new Date().toISOString(),
+    created: new Date().toISOString(),
+    appVersion: app.getVersion(),
+    reason,
+    data,
+    secrets: { apiKeys: store.getAllApiKeys() },
+    counts: countBackupItems(data)
+  };
+}
+
+function writeSafetyBackup(reason) {
+  const userDataPath = app.getPath('userData');
+  try {
+    fs.mkdirSync(userDataPath, { recursive: true });
+  } catch (error) {}
+  const backupFileName = `pixie-safety-backup-${Date.now()}.json`;
+  const backupPath = path.join(userDataPath, backupFileName);
+  fs.writeFileSync(backupPath, JSON.stringify(createFullBackup(reason), null, 2), 'utf8');
+  return backupFileName;
+}
+
+function looksLikeBackup(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+  if (payload.format === FULL_BACKUP_FORMAT || payload.format === 'desktop-pet-backup') return true;
+  return Boolean(
+    (payload.settings && typeof payload.settings === 'object') ||
+    (payload.data && typeof payload.data === 'object') ||
+    Array.isArray(payload.notes) ||
+    Array.isArray(payload.todos) ||
+    Array.isArray(payload.reminders)
+  );
+}
+
+function makeBackupId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeLegacyNotes(items) {
+  return (Array.isArray(items) ? items : []).map((item) => {
+    if (typeof item === 'string') {
+      return { id: makeBackupId('note'), title: 'Quick note', content: item, pinned: false, updatedAt: Date.now() };
+    }
+    const source = item && typeof item === 'object' ? item : {};
+    const updated = Number(source.updatedAt);
+    return {
+      id: typeof source.id === 'string' && source.id ? source.id : makeBackupId('note'),
+      title: typeof source.title === 'string' && source.title.trim() ? source.title : 'Quick note',
+      content: String(source.content ?? source.text ?? source.body ?? '').slice(0, 8000),
+      pinned: source.pinned === true,
+      updatedAt: Number.isFinite(updated) && updated > 0 ? updated : Date.now()
+    };
+  });
+}
+
+function mergeBackupNotes(existing, incoming) {
+  const ids = new Set(existing.map((note) => note && note.id).filter(Boolean));
+  const merged = existing.slice();
+  for (const note of incoming) {
+    merged.push(ids.has(note.id) ? Object.assign({}, note, { id: makeBackupId('note') }) : note);
   }
-  const clean = {};
-  const sensitive = ['apikey', 'key', 'keys', 'apikeys', 'secret', 'token', 'password', 'encryptedbase64'];
-  for (const [k, v] of Object.entries(obj)) {
-    if (sensitive.includes(k.toLowerCase())) continue;
-    clean[k] = deepStripKeys(v);
+  return merged;
+}
+
+function applyLegacyBackup(data, notesStrategy = 'replace') {
+  if (data.settings && typeof data.settings === 'object') {
+    if (data.settings.general) {
+      store.set('settings.general', Object.assign({}, store.get('settings.general') || {}, data.settings.general));
+    }
+    if (data.settings.behavior) {
+      const beh = Object.assign({}, data.settings.behavior);
+      if (beh.soundsEnabled === undefined) beh.soundsEnabled = true;
+      else beh.soundsEnabled = !!beh.soundsEnabled;
+      delete beh.sounds;
+      if (beh.soundVolume !== undefined) {
+        const volNum = Number(beh.soundVolume);
+        beh.soundVolume = isNaN(volNum) ? 60 : Math.max(0, Math.min(100, Math.round(volNum)));
+      } else {
+        beh.soundVolume = 60;
+      }
+      beh.soundReminders = beh.soundReminders !== false;
+      beh.soundTimer = beh.soundTimer !== false;
+      beh.soundReactions = beh.soundReactions !== false;
+      store.set('settings.behavior', Object.assign({}, store.get('settings.behavior') || {}, beh));
+    }
+    for (const section of ['reactions', 'appearance', 'privacy', 'companion']) {
+      if (data.settings[section]) {
+        store.set(`settings.${section}`, Object.assign({}, store.get(`settings.${section}`) || {}, data.settings[section]));
+      }
+    }
+    if (data.settings.ai) {
+      if (data.settings.ai.activeProvider) {
+        store.set('settings.ai.activeProvider', data.settings.ai.activeProvider);
+      }
+      if (data.settings.ai.models) {
+        store.set('settings.ai.models', Object.assign({}, store.get('settings.ai.models') || {}, data.settings.ai.models));
+      }
+      if (data.settings.ai.baseUrls) {
+        store.set('settings.ai.baseUrls', Object.assign({}, store.get('settings.ai.baseUrls') || {}, data.settings.ai.baseUrls));
+      }
+      const legacyKeys = Object.assign({}, data.settings.ai.apiKeys || {}, data.settings.ai.keys || {});
+      for (const [provider, key] of Object.entries(legacyKeys)) {
+        store.setApiKey(provider, String(key || ''));
+      }
+    }
   }
-  return clean;
+
+  store.normalizeThemeData(null, true);
+
+  if (data.timers && typeof data.timers === 'object') {
+    timerManager.updateSettings(data.timers);
+  }
+
+  const arrays = ['todos', 'reminders', 'chatHistory', 'savedPrompts'];
+  for (const key of arrays) {
+    if (Array.isArray(data[key])) store.set(key, data[key]);
+  }
+
+  if (data.tools && typeof data.tools === 'object') {
+    for (const [key, value] of Object.entries(data.tools)) {
+      store.set(`tools.${key}`, value);
+    }
+  }
+
+  // Map legacy top-level data onto the paths used by the current panel UI.
+  if (Array.isArray(data.todos) && !(data.tools && Array.isArray(data.tools.todo))) {
+    store.set('tools.todo', data.todos);
+  }
+  if (Array.isArray(data.clipboardHistory) && !(data.tools && Array.isArray(data.tools.clipboardHistory))) {
+    store.set('tools.clipboardHistory', data.clipboardHistory.slice(0, 50));
+  }
+
+  if (Array.isArray(data.notes)) {
+    const incoming = normalizeLegacyNotes(data.notes);
+    if (notesStrategy === 'replace') {
+      store.set('notes', data.notes);
+      store.set('tools.notes', incoming);
+      store.set('tools.activeNoteId', incoming.length ? incoming[0].id : '');
+    } else {
+      const existingLegacy = Array.isArray(store.get('notes')) ? store.get('notes') : [];
+      const existingNotes = Array.isArray(store.get('tools.notes'))
+        ? normalizeLegacyNotes(store.get('tools.notes'))
+        : normalizeLegacyNotes(existingLegacy);
+      const merged = mergeBackupNotes(existingNotes, incoming);
+      store.set('notes', mergeBackupNotes(existingLegacy, incoming));
+      store.set('tools.notes', merged);
+      if (!store.get('tools.activeNoteId')) {
+        store.set('tools.activeNoteId', merged.length ? merged[0].id : '');
+      }
+    }
+  }
+}
+
+function applyFullBackup(payload) {
+  const snapshot = payload.data;
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    throw new Error('Backup has no restorable data snapshot.');
+  }
+  store.replaceAllData(snapshot);
+
+  const apiKeys = (payload.secrets && payload.secrets.apiKeys && typeof payload.secrets.apiKeys === 'object')
+    ? payload.secrets.apiKeys
+    : {};
+  store.restoreApiKeys(apiKeys);
+
+  // Re-encrypt only keys that exist in the backup. Empty provider slots are
+  // already cleared by restoreApiKeys() without invoking the OS keychain.
+  for (const [provider, key] of Object.entries(apiKeys)) {
+    if (key) store.setApiKey(provider, String(key));
+  }
+
+  const behavior = store.get('settings.behavior') || {};
+  store.set('settings.behavior.soundsEnabled', behavior.soundsEnabled !== false);
+  store.set('settings.behavior.soundVolume', Number.isFinite(Number(behavior.soundVolume))
+    ? Math.max(0, Math.min(100, Math.round(Number(behavior.soundVolume))))
+    : 60);
+
+  const timers = store.get('settings.timers') || {};
+  if (timers && Object.keys(timers).length) timerManager.updateSettings(timers);
+}
+
+function broadcastRestoredState() {
+  const petName = store.get('settings.general.petName') || 'Pixie';
+  createTray();
+  relayToPet('pet:update-name', petName);
+
+  const appearance = store.get('settings.appearance') || {};
+  appearance.mouthColor = '#111111';
+  relayToPet('pet:apply-appearance', appearance);
+  if (appearance.accentColor) relayToPet('pet:update-accent', appearance.accentColor);
+
+  const behavior = store.get('settings.behavior') || {};
+  relayToPet('pet:update-sound-settings', behavior);
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    panelWindow.webContents.send('settings:sound-updated', behavior);
+    panelWindow.webContents.send('panel:data-imported');
+    panelWindow.webContents.send('panel:update-name', petName);
+    if (appearance.accentColor) panelWindow.webContents.send('panel:update-accent', appearance.accentColor);
+  }
+  if (welcomeWindow && !welcomeWindow.isDestroyed()) {
+    welcomeWindow.webContents.send('welcome:sound-updated', behavior);
+  }
+
+  syncClipboardWatcher();
+  const history = readClipboardHistory();
+  if (history.length) broadcastClipboardChange({ text: history[0].text, copiedAt: history[0].copiedAt });
 }
 
 // Data Management IPC (Item I1)
@@ -1314,58 +1989,25 @@ ipcMain.handle('data:export', async () => {
     const parentWin = (panelWindow && !panelWindow.isDestroyed()) ? panelWindow : null;
     const dateStr = new Date().toISOString().slice(0, 10);
     const saveRes = await dialog.showSaveDialog(parentWin, {
-      title: 'Export Desktop Pet Data',
-      defaultPath: `desktop-pet-backup-${dateStr}.json`,
-      filters: [{ name: 'JSON Backup', extensions: ['json'] }]
+      title: 'Export full Pixie backup',
+      defaultPath: `pixie-full-backup-${dateStr}.json`,
+      filters: [{ name: 'Pixie Full Backup', extensions: ['json'] }]
     });
 
     if (saveRes.canceled || !saveRes.filePath) {
       return { canceled: true };
     }
 
-    const settingsObj = {
-      general: store.get('settings.general') || {},
-      behavior: store.get('settings.behavior') || {},
-      reactions: store.get('settings.reactions') || {},
-      appearance: store.get('settings.appearance') || {},
-      privacy: store.get('settings.privacy') || {},
-      ai: {
-        activeProvider: store.get('settings.ai.activeProvider') || 'gemini',
-        models: store.get('settings.ai.models') || {},
-        baseUrls: store.get('settings.ai.baseUrls') || {}
-      },
-      timers: store.get('settings.timers') || {}
-    };
-
-    const notes = store.get('notes') || [];
-    const todos = store.get('todos') || [];
-    const reminders = store.get('reminders') || [];
-
-    const exportPayload = {
-      format: 'desktop-pet-backup',
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      appVersion: app.getVersion(),
-      settings: deepStripKeys(settingsObj),
-      notes: deepStripKeys(notes),
-      todos: deepStripKeys(todos),
-      reminders: deepStripKeys(reminders)
-    };
-
+    const exportPayload = createFullBackup('manual-export');
     fs.writeFileSync(saveRes.filePath, JSON.stringify(exportPayload, null, 2), 'utf8');
 
     return {
       success: true,
       filePath: saveRes.filePath,
-      counts: {
-        settings: Object.keys(exportPayload.settings).length,
-        notes: notes.length,
-        todos: todos.length,
-        reminders: reminders.length
-      }
+      counts: exportPayload.counts
     };
   } catch (err) {
-    console.error('[Desktop Pet] Export failed:', err);
+    console.error('[Pixie] Export failed:', err);
     return { success: false, error: err.message };
   }
 });
@@ -1374,9 +2016,9 @@ ipcMain.handle('data:select-import-file', async () => {
   try {
     const parentWin = (panelWindow && !panelWindow.isDestroyed()) ? panelWindow : null;
     const openRes = await dialog.showOpenDialog(parentWin, {
-      title: 'Select Desktop Pet Backup File',
+      title: 'Select Pixie full backup',
       properties: ['openFile'],
-      filters: [{ name: 'JSON Backup', extensions: ['json'] }]
+      filters: [{ name: 'Pixie Backup', extensions: ['json'] }]
     });
 
     if (openRes.canceled || !openRes.filePaths || openRes.filePaths.length === 0) {
@@ -1385,8 +2027,8 @@ ipcMain.handle('data:select-import-file', async () => {
 
     const filePath = openRes.filePaths[0];
     const stats = fs.statSync(filePath);
-    if (stats.size > 5 * 1024 * 1024) {
-      return { error: 'File size exceeds maximum allowed limit (5 MB).' };
+    if (stats.size > 10 * 1024 * 1024) {
+      return { error: 'File size exceeds maximum allowed limit (10 MB).' };
     }
 
     let parsed = null;
@@ -1397,40 +2039,27 @@ ipcMain.handle('data:select-import-file', async () => {
       return { error: 'Invalid file format: Not a valid JSON file (' + parseErr.message + ')' };
     }
 
-    if (!parsed || typeof parsed !== 'object') {
-      return { error: 'Invalid backup file: root element must be a valid JSON object.' };
+    if (!looksLikeBackup(parsed)) {
+      return { error: 'Unrecognized backup file. No Pixie settings or data found.' };
     }
 
-    const hasSettings = parsed.settings && typeof parsed.settings === 'object';
-    const hasNotes = Array.isArray(parsed.notes);
-    const hasTodos = Array.isArray(parsed.todos);
-    const hasReminders = Array.isArray(parsed.reminders);
-    const isFormat = parsed.format === 'desktop-pet-backup';
-
-    if (!hasSettings && !hasNotes && !hasTodos && !hasReminders && !isFormat) {
-      return { error: 'Unrecognized backup file. No settings, notes, to-dos, or reminders found.' };
-    }
-
-    const sanitized = deepStripKeys(parsed);
+    const isFull = parsed.format === FULL_BACKUP_FORMAT && parsed.data && typeof parsed.data === 'object';
+    const counts = isFull ? countBackupItems(parsed.data) : countBackupItems(parsed);
 
     return {
       success: true,
       filePath,
       preview: {
-        format: parsed.format || 'custom',
+        format: parsed.format || 'legacy-backup',
         version: parsed.version || 1,
-        exportedAt: parsed.exportedAt || null,
-        counts: {
-          settings: hasSettings ? Object.keys(parsed.settings).length : 0,
-          notes: hasNotes ? parsed.notes.length : 0,
-          todos: hasTodos ? parsed.todos.length : 0,
-          reminders: hasReminders ? parsed.reminders.length : 0
-        }
+        exportedAt: parsed.exportedAt || parsed.created || null,
+        full: isFull,
+        counts
       },
-      data: sanitized
+      data: parsed
     };
   } catch (err) {
-    console.error('[Desktop Pet] Select import file failed:', err);
+    console.error('[Pixie] Select import file failed:', err);
     return { error: err.message };
   }
 });
@@ -1441,152 +2070,24 @@ ipcMain.handle('data:apply-import', async (e, { data, notesStrategy }) => {
       return { error: 'No data provided to import.' };
     }
 
-    // 1. Automatic safety backup before applying
-    const userDataPath = app.getPath('userData');
-    const backupFileName = `backup-before-import-${Date.now()}.json`;
-    const backupPath = path.join(userDataPath, backupFileName);
+    const backupFileName = writeSafetyBackup('pre-import-safety');
+    const isFull = data.format === FULL_BACKUP_FORMAT && data.data && typeof data.data === 'object';
 
-    const currentData = {
-      format: 'desktop-pet-backup',
-      version: 1,
-      backupReason: 'pre-import-safety',
-      created: new Date().toISOString(),
-      settings: {
-        general: store.get('settings.general') || {},
-        behavior: store.get('settings.behavior') || {},
-        reactions: store.get('settings.reactions') || {},
-        appearance: store.get('settings.appearance') || {},
-        privacy: store.get('settings.privacy') || {},
-        ai: {
-          activeProvider: store.get('settings.ai.activeProvider') || 'gemini',
-          models: store.get('settings.ai.models') || {},
-          baseUrls: store.get('settings.ai.baseUrls') || {}
-        }
-      },
-      notes: store.get('notes') || [],
-      todos: store.get('todos') || [],
-      reminders: store.get('reminders') || []
-    };
-    fs.writeFileSync(backupPath, JSON.stringify(currentData, null, 2), 'utf8');
-
-    // 2. Apply settings
-    if (data.settings && typeof data.settings === 'object') {
-      if (data.settings.general) {
-        store.set('settings.general', Object.assign({}, store.get('settings.general') || {}, data.settings.general));
-      }
-      if (data.settings.behavior) {
-        const beh = Object.assign({}, data.settings.behavior);
-        // Validate booleans and 0-100 volume range, migrate old settings (Item SND1)
-        if (beh.soundsEnabled === undefined) {
-          beh.soundsEnabled = false; // migrate to OFF
-        } else {
-          beh.soundsEnabled = !!beh.soundsEnabled;
-        }
-        delete beh.sounds;
-
-        if (beh.soundVolume !== undefined) {
-          const volNum = Number(beh.soundVolume);
-          beh.soundVolume = isNaN(volNum) ? 50 : Math.max(0, Math.min(100, Math.round(volNum)));
-        } else {
-          beh.soundVolume = 50;
-        }
-
-        beh.soundReminders = beh.soundReminders !== false;
-        beh.soundTimer = beh.soundTimer !== false;
-        beh.soundReactions = beh.soundReactions !== false;
-
-        store.set('settings.behavior', Object.assign({}, store.get('settings.behavior') || {}, beh));
-        relayToPet('pet:update-sound-settings', beh);
-        if (panelWindow && !panelWindow.isDestroyed()) {
-          panelWindow.webContents.send('settings:sound-updated', beh);
-        }
-      }
-      if (data.settings.reactions) {
-        store.set('settings.reactions', Object.assign({}, store.get('settings.reactions') || {}, data.settings.reactions));
-      }
-      if (data.settings.appearance) {
-        store.set('settings.appearance', Object.assign({}, store.get('settings.appearance') || {}, data.settings.appearance));
-      }
-      if (data.settings.privacy) {
-        store.set('settings.privacy', Object.assign({}, store.get('settings.privacy') || {}, data.settings.privacy));
-      }
-      if (data.settings.ai) {
-        if (data.settings.ai.activeProvider) {
-          store.set('settings.ai.activeProvider', data.settings.ai.activeProvider);
-        }
-        if (data.settings.ai.models) {
-          store.set('settings.ai.models', Object.assign({}, store.get('settings.ai.models') || {}, data.settings.ai.models));
-        }
-        if (data.settings.ai.baseUrls) {
-          store.set('settings.ai.baseUrls', Object.assign({}, store.get('settings.ai.baseUrls') || {}, data.settings.ai.baseUrls));
-        }
-      }
-      if (data.settings.timers && typeof data.settings.timers === 'object') {
-        timerManager.updateSettings(data.settings.timers);
-      }
+    if (isFull) {
+      applyFullBackup(data);
+    } else {
+      applyLegacyBackup(data, notesStrategy);
     }
 
-    // 3. Apply Todos
-    if (Array.isArray(data.todos)) {
-      store.set('todos', data.todos);
-    }
-
-    // 4. Apply Reminders
-    if (Array.isArray(data.reminders)) {
-      store.set('reminders', data.reminders);
-    }
-
-    // 5. Apply Notes (Merge vs Replace)
-    if (Array.isArray(data.notes)) {
-      if (notesStrategy === 'replace') {
-        store.set('notes', data.notes);
-      } else {
-        const existingNotes = store.get('notes') || [];
-        const existingIds = new Set(existingNotes.map(n => n.id));
-        const mergedNotes = [...existingNotes];
-        for (const item of data.notes) {
-          if (!existingIds.has(item.id)) {
-            mergedNotes.push(item);
-          } else {
-            mergedNotes.push(Object.assign({}, item, {
-              id: 'note-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6)
-            }));
-          }
-        }
-        store.set('notes', mergedNotes);
-      }
-    }
-
-    // 6. Broadcast updates to windows
-    const petName = store.get('settings.general.petName') || 'Pixel';
-    app.setName(petName);
-    createTray();
-    relayToPet('pet:update-name', petName);
-
-    const appearance = store.get('settings.appearance') || {};
-    relayToPet('pet:apply-appearance', appearance);
-    relayToPet('pet:update-glasses', appearance.glassesEnabled !== undefined ? appearance.glassesEnabled : store.get('settings.appearance.glassesEnabled'));
-    if (appearance.accentColor) {
-      relayToPet('pet:update-accent', appearance.accentColor);
-    }
-
-    if (panelWindow && !panelWindow.isDestroyed()) {
-      panelWindow.webContents.send('panel:data-imported');
-      panelWindow.webContents.send('panel:update-name', petName);
-      if (appearance.accentColor) {
-        panelWindow.webContents.send('panel:update-accent', appearance.accentColor);
-      }
-      if (appearance.glassesEnabled !== undefined) {
-        panelWindow.webContents.send('panel:update-glasses', appearance.glassesEnabled);
-      }
-    }
+    broadcastRestoredState();
 
     return {
       success: true,
+      full: isFull,
       backupFile: backupFileName
     };
   } catch (err) {
-    console.error('[Desktop Pet] Apply import failed:', err);
+    console.error('[Pixie] Apply import failed:', err);
     return { error: err.message };
   }
 });
@@ -1656,10 +2157,19 @@ let lastFsFetchTime = 0;
 
 
 
-// Sensor Status & Settings Pane
-ipcMain.handle('system:get-sensor-status', async () => {
-  return await systemSense.getSensorStatus();
-});
+
+// Companion Features (Pet Care, Clipboard Buddy, Focus Streaks, Check-in, Capture, Breathing)
+ipcMain.handle('companion:get-state', () => companion.getPublicState());
+ipcMain.handle('companion:care-action', (_e, action) => companion.careAction(action));
+ipcMain.handle('companion:checkin', (_e, mood) => companion.submitCheckin(mood));
+ipcMain.handle('companion:capture-add', (_e, payload) => companion.addCapture(payload || {}));
+ipcMain.handle('companion:capture-toggle', (_e, id) => companion.toggleCapture(id));
+ipcMain.handle('companion:capture-delete', (_e, id) => companion.deleteCapture(id));
+ipcMain.handle('companion:capture-clear-completed', () => companion.clearCompletedCaptures());
+ipcMain.handle('companion:clipboard-action', async (_e, action) => companion.clipboardAction(action));
+ipcMain.handle('companion:breathing-start', (_e, seconds) => companion.startBreathing(seconds));
+ipcMain.handle('companion:trick', (_e, trick) => companion.getQuickTrick(trick));
+ipcMain.handle('companion:summary', () => companion.getDailySummary());
 
 // System Permissions Diagnostics & Actions (Requirement 4)
 async function checkSystemPermissions() {
@@ -1735,6 +2245,11 @@ ipcMain.handle('system:request-permission', async (event, type) => {
 });
 
 ipcMain.on('system:open-permission-settings', (event, type) => {
+  if (process.platform === 'win32') {
+    const url = type === 'notifications' ? 'ms-settings:notifications' : 'ms-settings:privacy';
+    shell.openExternal(url).catch(() => {});
+    return;
+  }
   if (process.platform !== 'darwin') return;
   let url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
   if (type === 'screen' || type === 'screenRecording') {
@@ -1748,6 +2263,13 @@ ipcMain.on('system:open-permission-settings', (event, type) => {
 });
 
 ipcMain.on('system:open-settings-pane', (event, pane) => {
+  if (process.platform === 'win32') {
+    const url = pane === 'about'
+      ? 'ms-settings:about'
+      : (pane === 'notifications' ? 'ms-settings:notifications' : 'ms-settings:privacy');
+    shell.openExternal(url).catch(() => {});
+    return;
+  }
   if (process.platform === 'darwin') {
     let url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
     if (pane === 'screen' || pane === 'screenRecording') {
@@ -1764,7 +2286,6 @@ ipcMain.on('system:open-settings-pane', (event, pane) => {
 // User Name Setting Handler (Requirement 5)
 ipcMain.on('settings:user-name-changed', (event, name) => {
   store.set('settings.general.userName', name);
-  systemSense.setUserName(name);
   if (panelWindow && !panelWindow.isDestroyed()) {
     panelWindow.webContents.send('settings:user-name-updated', name);
   }
@@ -1844,7 +2365,7 @@ app.whenReady().then(async () => {
 
   // CLI Test: Full Self-Test Suite (Item WIN1)
   if (process.argv.includes('--selftest')) {
-    console.log('[SELFTEST] Starting Desktop Pet Self-Test Suite...');
+    console.log('[SELFTEST] Starting Pixie Self-Test Suite...');
     let failedCount = 0;
 
     // 1. SecureStore & Settings check
@@ -1867,14 +2388,14 @@ app.whenReady().then(async () => {
       ];
       let emotionsValid = true;
       for (const em of allEmotions) {
-        const svg = renderer.render(em, { glassesEnabled: true });
-        if (!svg || !svg.includes('</svg>') || !svg.includes('facebot-glasses')) {
+        const svg = renderer.render(em);
+        if (!svg || !svg.includes('</svg>') || !svg.includes('coucou-face-rig') || !svg.includes('facebot-body-shape')) {
           emotionsValid = false;
           break;
         }
       }
       if (emotionsValid) {
-        console.log(`[SELFTEST] pet-renderer: PASS (${allEmotions.length} emotions + glasses validated)`);
+        console.log(`[SELFTEST] pet-renderer: PASS (${allEmotions.length} emotions + Pixie hooks validated)`);
       } else {
         console.error('[SELFTEST] pet-renderer: FAIL (invalid SVG output)');
         failedCount++;
@@ -1897,19 +2418,6 @@ app.whenReady().then(async () => {
       }
     } catch (e) {
       console.error(`[SELFTEST] audio-assets: FAIL (${e.message})`);
-      failedCount++;
-    }
-
-    // 4. System Sensors Check
-    try {
-      if (process.platform === 'darwin') {
-        const sensorStatus = await systemSense.getSensorStatus();
-        console.log(`[SELFTEST] system-sensors: PASS (${sensorStatus.length} macOS sensors monitored)`);
-      } else {
-        console.log('[SELFTEST] system-sensors: UNAVAILABLE (Windows platform - graceful telemetry fallback)');
-      }
-    } catch (e) {
-      console.error(`[SELFTEST] system-sensors: FAIL (${e.message})`);
       failedCount++;
     }
 
@@ -1973,6 +2481,8 @@ app.whenReady().then(async () => {
   bootLifecycle = new BootLifecycle((channel, data) => relayToPet(channel, data));
   createTray();
   createPetWindow();
+  startTypingHelper();
+  startClipboardWatcher();
 
   // Test emotion CLI flag (--emotion=<name>)
   const emotionArg = process.argv.find(a => a.startsWith('--emotion='));
@@ -1995,28 +2505,15 @@ app.whenReady().then(async () => {
     createWelcomeWindow();
   }
 
-  // One-time migration for existing installs to Sounds OFF (Item SND1)
-  const soundMigrationDone = store.get('soundMigrationDone');
-  if (!soundMigrationDone) {
-    const isExistingInstall = store.get('isFirstRun') === false || store.get('settings.behavior.sounds') !== undefined;
-    store.set('settings.behavior.soundsEnabled', false);
-    store.set('soundMigrationDone', true);
-    if (isExistingInstall) {
-      setTimeout(() => {
-        bubble.show({
-          badge: '',
-          text: 'Sounds are now off by default. You can turn them on in Settings > Behavior > Sounds.',
-          duration: 6000,
-          sound: '',
-          emotion: 'neutral'
-        });
-      }, 2500);
-    }
+  // Sounds are ON by default. Existing installs keep their saved choice unless
+  // the key was never written at all.
+  if (store.get('settings.behavior.soundsEnabled') === undefined) {
+    store.set('settings.behavior.soundsEnabled', true);
   }
 
   // Start background services
   scheduler.start();
-  systemSense.start();
+  companion.start();
   updateChecker = new UpdateChecker(
     (channel, data) => relayToPet(channel, data),
     () => panelWindow
@@ -2061,9 +2558,6 @@ app.whenReady().then(async () => {
       store.set('settings.appearance', appearance);
       relayToPet('theme:apply-custom-appearance', appearance);
       relayToPet('pet:apply-appearance', appearance);
-      if (appearance.glassesEnabled !== undefined) {
-        relayToPet('pet:update-glasses', appearance.glassesEnabled);
-      }
       if (petWindow && !petWindow.isDestroyed() && appearance.scale) {
         const [newW, newH] = getPetWindowSize(appearance.scale);
         petWindow.setSize(newW, newH);
@@ -2098,12 +2592,6 @@ app.whenReady().then(async () => {
       return true;
     });
 
-    ipcMain.handle('test:trigger-volume-reaction', (e, vol) => {
-      bubble.hide();
-      systemSense.injectSensorReading('volume', vol);
-      return true;
-    });
-
     ipcMain.handle('test:trigger-welcome', () => {
       bubble.hide();
       bootLifecycle.isSimulatedBoot = true;
@@ -2125,22 +2613,8 @@ app.whenReady().then(async () => {
       return true;
     });
 
-    ipcMain.handle('test:inject-sensor', (e, arg1, arg2) => {
-      let type, value;
-      if (typeof arg1 === 'object' && arg1 !== null) {
-        type = arg1.type;
-        value = arg1.value;
-      } else {
-        type = arg1;
-        value = arg2;
-      }
-      return systemSense.injectSensorReading(type, value);
-    });
-
-    ipcMain.handle('test:resume-sensors', () => {
-      systemSense.resumeBackgroundPolling();
-      return true;
-    });
+    ipcMain.handle('test:inject-sensor', (_e, arg1) => { const t=(arg1&&arg1.type)||arg1||'unknown'; return { success: true, removed: 'SystemSense removed', type: t, emotion: 'neutral' }; });
+    ipcMain.handle('test:resume-sensors', () => true);
 
     ipcMain.handle('test:get-pet-emotion', async () => {
       if (!petWindow || petWindow.isDestroyed()) return null;
@@ -2216,15 +2690,24 @@ app.on('before-quit', (e) => {
     e.preventDefault();
     bootLifecycle.handleGoodbye('shutdown', () => {
       app.isQuitting = true;
+      stopTypingHelper();
+      stopClipboardWatcher();
       app.exit(0);
     });
     return;
   }
   app.isQuitting = true;
+  stopTypingHelper();
+  stopClipboardWatcher();
   scheduler.stop();
-  systemSense.stop();
+  companion.stop();
   if (cursorPollInterval) clearInterval(cursorPollInterval);
   if (idlePollInterval) clearInterval(idlePollInterval);
+});
+
+app.on('will-quit', () => {
+  stopTypingHelper();
+  stopClipboardWatcher();
 });
 
 /**
@@ -2277,8 +2760,7 @@ ipcMain.handle('welcome:get-init-data', () => {
   return {
     userName: store.get('settings.general.userName') || '',
     petName: store.get('settings.general.petName') || 'Pixie',
-    glassesEnabled: store.get('settings.appearance.glassesEnabled') || false,
-    soundsEnabled: store.get('settings.behavior.soundsEnabled') === true,
+    soundsEnabled: store.get('settings.behavior.soundsEnabled') !== false,
     appearance: store.get('settings.appearance') || {},
     aiProvider: store.get('settings.ai.activeProvider') || 'gemini',
     aiModel: store.get(`settings.ai.models.${store.get('settings.ai.activeProvider') || 'gemini'}`)
@@ -2286,7 +2768,14 @@ ipcMain.handle('welcome:get-init-data', () => {
 });
 
 ipcMain.on('welcome:open', () => {
-  createWelcomeWindow();
+  // The welcome screen belongs to a fresh install only. Later calls are
+  // intentionally routed to Settings in the panel instead.
+  if (store.get('isFirstRun') !== false) createWelcomeWindow();
+  else showPanel('settings');
+});
+
+ipcMain.on('settings:open', () => {
+  showPanel('settings');
 });
 
 ipcMain.on('welcome:close', () => {
@@ -2303,18 +2792,10 @@ ipcMain.on('welcome:finish', (e, data) => {
     if (data.petName !== undefined) {
       const pName = data.petName.trim() || 'Pixie';
       store.set('settings.general.petName', pName);
-      app.setName(pName);
       createTray();
       relayToPet('pet:update-name', pName);
       if (panelWindow && !panelWindow.isDestroyed()) {
         panelWindow.webContents.send('panel:update-name', pName);
-      }
-    }
-    if (data.glassesEnabled !== undefined) {
-      store.set('settings.appearance.glassesEnabled', !!data.glassesEnabled);
-      relayToPet('pet:update-glasses', !!data.glassesEnabled);
-      if (panelWindow && !panelWindow.isDestroyed()) {
-        panelWindow.webContents.send('panel:update-glasses', !!data.glassesEnabled);
       }
     }
     if (data.soundsEnabled !== undefined) {
@@ -2327,9 +2808,7 @@ ipcMain.on('welcome:finish', (e, data) => {
     if (data.appearance) {
       const current = store.get('settings.appearance') || {};
       const updated = Object.assign({}, current, data.appearance);
-      if (data.glassesEnabled !== undefined) {
-        updated.glassesEnabled = !!data.glassesEnabled;
-      }
+      updated.mouthColor = '#111111';
       if (data.accentColor) {
         updated.accentColor = data.accentColor;
         updated.primaryColor = data.accentColor;
@@ -2359,15 +2838,15 @@ ipcMain.on('welcome:finish', (e, data) => {
       store.set(`settings.ai.keys.${data.aiProvider}`, data.apiKey);
     }
   } else {
-    // Skip keeps sounds OFF
-    store.set('settings.behavior.soundsEnabled', false);
-    relayToPet('pet:update-sound-settings', { soundsEnabled: false });
+    // Skipping setup keeps Pixie's sensible defaults, including audible reminders.
+    store.set('settings.behavior.soundsEnabled', true);
+    relayToPet('pet:update-sound-settings', { soundsEnabled: true });
     if (panelWindow && !panelWindow.isDestroyed()) {
-      panelWindow.webContents.send('settings:sound-updated', { soundsEnabled: false });
+      panelWindow.webContents.send('settings:sound-updated', { soundsEnabled: true });
     }
   }
 
-  // Both Save & Skip mark first run and onboarding completed
+  // Both Save & Skip mark first run and onboarding completed.
   store.set('isFirstRun', false);
   store.set('onboarding.completed', true);
 
@@ -2388,9 +2867,15 @@ ipcMain.on('pet:play-sound-request', (e, { sound, category }) => {
 
 ipcMain.on('settings:sound-changed', (e, newSettings) => {
   if (newSettings && typeof newSettings === 'object') {
-    for (const [k, v] of Object.entries(newSettings)) {
+    const normalized = Object.assign({}, newSettings);
+    if (normalized.soundVolume !== undefined) {
+      const vol = Number(normalized.soundVolume);
+      normalized.soundVolume = Number.isFinite(vol) ? Math.max(0, Math.min(100, Math.round(vol))) : 60;
+    }
+    for (const [k, v] of Object.entries(normalized)) {
       store.set(`settings.behavior.${k}`, v);
     }
+    newSettings = normalized;
   }
   relayToPet('pet:update-sound-settings', newSettings);
   if (panelWindow && !panelWindow.isDestroyed()) {
@@ -2402,13 +2887,15 @@ ipcMain.on('settings:sound-changed', (e, newSettings) => {
 });
 
 ipcMain.on('pet:get-sound-settings', (event) => {
+  const behavior = store.get('settings.behavior') || {};
+  const volume = Number(behavior.soundVolume);
   event.returnValue = {
-    soundsEnabled: store.get('settings.behavior.soundsEnabled') === true,
-    soundVolume: store.get('settings.behavior.soundVolume') ?? 50,
-    soundReminders: store.get('settings.behavior.soundReminders') !== false,
-    soundTimer: store.get('settings.behavior.soundTimer') !== false,
-    soundReactions: store.get('settings.behavior.soundReactions') !== false,
-    dnd: store.get('settings.behavior.dnd') === true
+    soundsEnabled: behavior.soundsEnabled !== false,
+    soundVolume: Number.isFinite(volume) ? Math.max(0, Math.min(100, Math.round(volume))) : 60,
+    soundReminders: behavior.soundReminders !== false,
+    soundTimer: behavior.soundTimer !== false,
+    soundReactions: behavior.soundReactions !== false,
+    dnd: behavior.dnd === true
   };
 });
 

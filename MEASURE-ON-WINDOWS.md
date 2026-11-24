@@ -84,7 +84,7 @@ while ($true) {
 | **Idle Budgets (CPU/Wake-ups)** | Verified live via `top` (GPU <1%, Renderer <1%) | Verified via CI smoke test; **UNVERIFIED on physical Windows machine** |
 | **Vector Pet SVG & Animations** | Verified | Verified in Chromium / CI |
 | **All 25 Emotions & Blinking** | Verified | Verified in Chromium / CI |
-| **Round Glasses Overlay** | Verified | Verified in Chromium / CI |
+| **Pet Face (No Glasses, Black Mouth)** | Verified | Verified in Chromium / CI |
 | **Data Import / Export** | Verified | Verified via Node/Electron file system APIs |
 | **Update Checker (Asset Picker)** | Verified (macOS Intel `.dmg`) | Verified (Windows `.exe` picker logic in CI) |
 | **System Sensors (Volume/Battery)** | Verified live | Graceful "Unavailable" state verified in `--selftest` |

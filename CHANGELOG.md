@@ -1,3 +1,23 @@
+## [1.2.0] - 2026-11-24 — **Black Matte UI & Full macOS/Windows Parity**
+
+- **Battery-friendly theme**: Panel, pet bubble, quick menu, and welcome surface now use solid black matte colors with blue accent highlights. No blur, glass, or light-theme override remains. Removed the legacy Panel alpha and Panel blur controls from Settings.
+- **Windows parity**:
+  - Added a local Windows low-level keyboard hook for OS-wide typing animation, matching macOS behavior.
+  - The Windows hook now runs on a real Win32 message pump and emits pulses from a background writer instead of writing to the console inside the hook callback.
+  - Added a Windows foreground-window context helper with the same privacy redaction rules as macOS.
+  - Windows Settings deep links now open the relevant OS Settings pages.
+- **Reminders**: Reminders now have their own dedicated in-panel section. Due reminders show a native popup, speech bubble, and alarm sound; notification clicks open Reminders on both platforms.
+- **Panel reactions**: Section and action reactions now fire before lazy tab loading, bubble messages are forced to the front, and a stalled bubble queue advances immediately. Typing and idle poses no longer hide forced panel reactions.
+- **Idle play**: Inactive time now triggers short random activities (clamped hops, waves, claps, vibing, ball play, and eye/mouth antics) instead of a static bored pose, using one chained timer and no extra RAF or visual filters.
+- **Typing everywhere**: macOS now retries recoverable tap failures with bounded backoff, requests Accessibility from the frontmost Pixie Settings button, and shows helper readiness, errors, and the last OS key in Settings.
+- **Packaging**: Added dedicated build scripts for unsigned macOS and Windows x64 installers with all helper scripts unpacked for runtime use.
+
+## [1.1.3] - 2026-04-21 — **Companion & Wellness (SystemSense Replaced)**
+
+- **Removed SystemSense**: Removed legacy hardware/system-sense polling, diagnostics, and sensor reaction wiring.
+- **Added Companion Features**: Pet Care & Mood, Smart Clipboard Buddy, Focus Streaks & Gentle Breaks, Daily Check-in, Quick Capture, Micro-Break Breathing, wellness nudges, quick tricks, and daily summary.
+- **Performance**: New features are event-driven/slow-interval and designed to stay low-resource for always-on desktop use.
+
 # Changelog
 
 All notable changes to Pixie are documented in this file.
@@ -29,15 +49,11 @@ All notable changes to Pixie are documented in this file.
 - Replaced tools tab with functional clipboard tab.
 - Enabled `onboarding.completed` flag to prevent modal re-appearing.
 
-## [1.0.9] - 2026-10-06 — **Removal of Bulb Glow, 11 Glasses Frames, Windows Reminders & Zero-Latency System Sense**
+## [1.0.9] - 2026-10-06 — **Removal of Bulb Glow, Windows Reminders & Zero-Latency System Sense**
 
 ### Removed
 - **Electric Bulb Glow Effect Removed**: Completely removed `.pet-bulb-active` CSS drop-shadow/pulse animations and `setBulbActive` controller routines as requested.
-
-### Added
-- **More Glasses Frame Shapes**: Expanded glasses frame shapes to 11 styles:
-  - Round (Classic Circular), Square (Retro Geek), Rectangle (Sleek Modern), Hexagon (Geometric Chic), Cat-Eye (Chic & Winged), Oval (Soft & Friendly), Aviator (Double-Bridge), Browline / Clubmaster (Iconic Vintage), Semi-Rimless (Flat-Top), Heart (Sweet & Kawaii), and Star (Fun & Starry).
-  - All selectable from Settings > Appearance > Glasses Frame Shape.
+- **Glasses Overlay Removed**: The pet no longer renders any glasses frame; face rendering is a code-driven SVG rig with a black (#111111) mouth.
 
 ### Fixed
 - **Windows Reminders Not Working**:
@@ -52,7 +68,7 @@ All notable changes to Pixie are documented in this file.
   - Disabled `backgroundThrottling` on `petWindow` to prevent Chromium from delaying background event loops and pet reactions when other apps are active.
 
 ## [1.0.8] - 2026-10-05 — **Customization and Color Pickers**
-- Added glasses frame selection, glasses color picker, eyes color picker, mouth color picker.
+- Added eyes color picker and mouth color picker.
 
 ## [1.0.7] - 2026-10-05 — **Auto-Update Detection Reliability Fix**
 
@@ -123,12 +139,11 @@ All notable changes to Pixie are documented in this file.
 ## [1.0.2] - 2026-10-05
 
 ### Added
-- **Sounds on/off option, off by default**: Unified master sound toggle under `soundsEnabled` (off by default) controlling all reminders, timer/pomodoro alarms, and pet reactions. Includes volume slider (0-100), test sound button, category sub-toggles, Do Not Disturb muting, Welcome screen sync, and automatic one-time settings migration.
+- **Sounds on/off option**: Unified master sound toggle under `soundsEnabled` controlling all reminders, timer/pomodoro alarms, and pet reactions. Sounds now default ON at volume 60. Includes volume slider (0-100), test sound button, category sub-toggles, Do Not Disturb muting, Welcome screen sync, and automatic one-time settings migration.
 
 ## [1.0.1] - 2026-10-04
 
 ### Added
-- **Round Frame Glasses**: Customizable black round frame SVG glasses overlay with clamped eye follow inside lenses.
 - **11 New Vector Emotions**: Shape-only eye/mouth vector morphs (yawn, dizzy, blush, excited, scared, annoyed, bored, proud, worried, grateful, goodbye) bringing total emotions to 25.
 - **Boot & Shutdown Lifecycle**: Warm greeting once per real system boot/login; graceful ~1s goodbye wave on system shutdown, logout, or tray Quit; silent wake on sleep/lock.
 - **Data Export & Import**: Native file dialogs for JSON export/import with schema/version validation, notes merge/replace, security scrubbing (API keys excluded), and automatic safety backups in userData.

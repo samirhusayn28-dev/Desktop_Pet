@@ -17,8 +17,7 @@ class WelcomeController {
       eyeSpacing: 44,
       mouthWidth: 14,
       bodyColor: '#FFFFFF',
-      accentColor: '#FF7A2F',
-      glassesEnabled: false
+      accentColor: '#007aff'
     };
 
     this.providerDefaults = {
@@ -46,7 +45,6 @@ class WelcomeController {
     this.linkGithub = document.getElementById('link-github');
     this.inputUserName = document.getElementById('input-user-name');
     this.inputPetName = document.getElementById('input-pet-name');
-    this.toggleGlasses = document.getElementById('toggle-glasses');
     this.toggleSounds = document.getElementById('toggle-sounds');
 
     // Appearance Sliders
@@ -98,12 +96,8 @@ class WelcomeController {
           Object.assign(this.appearance, initData.appearance);
           this.applyAppearanceToInputs();
         }
-        if (initData.glassesEnabled !== undefined) {
-          this.appearance.glassesEnabled = !!initData.glassesEnabled;
-          this.toggleGlasses.checked = this.appearance.glassesEnabled;
-        }
         if (this.toggleSounds) {
-          this.toggleSounds.checked = initData.soundsEnabled === true;
+          this.toggleSounds.checked = initData.soundsEnabled !== false;
         }
         if (initData.aiProvider) {
           this.selectProvider.value = initData.aiProvider;
@@ -163,12 +157,6 @@ class WelcomeController {
     this.linkGithub?.addEventListener('click', (e) => {
       e.preventDefault();
       shell.openExternal('https://github.com/samirhusayn28-dev');
-    });
-
-    // 2. Glasses toggle live preview (G1)
-    this.toggleGlasses?.addEventListener('change', () => {
-      this.appearance.glassesEnabled = this.toggleGlasses.checked;
-      ipcRenderer.send('pet:update-glasses', this.appearance.glassesEnabled);
     });
 
     // 3. Sliders live preview
@@ -328,8 +316,7 @@ class WelcomeController {
 
     const userName = (this.inputUserName?.value || '').trim();
     const petName = (this.inputPetName?.value || 'Pixie').trim();
-    const glassesEnabled = !!this.toggleGlasses?.checked;
-    const soundsEnabled = !!this.toggleSounds?.checked;
+    const soundsEnabled = this.toggleSounds ? !!this.toggleSounds.checked : true;
     const aiProvider = this.selectProvider?.value || 'gemini';
     const aiModel = this.selectModel?.value || this.providerDefaults[aiProvider];
     const apiKey = (this.inputApiKey?.value || '').trim();
@@ -344,16 +331,14 @@ class WelcomeController {
     if (this.inputEyeSpacing) this.appearance.eyeSpacing = parseFloat(this.inputEyeSpacing.value) || 44;
     if (this.inputMouthWidth) this.appearance.mouthWidth = parseFloat(this.inputMouthWidth.value) || 14;
     if (this.inputBodyColor) this.appearance.bodyColor = this.inputBodyColor.value || '#FFFFFF';
-    if (this.inputAccentColor) this.appearance.accentColor = this.inputAccentColor.value || '#FF7A2F';
+    if (this.inputAccentColor) this.appearance.accentColor = this.inputAccentColor.value || '#007aff';
     this.appearance.primaryColor = this.appearance.accentColor;
     this.appearance.primaryGlow = this.appearance.accentColor;
-    this.appearance.glassesEnabled = glassesEnabled;
 
     ipcRenderer.send('welcome:finish', {
       save: true,
       userName,
       petName,
-      glassesEnabled,
       soundsEnabled,
       appearance: this.appearance,
       accentColor: this.appearance.accentColor,
