@@ -68,7 +68,7 @@ npm run build:win   # dist/Pixie-<version>-win-x64.exe
 npm run build:all   # both platforms in one command
 ```
 
-Current release: **1.2.0**.
+Current release: **1.2.1**.
 
 The macOS and Windows helper scripts are unpacked into `app.asar.unpacked/main/` so the typing and context helpers are available at runtime.
 
@@ -87,7 +87,7 @@ These builds are **unsigned and not notarized**.
 
 ### Windows
 
-1. Run `Pixie-1.2.0-win-x64.exe`.
+1. Run `Pixie-1.2.1-win-x64.exe`.
 2. If SmartScreen appears, choose **More info → Run anyway**.
 3. The Windows keyboard hook does not need Accessibility permission. Settings deep links open the relevant Windows Settings pages.
 

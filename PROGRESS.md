@@ -1,6 +1,6 @@
 # Pixie — Fix Progress Tracker
 
-## Current release: v1.2.0 — Black Matte UI & macOS/Windows parity
+## Current release: v1.2.1 — Black Matte UI, fixes & release packaging
 
 - [x] Solid black matte panel, pet bubble, quick menu, standalone bubble, and welcome surface
 - [x] Removed the active Panel alpha and Panel blur controls; no runtime blur/glass variables remain
@@ -11,7 +11,7 @@
 - [x] Panel reactions made immediate (pre-load reaction, forced bubbles, queue unblock, forced emotion override)
 - [x] Short random idle activities added with clamped hops and one chained timer
 - [x] OS-wide typing repaired (bounded tap retry, Settings permission request, status errors, Windows message pump)
-- [x] Version set to 1.2.0; macOS DMG/ZIP and Windows x64 NSIS installers rebuilt
+- [x] Version bumped to 1.2.1; macOS DMG/ZIP and Windows x64 NSIS installers rebuilt with Pixie-1.2.1-* naming
 - [ ] Runtime verification on a Windows machine (installer builds on macOS, but cannot be executed there)
 - [ ] Signed / notarized installers (requires Apple Developer and Windows code-signing credentials)
 

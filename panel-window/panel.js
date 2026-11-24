@@ -191,7 +191,7 @@ class PanelController {
   }
 
   applyGlassmorphismSettings() {
-    // Kept as a compatibility name for older scripts. Pixie 1.2.0 is solid
+    // Kept as a compatibility name for older scripts. Pixie v1.2.x uses solid surfaces
     // matte only: no transparency, no blur, no glass layers.
     document.documentElement.style.setProperty('--panel-transparency', '1');
     document.documentElement.style.setProperty('--panel-alpha', '1');

@@ -1,3 +1,14 @@
+## [1.2.1] - 2026-11-24 — **Idle Play, Panel Independence & Update UI**
+
+### Fixes & Improvements
+- **Dedicated Reminders**: Reminders is a visible panel section; reminder notifications route to Reminders.
+- **Instant panel reactions**: Section/action reactions fire before lazy load; forced bubbles clear stale queued reactions to prevent previous-section popups.
+- **Idle boredom play**: After ~3 minutes inactivity Pixie does random roaming/hops/reactions (look around, stretch, vibe, ball play, etc.); after long inactivity becomes sleepy/tired, then sleeps shortly after.
+- **Pet/panel independence**: Dragging the pet no longer moves the panel; idle hop movement does not move the panel. Idle hops are bounded and clamped to the work area.
+- **Smoother sounds**: Replaced bundled WAVs with softer generated sine/bell tones while keeping master/category/DND sound rules.
+- **Update trigger/UI**: Settings shows update status and a Download Update button when GitHub has a newer release; manual check and cached status are handled.
+- **Installer naming**: Release artifacts renamed to `Pixie-${version}-mac-x64.*` / `Pixie-${version}-win-x64.*`.
+
 ## [1.2.0] - 2026-11-24 — **Black Matte UI & Full macOS/Windows Parity**
 
 - **Battery-friendly theme**: Panel, pet bubble, quick menu, and welcome surface now use solid black matte colors with blue accent highlights. No blur, glass, or light-theme override remains. Removed the legacy Panel alpha and Panel blur controls from Settings.
