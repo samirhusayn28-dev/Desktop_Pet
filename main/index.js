@@ -2262,6 +2262,8 @@ ipcMain.on('system:open-permission-settings', (event, type) => {
     url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation';
   } else if (type === 'notifications') {
     url = 'x-apple.systempreferences:com.apple.preference.notifications';
+  } else if (type === 'inputMonitoring' || type === 'input') {
+    url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent';
   }
   shell.openExternal(url).catch(() => {});
 });

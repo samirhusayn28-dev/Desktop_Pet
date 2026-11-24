@@ -188,8 +188,9 @@
           <div class="settings-actions">
             <button type="button" class="tool-btn" id="set-typing-restart">Restart helper</button>
             <button type="button" class="tool-btn" id="set-typing-permissions">${IS_WINDOWS ? 'Windows settings' : 'Accessibility'}</button>
+            ${IS_WINDOWS ? '' : '<button type="button" class="tool-btn" id="set-typing-input-monitoring">Input Monitoring</button>'}
           </div>
-          <div class="tool-section-note">In-panel typing always works. For typing in other apps on macOS: open <b>System Settings → Privacy &amp; Security → Accessibility</b>, enable <b>Pixie</b>, then click <b>Restart helper</b>. If Pixie is not listed, click <b>Accessibility</b> here first, then enable it in System Settings.</div>
+          <div class="tool-section-note">In-panel typing always works. For typing in other apps on macOS: open <b>System Settings → Privacy &amp; Security → Accessibility</b>, enable <b>Pixie</b>, then click <b>Restart helper</b>. If Pixie is not listed, click <b>Accessibility</b> here first. On newer macOS, also enable Pixie in <b>Input Monitoring</b> if needed.</div>
         </section>
 
         <section class="tool-section settings-card">
@@ -323,6 +324,9 @@
                 this.refreshTypingStatus();
               });
             }
+            break;
+          case 'set-typing-input-monitoring':
+            if (this.ipc) this.ipc.send('system:open-permission-settings', 'inputMonitoring');
             break;
           case 'set-github':
             if (this.ipc) this.ipc.send('system:open-settings-pane', 'about');
