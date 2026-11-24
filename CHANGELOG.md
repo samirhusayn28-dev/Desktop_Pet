@@ -1,3 +1,9 @@
+## [1.2.3] - 2026-11-24 — **Typing Helper Fix**
+
+### Fixes
+- **macOS typing helper**: Recompiled helper with unbuffered stdout/stderr, `READY` after tap enable, and tap re-enable on timeout/disable.
+- **Accessibility guidance**: Settings now includes clearer Accessibility/Input Monitoring instructions and an Input Monitoring button.
+
 ## [1.2.2] - 2026-11-24 — **Subtle Idle Animations**
 
 ### Changes

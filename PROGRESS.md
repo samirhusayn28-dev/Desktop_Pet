@@ -1,6 +1,6 @@
 # Pixie — Fix Progress Tracker
 
-## Current release: v1.2.2 — Subtle idle animations & polish
+## Current release: v1.2.3 — Typing helper fix & accessibility guidance
 
 - [x] Solid black matte panel, pet bubble, quick menu, standalone bubble, and welcome surface
 - [x] Removed the active Panel alpha and Panel blur controls; no runtime blur/glass variables remain
@@ -11,7 +11,7 @@
 - [x] Panel reactions made immediate (pre-load reaction, forced bubbles, queue unblock, forced emotion override)
 - [x] Short random idle activities added with clamped hops and one chained timer
 - [x] OS-wide typing repaired (bounded tap retry, Settings permission request, status errors, Windows message pump)
-- [x] Version bumped to 1.2.2; idle animations refined to subtle eye/mouth movements with reduced hand actions; installers rebuilt as Pixie-1.2.2-*
+- [x] Version bumped to 1.2.3; macOS typing helper recompiled/hardened, Accessibility/Input Monitoring guidance added, installers rebuilt as Pixie-1.2.3-*
 - [ ] Runtime verification on a Windows machine (installer builds on macOS, but cannot be executed there)
 - [ ] Signed / notarized installers (requires Apple Developer and Windows code-signing credentials)
 
