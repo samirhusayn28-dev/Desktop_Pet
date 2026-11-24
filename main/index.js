@@ -470,7 +470,7 @@ function stopCursorTracking() {
 /**
  * Event-Driven Idle Monitoring using Electron powerMonitor.getSystemIdleTime
  * Triggers:
- * - Idle >= 3 min -> random boredom-relief activities (hops, reactions, roaming)
+ * - Idle >= 1 min -> random boredom-relief activities (hops, reactions, roaming)
  * - Idle >= sleepySec (default 6 min) -> sleepy/tired
  * - Idle >= sleepySec + 30s -> sleeping
  * - Any activity -> stops play and wakes up (surprised -> neutral)
@@ -483,7 +483,7 @@ function startIdleMonitoring() {
 
     try {
       const idleSec = powerMonitor.getSystemIdleTime();
-      const playSec = 180; // 3 minutes of inactivity before random play starts
+      const playSec = 60; // 1 minute of inactivity before random play starts
       const sleepySec = Math.max(240, (store.get('settings.behavior.idleSleepyMinutes') || 6) * 60);
       // Sleep follows shortly after sleepy/tired, matching "after a few seconds he sleeps".
       const sleepingSec = sleepySec + 30;
@@ -1019,6 +1019,10 @@ function startTypingHelper(force = false) {
     return;
   }
 
+  if (process.platform === 'darwin') {
+    try { fs.chmodSync(helperPath, 0o755); } catch (error) {}
+  }
+
   // macOS needs an Accessibility grant. Ask from the app itself (not from a
   // detached helper) so TCC attributes the prompt to Pixie. Auto retries do
   // not re-prompt; the Settings button or Restart helper can do that.
@@ -1084,7 +1088,7 @@ function startTypingHelper(force = false) {
           typingHelperErrorLogged = true;
         }
       } else {
-        typingHelperLastError = 'Accessibility permission is required for OS-wide typing. Grant it to Pixie, then use Restart helper.';
+        typingHelperLastError = 'Accessibility permission required. Open System Settings → Privacy & Security → Accessibility, enable Pixie, then click Restart helper in Pixie Settings.';
         if (!typingHelperErrorLogged) {
           console.warn('[Pixie] Global typing needs Accessibility permission. Enable Pixie in System Settings > Privacy & Security > Accessibility, then use Restart helper.');
           typingHelperErrorLogged = true;

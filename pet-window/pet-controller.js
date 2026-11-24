@@ -85,7 +85,7 @@ const FACE_BOX = GEO.FACE_BOX || Object.freeze({
   minX: FACE.x - 33, maxX: FACE.x + 33,
   minY: FACE.y - 15, maxY: FACE.y + 33
 });
-const LOOK = GEO.LOOK || Object.freeze({ x:11, y:3, pad:6 });
+const LOOK = GEO.LOOK || Object.freeze({ x:11, y:9, pad:6 });
 const SHY_BLUSH = GEO.SHY_BLUSH !== undefined ? GEO.SHY_BLUSH : 0.33;
 const BODY_X1 = BODY.x + BODY.w, BODY_Y1 = BODY.y + BODY.h;
 
@@ -235,6 +235,8 @@ class CoucouAnimator {
     this.lastNx = undefined;
     this.lastNy = undefined;
     this.lastApproachReactionAt = 0;
+    this.lastScaredReactionAt = 0;
+    this.lastDizzyReactionAt = 0;
     this.sp = 0;
     this.slowCount = 0;
     this.lastLunch = '';
@@ -322,7 +324,11 @@ class CoucouAnimator {
       const now = performance.now();
       this.wheels = this.wheels.filter(t => now - t < 1000);
       this.wheels.push(now);
-      if (this.wheels.length >= 8) { this.wheels = []; this.tryMood('dizzy', 2500); }
+      if (this.wheels.length >= 12 && now - this.lastDizzyReactionAt > 10000) {
+        this.wheels = [];
+        this.lastDizzyReactionAt = now;
+        this.tryMood('dizzy', 2200);
+      }
     }, { passive: true });
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) { this.activity(); this.tryMood('playful', 2500); }
@@ -746,7 +752,7 @@ class CoucouAnimator {
   }
 
   isLocalIdle() {
-    return (Date.now() - this.lastAct) / 1000 > 180 * this.idleK;
+    return (Date.now() - this.lastAct) / 1000 > 60 * this.idleK;
   }
 
   async runIdleActivity() {
@@ -760,23 +766,20 @@ class CoucouAnimator {
     this.idleActivityRunning = true;
     const pick = Math.random();
     try {
-      if (pick < 0.16)      await this.idleRoam();
-      else if (pick < 0.30) await this.idleHop(true);
-      else if (pick < 0.42) await this.hello();
-      else if (pick < 0.52) await this.clap();
-      else if (pick < 0.64) await this.vibe();
-      else if (pick < 0.74) await this.facePlay();
-      else if (pick < 0.84) await this.ballPlay();
-      else if (pick < 0.92) await this.idleLookAround();
-      else                  await this.idleStretch();
+      if (pick < 0.35)      await this.idleEyeWander();
+      else if (pick < 0.65) await this.idleMumble();
+      else if (pick < 0.80) await this.idleLookAround();
+      else if (pick < 0.90) await this.idleStretch();
+      else if (pick < 0.95) await this.hello();
+      else                  await this.facePlay();
     } finally {
       this.busy = false;
       this.lastIdleActivityAt = Date.now();
       if (token !== this.idleToken) return;
       this.idleActivityRunning = false;
       if (this.idleSignalActive || this.isLocalIdle()) {
-        // One short timer only. No RAF or extra watchers are added at idle.
-        this.scheduleIdleActivity(5000 + Math.round(Math.random() * 6000));
+        // Subtle idle animations; one timer only.
+        this.scheduleIdleActivity(4000 + Math.round(Math.random() * 5000));
       }
     }
   }
@@ -826,6 +829,35 @@ class CoucouAnimator {
       this.pose('hidden');
       await this.wait(380);
     }
+    this.setMouth();
+  }
+
+  async idleEyeWander() {
+    const token = this.animToken;
+    this.busy = true;
+    const glances = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < glances; i++) {
+      if (!this.animationCurrent(token)) return;
+      this.look.tx = (Math.random() * 2 - 1) * 0.85;
+      this.look.ty = (Math.random() * 2 - 1) * 0.65;
+      await this.wait(700 + Math.round(Math.random() * 900));
+    }
+    if (!this.animationCurrent(token)) return;
+    this.look.tx = 0;
+    this.look.ty = 0;
+  }
+
+  async idleMumble() {
+    const token = this.animToken;
+    this.busy = true;
+    const shapes = ['tiny_smile', 'tiny_o', 'smile', 'tiny_o', 'open_smile', 'tiny_smile', 'tiny_o', 'smile'];
+    const count = 4 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < count; i++) {
+      if (!this.animationCurrent(token)) return;
+      this.setMouth(shapes[Math.floor(Math.random() * shapes.length)]);
+      await this.wait(140 + Math.round(Math.random() * 180));
+    }
+    if (!this.animationCurrent(token)) return;
     this.setMouth();
   }
 
@@ -940,7 +972,7 @@ class CoucouAnimator {
       }
       return;
     }
-    if (idle > 180 * this.idleK && !this.idleSignalActive && !this.idleActivityTimer && !this.idleActivityRunning) {
+    if (idle > 60 * this.idleK && !this.idleSignalActive && !this.idleActivityTimer && !this.idleActivityRunning) {
       this.onIdleSignal();
     }
   }
@@ -1041,7 +1073,10 @@ class CoucouAnimator {
       const dt = this.cursorDtMs / 1000;
       const approachRate = (this.lastNormDist !== undefined ? this.lastNormDist : dist) - dist;
       const rate = approachRate / dt;
-      if (rate > 4.5 && dist < 0.7 && dist > 0.1 && !this.inside) this.tryMood('scared', 2200);
+      if (rate > 7 && dist < 0.5 && dist > 0.1 && !this.inside && now - this.lastScaredReactionAt > 8000) {
+        this.lastScaredReactionAt = now;
+        this.tryMood('scared', 1800);
+      }
       if (!this.inside && !this.c.isDragging && dist < 0.35 && dist > 0.08 &&
           now - this.lastApproachReactionAt > 6000) {
         this.lastApproachReactionAt = now;
@@ -1055,7 +1090,10 @@ class CoucouAnimator {
       const dx = nx - this.lastNx, dy = ny - this.lastNy;
       const speed = Math.hypot(dx, dy) / (this.cursorDtMs / 1000);
       this.sp = this.sp * 0.8 + speed * 0.2;
-      if (speed > 2.2 && dist < 0.9) this.tryMood('scared', 2200);
+      if (speed > 4 && dist < 0.6 && now - this.lastScaredReactionAt > 8000) {
+        this.lastScaredReactionAt = now;
+        this.tryMood('scared', 1800);
+      }
       if (dist < 0.35 && speed > 0.03 && speed < 0.4) {
         if (++this.slowCount > 25) { this.slowCount = 0; this.tryMood('curious', 2500); }
       } else this.slowCount = 0;
@@ -1085,7 +1123,11 @@ class CoucouAnimator {
       } else this.ang = 0;
       this.lastA = a;
       this.angT = now;
-      if (Math.abs(this.ang) > 9.5 && dist < 1) { this.ang = 0; this.tryMood('dizzy', 3000); }
+      if (Math.abs(this.ang) > 12 && dist < 1 && now - this.lastDizzyReactionAt > 10000) {
+        this.ang = 0;
+        this.lastDizzyReactionAt = now;
+        this.tryMood('dizzy', 2200);
+      }
     }
     this.lastNx = nx;
     this.lastNy = ny;
@@ -1095,8 +1137,13 @@ class CoucouAnimator {
     const x = window.screenX || 0, y = window.screenY || 0;
     const d = Math.hypot(x - this.wx, y - this.wy);
     this.wx = x; this.wy = y;
-    if (d > 60) this.tryMood('dizzy', 2500);
-    else if (d > 25) this.tryMood('startled', 1200);
+    const now = performance.now();
+    if (d > 90 && now - this.lastDizzyReactionAt > 10000) {
+      this.lastDizzyReactionAt = now;
+      this.tryMood('dizzy', 2200);
+    } else if (d > 40) {
+      this.tryMood('startled', 1000);
+    }
   }
 
   timeCheck() {
@@ -1203,6 +1250,8 @@ class CoucouController {
     this.lastNormDist = 0;
     this.lastCursorUpdateAt = 0;
     this.lastApproachReactionAt = 0;
+    this.lastScaredReactionAt = 0;
+    this.lastDizzyReactionAt = 0;
     this.idleBehaviorTimer = null;
     this.idleGlanceTimer = null;
     this.isIdleGlancing = false;

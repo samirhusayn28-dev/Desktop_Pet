@@ -71,7 +71,7 @@ assert(/clamp\(Math\.round\(Number\(dx\) \|\| 0\), -\d+, \d+\)/.test(hopBlock), 
 assert(/clamp\(Math\.round\(Number\(dy\) \|\| 0\), -\d+, \d+\)/.test(hopBlock), 'idle hop Y delta must be bounded');
 assert(hopBlock.includes('area.x + area.width - w'), 'idle hops must be clamped to the work area');
 assert(mainJs.includes("send('pet:idle-play')"), 'main must signal playtime on system idle');
-assert(mainJs.includes('playSec = 180') || mainJs.includes('playSec=180'), 'boredom play should start after ~3 minutes idle');
+assert(mainJs.includes('playSec = 60') || mainJs.includes('playSec=60'), 'boredom play should start after ~1 minute idle');
 console.log('✓ Idle play is random, bounded, and clamped on screen.');
 
 // 4. OS-wide typing

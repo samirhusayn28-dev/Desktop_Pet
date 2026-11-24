@@ -20,7 +20,7 @@
     minX: FACE.x - FACE_EXTENT.x, maxX: FACE.x + FACE_EXTENT.x,
     minY: FACE.y - FACE_EXTENT.top, maxY: FACE.y + FACE_EXTENT.bottom
   });
-  const LOOK = Object.freeze({ x:11, y:3, pad:6 });
+  const LOOK = Object.freeze({ x:11, y:9, pad:6 });
   const SHY_BLUSH = 0.33;
 
   const GEOMETRY = Object.freeze({

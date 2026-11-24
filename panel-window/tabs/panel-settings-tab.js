@@ -189,7 +189,7 @@
             <button type="button" class="tool-btn" id="set-typing-restart">Restart helper</button>
             <button type="button" class="tool-btn" id="set-typing-permissions">${IS_WINDOWS ? 'Windows settings' : 'Accessibility'}</button>
           </div>
-          <div class="tool-section-note">In-panel typing always works. For other apps, keep the helper ready; on macOS grant Accessibility to Pixie, then restart the helper if needed.</div>
+          <div class="tool-section-note">In-panel typing always works. For typing in other apps on macOS: open <b>System Settings → Privacy &amp; Security → Accessibility</b>, enable <b>Pixie</b>, then click <b>Restart helper</b>. If Pixie is not listed, click <b>Accessibility</b> here first, then enable it in System Settings.</div>
         </section>
 
         <section class="tool-section settings-card">
@@ -533,18 +533,20 @@
 
         let label;
         let state = 'info';
-        if (status.error) {
+        if (status.accessibility === 'denied' && !windowsHook) {
+          label = 'Accessibility not granted. Go to System Settings → Privacy & Security → Accessibility, enable Pixie, then click Restart helper.';
+          state = 'error';
+        } else if (status.error) {
           label = status.error;
           state = 'error';
         } else if (!status.running) {
-          label = 'Helper is not running. In-panel typing still works.';
+          label = 'Helper is not running. Click Restart helper. In-panel typing still works.';
+          state = 'error';
         } else if (!status.ready) {
           label = 'Helper is starting…';
         } else if (windowsHook) {
           label = 'Ready — Windows keyboard hook is active.';
           state = 'pass';
-        } else if (status.accessibility !== 'granted') {
-          label = 'Helper is running but needs Accessibility permission.';
         } else {
           label = 'Ready — Pixie can animate while you type in any app.';
           state = 'pass';

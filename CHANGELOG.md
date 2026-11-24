@@ -1,3 +1,11 @@
+## [1.2.2] - 2026-11-24 — **Subtle Idle Animations**
+
+### Changes
+- **Removed over-animations**: No more jumping/hopping from place to place during idle boredom play.
+- **Reduced hand animations**: Hand/pose actions are rare during idle; most idle time uses subtle animations.
+- **New classy idle animations**: Eyes gently wander around the screen; mouth occasionally moves as if speaking (mouth-only mumble), without overacting.
+- **Sleep progression preserved**: After long inactivity Pixie still gets sleepy/dizzy-eyed, then falls asleep after a short delay.
+
 ## [1.2.1] - 2026-11-24 — **Idle Play, Panel Independence & Update UI**
 
 ### Fixes & Improvements
